@@ -16,7 +16,9 @@ assets-cache/
 viewer/node_modules/
 viewer/dist/
 desktop/build/bin/
-desktop/frontend/dist/
+desktop/frontend/dist/*
+!desktop/frontend/dist/.gitkeep
+desktop/frontend/wailsjs/
 
 # Generated debug output
 *.pb
@@ -24,3 +26,4 @@ out/
 
 # Local tool config
 .claude/
+viewer/package.json.md5

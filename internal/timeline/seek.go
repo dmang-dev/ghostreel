@@ -23,7 +23,7 @@ type UnitState struct {
 // State is the whole game at one loop.
 type State struct {
 	Loop  uint32
-	Units []UnitState            // sorted by ID
+	Units []UnitState                // sorted by ID
 	Stats map[uint32]*pb.PlayerStats // latest per player at or before Loop
 }
 

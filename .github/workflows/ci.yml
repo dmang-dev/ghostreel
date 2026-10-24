@@ -14,6 +14,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l cmd internal)"
       - run: go vet ./...
       # Real replays are never committed, so replay-backed tests skip here.
       - run: go test ./...

@@ -12,6 +12,8 @@
 //	GET  /api/r/{id}/map           map JSON (404 when no map)
 //	GET  /api/r/{id}/minimap       PNG (404 when none)
 //	POST /api/r/{id}/map           body = map bytes, X-Filename header → Summary
+//	POST /api/r/{id}/download-map  fetch the map from Blizzard's depot (user-initiated) → Summary
+//	GET  /api/startup              Summary of a replay opened at launch, or null
 package server
 
 import (
@@ -40,28 +42,33 @@ type Server struct {
 	Library []string
 	// Static serves the built viewer; nil serves only the API.
 	Static fs.FS
+	// Startup, if set, is a replay already loaded at launch (desktop "Open
+	// with"); the viewer shows it on start.
+	Startup *app.Loaded
 }
 
 // Summary is what the viewer needs to know after loading a replay.
 type Summary struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	MapTitle  string   `json:"mapTitle"`
-	Duration  string   `json:"duration"`
-	Version   string   `json:"version"`
-	Approx    int      `json:"protocolApproxFrom,omitempty"`
-	HasMap    bool     `json:"hasMap"`
-	MapHow    string   `json:"mapHow,omitempty"`
-	MapError  string   `json:"mapError,omitempty"`
-	FromCache bool     `json:"fromCache"`
-	Players   []string `json:"players"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	MapTitle  string `json:"mapTitle"`
+	Duration  string `json:"duration"`
+	Version   string `json:"version"`
+	Approx    int    `json:"protocolApproxFrom,omitempty"`
+	HasMap    bool   `json:"hasMap"`
+	MapHow    string `json:"mapHow,omitempty"`
+	MapError  string `json:"mapError,omitempty"`
+	FromCache bool   `json:"fromCache"`
+	// CanDownload: the map is missing but Blizzard's depot has it.
+	CanDownload bool     `json:"canDownload"`
+	Players     []string `json:"players"`
 }
 
 func summarize(l *app.Loaded) Summary {
 	s := Summary{
 		ID: l.ID, Name: l.Name, MapTitle: l.Info.MapTitle, Duration: replay.FormatClock(l.Info.Loops),
 		Version: l.Info.Version, Approx: l.Info.ProtocolApproxFrom, HasMap: l.Map != nil,
-		MapHow: string(l.MapHow), MapError: l.MapErr, FromCache: l.FromCache,
+		MapHow: string(l.MapHow), MapError: l.MapErr, FromCache: l.FromCache, CanDownload: l.CanDownload(),
 	}
 	for _, p := range l.Info.Players {
 		s.Players = append(s.Players, p.Name)
@@ -88,6 +95,26 @@ func (s *Server) Handler() http.Handler {
 		return l.Minimap, "image/png"
 	}))
 	mux.HandleFunc("POST /api/r/{id}/map", s.setMap)
+	mux.HandleFunc("POST /api/r/{id}/download-map", func(w http.ResponseWriter, r *http.Request) {
+		l, err := s.App.DownloadMap(r.Context(), r.PathValue("id"))
+		if err != nil {
+			httpError(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+		writeJSON(w, summarize(l))
+	})
+	mux.HandleFunc("GET /api/startup", func(w http.ResponseWriter, r *http.Request) {
+		if s.Startup == nil {
+			writeJSON(w, nil)
+			return
+		}
+		// Later loads may have replaced it (map picked, map downloaded).
+		l := s.App.Get(s.Startup.ID)
+		if l == nil {
+			l = s.Startup
+		}
+		writeJSON(w, summarize(l))
+	})
 	if s.Static != nil {
 		mux.Handle("/", http.FileServerFS(s.Static))
 	}

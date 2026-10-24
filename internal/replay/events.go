@@ -68,11 +68,11 @@ type PositionSample struct {
 // PlayerStats is the subset of the periodic score snapshot the viewer shows.
 // Supply values are already converted from the game's ×4096 fixed point.
 type PlayerStats struct {
-	SupplyUsed, SupplyMade   float64
-	Minerals, Vespene        int64
-	MineralRate, VespeneRate int64 // collection rate per in-game minute
-	Workers                  int64
-	ArmyMinerals, ArmyGas    int64 // value of the active army
-	LostMinerals, LostGas    int64 // total resources lost (army + economy + tech)
+	SupplyUsed, SupplyMade    float64
+	Minerals, Vespene         int64
+	MineralRate, VespeneRate  int64 // collection rate per in-game minute
+	Workers                   int64
+	ArmyMinerals, ArmyGas     int64 // value of the active army
+	LostMinerals, LostGas     int64 // total resources lost (army + economy + tech)
 	KilledMinerals, KilledGas int64
 }

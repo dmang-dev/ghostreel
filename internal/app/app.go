@@ -47,10 +47,10 @@ type Service struct {
 
 // Loaded is one replay ready for viewing.
 type Loaded struct {
-	ID       string // replay content hash
-	Name     string // file name the replay came from
-	Info     replay.Info
-	Timeline []byte // binary timeline
+	ID        string // replay content hash
+	Name      string // file name the replay came from
+	Info      replay.Info
+	Timeline  []byte // binary timeline
 	FromCache bool
 
 	Map     []byte // mapfile.Export JSON; nil when no map was found
@@ -148,9 +148,39 @@ func (s *Service) LoadBytes(ctx context.Context, name string, data []byte) (*Loa
 	}
 	l.Info.Hash = id
 
-	s.attachMap(ctx, l, "")
+	s.attachMap(ctx, l, "", s.Resolver)
 	s.put(l)
 	return l, nil
+}
+
+// DownloadMap retries the map lookup with depot downloads allowed for this
+// one replay. It is what the viewer's "download from Blizzard" button calls,
+// so a download only ever happens on the user's explicit request.
+func (s *Service) DownloadMap(ctx context.Context, id string) (*Loaded, error) {
+	l := s.Get(id)
+	if l == nil {
+		return nil, fmt.Errorf("replay %s is not loaded", id)
+	}
+	if l.Info.MapHandle == nil {
+		return nil, errors.New("this replay's map isn't on Blizzard's depot (it was played on a local map file)")
+	}
+	if s.Resolver == nil {
+		return nil, errors.New("map lookup disabled")
+	}
+	r := *s.Resolver
+	r.AllowNetwork = true
+	cp := *l
+	s.attachMap(ctx, &cp, "", &r)
+	if cp.Map == nil {
+		return nil, errors.New(cp.MapErr)
+	}
+	s.put(&cp)
+	return &cp, nil
+}
+
+// CanDownload reports whether DownloadMap could find this replay's map.
+func (l *Loaded) CanDownload() bool {
+	return l.Map == nil && l.Info.MapHandle != nil && l.Info.MapHandle.DepotURL != ""
 }
 
 // SetMap loads a replay's map from a file the user picked.
@@ -172,7 +202,7 @@ func (s *Service) SetMap(ctx context.Context, id string, name string, data []byt
 		return nil, err
 	}
 	cp := *l
-	s.attachMap(ctx, &cp, p)
+	s.attachMap(ctx, &cp, p, s.Resolver)
 	if cp.Map == nil {
 		return nil, errors.New(cp.MapErr)
 	}
@@ -182,13 +212,13 @@ func (s *Service) SetMap(ctx context.Context, id string, name string, data []byt
 
 // attachMap resolves and decodes the map; failures are recorded, not fatal,
 // so the viewer can still play on a blank grid.
-func (s *Service) attachMap(ctx context.Context, l *Loaded, manual string) {
+func (s *Service) attachMap(ctx context.Context, l *Loaded, manual string, r *mapcache.Resolver) {
 	l.Map, l.Minimap, l.MapErr, l.MapHow = nil, nil, "", ""
-	if s.Resolver == nil {
+	if r == nil {
 		l.MapErr = "map lookup disabled"
 		return
 	}
-	path, how, err := s.Resolver.Resolve(ctx, &l.Info, manual)
+	path, how, err := r.Resolve(ctx, &l.Info, manual)
 	if err != nil {
 		l.MapErr = err.Error()
 		s.logf("%s: %v", l.Name, err)

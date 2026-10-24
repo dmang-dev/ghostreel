@@ -106,15 +106,23 @@ func guess(name string) Unit {
 }
 
 // Shorthands for the table below.
-func army(radius, speed float64) Unit    { return Unit{Class: ClassArmy, Radius: radius, Speed: speed} }
-func air(radius, speed float64) Unit     { return Unit{Class: ClassArmy, Radius: radius, Speed: speed, Air: true} }
-func worker(radius, speed float64) Unit  { return Unit{Class: ClassWorker, Radius: radius, Speed: speed} }
-func bld(w, h int) Unit                  { return Unit{Class: ClassBuilding, FootprintW: w, FootprintH: h} }
-func movable(u Unit) Unit                { u.Movable = true; return u }
-func flying(w int, speed float64) Unit   { return Unit{Class: ClassBuilding, FootprintW: w, FootprintH: w, Radius: float64(w) / 2, Speed: speed, Movable: true, Air: true} }
-func uprooted(speed float64) Unit        { return Unit{Class: ClassBuilding, FootprintW: 2, FootprintH: 2, Radius: 1, Speed: speed, Movable: true} }
-func static(radius float64) Unit         { return Unit{Class: ClassArmy, Radius: radius} }
-func hidden() Unit                       { return Unit{Class: ClassHidden} }
+func army(radius, speed float64) Unit { return Unit{Class: ClassArmy, Radius: radius, Speed: speed} }
+func air(radius, speed float64) Unit {
+	return Unit{Class: ClassArmy, Radius: radius, Speed: speed, Air: true}
+}
+func worker(radius, speed float64) Unit {
+	return Unit{Class: ClassWorker, Radius: radius, Speed: speed}
+}
+func bld(w, h int) Unit   { return Unit{Class: ClassBuilding, FootprintW: w, FootprintH: h} }
+func movable(u Unit) Unit { u.Movable = true; return u }
+func flying(w int, speed float64) Unit {
+	return Unit{Class: ClassBuilding, FootprintW: w, FootprintH: w, Radius: float64(w) / 2, Speed: speed, Movable: true, Air: true}
+}
+func uprooted(speed float64) Unit {
+	return Unit{Class: ClassBuilding, FootprintW: 2, FootprintH: 2, Radius: 1, Speed: speed, Movable: true}
+}
+func static(radius float64) Unit { return Unit{Class: ClassArmy, Radius: radius} }
+func hidden() Unit               { return Unit{Class: ClassHidden} }
 
 // Speeds are cells per game second at Normal speed (multiply by 1.4 for the
 // Faster clock). Radii are collision radii in cells.
@@ -179,7 +187,7 @@ var table = map[string]Unit{
 	"RoachWarren": bld(3, 3), "BanelingNest": bld(3, 3), "HydraliskDen": bld(3, 3), "LurkerDenMP": bld(3, 3),
 	"InfestationPit": bld(3, 3), "Spire": bld(3, 3), "GreaterSpire": bld(3, 3), "NydusNetwork": bld(3, 3),
 	"UltraliskCavern": bld(3, 3),
-	"SpineCrawler": movable(bld(2, 2)), "SporeCrawler": movable(bld(2, 2)),
+	"SpineCrawler":    movable(bld(2, 2)), "SporeCrawler": movable(bld(2, 2)),
 	"SpineCrawlerUprooted": uprooted(1), "SporeCrawlerUprooted": uprooted(1),
 
 	// UI-only units that show up in tracker events.
