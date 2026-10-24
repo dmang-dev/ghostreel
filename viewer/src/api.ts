@@ -14,6 +14,8 @@ export interface Summary {
   mapHow?: string;
   mapError?: string;
   fromCache: boolean;
+  /** The map is missing but Blizzard's depot has it. */
+  canDownload: boolean;
   players: string[];
 }
 
@@ -86,6 +88,17 @@ export async function openFromLibrary(name: string): Promise<Summary> {
     body: JSON.stringify({ name }),
   });
   return (await check(resp)).json();
+}
+
+/** Asks the server to fetch the map from Blizzard's depot (user-initiated). */
+export async function downloadMap(id: string): Promise<Summary> {
+  return (await check(await fetch(`/api/r/${id}/download-map`, { method: "POST" }))).json();
+}
+
+/** A replay the desktop app was launched with, or null. */
+export async function startup(): Promise<Summary | null> {
+  const resp = await fetch("/api/startup");
+  return resp.ok ? resp.json() : null;
 }
 
 export async function setMapFile(id: string, file: File): Promise<Summary> {

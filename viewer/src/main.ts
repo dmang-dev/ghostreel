@@ -95,19 +95,21 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   scrub.disabled = false;
   $("mapbanner").hidden = summary.hasMap;
   $("maperror").textContent = summary.mapError ?? "";
+  $("downloadmap").hidden = !summary.canDownload;
   buildPlayers();
   drawMarks();
   sizeMinimap();
   updatePanels(true);
 }
 
-async function pickMap(file: File): Promise<void> {
+/** Replaces the current replay's map (picked file or depot download), keeping the playback position. */
+async function replaceMap(get: (id: string) => Promise<api.Summary>, label: string): Promise<void> {
   if (!cur) return;
   const c = cur;
-  $("loading-text").textContent = `Reading ${file.name}…`;
+  $("loading-text").textContent = label;
   $("loading").hidden = false;
   try {
-    const summary = await api.setMapFile(c.summary.id, file);
+    const summary = await get(c.summary.id);
     const [map, minimap] = await Promise.all([api.fetchMap(summary.id), api.fetchMinimap(summary.id)]);
     const at = loop;
     show(summary, c.model, map, minimap);
@@ -118,6 +120,8 @@ async function pickMap(file: File): Promise<void> {
     $("loading").hidden = true;
   }
 }
+
+const pickMap = (file: File) => replaceMap((id) => api.setMapFile(id, file), `Reading ${file.name}…`);
 
 function showError(msg: string): void {
   $("error").textContent = msg;
@@ -449,6 +453,7 @@ $<HTMLInputElement>("file").onchange = (e) => {
   (e.target as HTMLInputElement).value = "";
 };
 $("pickmap").onclick = () => $<HTMLInputElement>("mapfile").click();
+$("downloadmap").onclick = () => replaceMap(api.downloadMap, "Downloading the map from Blizzard…");
 $<HTMLInputElement>("mapfile").onchange = (e) => {
   const f = (e.target as HTMLInputElement).files?.[0];
   if (f) pickMap(f);
@@ -585,10 +590,17 @@ api.library().then((entries) => {
   // No library endpoint (or server down): the file picker still works.
 });
 
-// ?replay=<name> opens a library replay directly (handy for links and tests).
+// ?replay=<name> opens a library replay directly (handy for links and tests);
+// otherwise show the replay the desktop app was launched with, if any.
 {
   const name = new URLSearchParams(location.search).get("replay");
-  if (name) load(() => api.openFromLibrary(name), name);
+  if (name) {
+    load(() => api.openFromLibrary(name), name);
+  } else {
+    api.startup().then((s) => {
+      if (s) load(async () => s, s.name);
+    }).catch(() => {});
+  }
 }
 
 // Benchmark hook for the Phase 1 gate: renders `frames` frames spread over the
