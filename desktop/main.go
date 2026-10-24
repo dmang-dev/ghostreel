@@ -24,22 +24,32 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
 	"github.com/OWNER/ghostreel/internal/app"
+	"github.com/OWNER/ghostreel/internal/assets"
 	"github.com/OWNER/ghostreel/internal/server"
 )
 
 // The viewer build, written here by `wails build` (see wails.json).
 //
 //go:embed all:frontend/dist
-var assets embed.FS
+var viewerFS embed.FS
 
 func main() {
-	dist, err := fs.Sub(assets, "frontend/dist")
+	dist, err := fs.Sub(viewerFS, "frontend/dist")
 	if err != nil {
 		log.Fatal(err)
 	}
 	svc := app.New() // timelines cached under the user cache dir; depot downloads only on request
 	svc.Log = func(format string, a ...any) { log.Printf(format, a...) }
 	srv := &server.Server{App: svc, Library: replayFolders()}
+	if dir := assets.FindInstall(); dir != "" {
+		go func() { // reading the game data takes a moment; the 2D view needs none of it
+			if l, err := assets.Open(dir, svc.CacheDir); err != nil {
+				log.Printf("3D models unavailable: %v", err)
+			} else {
+				srv.SetAssets(l)
+			}
+		}()
+	}
 
 	// "Open with ghostreel": a replay passed on the command line opens at start.
 	if len(os.Args) > 1 && strings.EqualFold(filepath.Ext(os.Args[1]), ".SC2Replay") {

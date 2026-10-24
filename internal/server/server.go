@@ -14,6 +14,10 @@
 //	POST /api/r/{id}/map           body = map bytes, X-Filename header → Summary
 //	POST /api/r/{id}/download-map  fetch the map from Blizzard's depot (user-initiated) → Summary
 //	GET  /api/startup              Summary of a replay opened at launch, or null
+//	GET  /api/assets               {available, build}: whether 3D models can be served
+//	GET  /api/assets/unit/{type}   binary glTF of a unit type's model (404 when none)
+//	GET  /api/assets/death/{type}  binary glTF of its death model (404 when none)
+//	GET  /api/assets/icon/{type}   PNG command-card icon (404 when none)
 package server
 
 import (
@@ -27,8 +31,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/OWNER/ghostreel/internal/app"
+	"github.com/OWNER/ghostreel/internal/assets"
+	"github.com/OWNER/ghostreel/internal/casc"
 	"github.com/OWNER/ghostreel/internal/replay"
 )
 
@@ -45,7 +52,13 @@ type Server struct {
 	// Startup, if set, is a replay already loaded at launch (desktop "Open
 	// with"); the viewer shows it on start.
 	Startup *app.Loaded
+
+	assets atomic.Pointer[assets.Library]
 }
+
+// SetAssets makes 3D models available once the game data has been opened
+// (which takes a moment, so callers may do it in the background).
+func (s *Server) SetAssets(l *assets.Library) { s.assets.Store(l) }
 
 // Summary is what the viewer needs to know after loading a replay.
 type Summary struct {
@@ -117,10 +130,49 @@ func (s *Server) Handler() http.Handler {
 		}
 		writeJSON(w, summarize(l))
 	})
+	mux.HandleFunc("GET /api/assets", func(w http.ResponseWriter, r *http.Request) {
+		l := s.assets.Load()
+		if l == nil {
+			writeJSON(w, map[string]any{"available": false})
+			return
+		}
+		writeJSON(w, map[string]any{"available": true, "build": l.Build()})
+	})
+	mux.HandleFunc("GET /api/assets/unit/{type}", s.asset("model/gltf-binary", func(l *assets.Library, t string) ([]byte, error) {
+		return l.UnitGLB(t, false)
+	}))
+	mux.HandleFunc("GET /api/assets/death/{type}", s.asset("model/gltf-binary", func(l *assets.Library, t string) ([]byte, error) {
+		return l.UnitGLB(t, true)
+	}))
+	mux.HandleFunc("GET /api/assets/icon/{type}", s.asset("image/png", (*assets.Library).IconPNG))
 	if s.Static != nil {
 		mux.Handle("/", http.FileServerFS(s.Static))
 	}
 	return mux
+}
+
+// asset serves one converted asset. Models are immutable for a game build,
+// so the viewer may cache them.
+func (s *Server) asset(mime string, get func(*assets.Library, string) ([]byte, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := s.assets.Load()
+		if l == nil {
+			httpError(w, http.StatusNotFound, errors.New("no game data: 3D models are unavailable"))
+			return
+		}
+		b, err := get(l, r.PathValue("type"))
+		if err != nil {
+			code := http.StatusInternalServerError
+			if errors.Is(err, assets.ErrNoModel) || errors.Is(err, os.ErrNotExist) || errors.Is(err, casc.ErrNotLocal) {
+				code = http.StatusNotFound
+			}
+			httpError(w, code, err)
+			return
+		}
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "private, max-age=86400")
+		w.Write(b)
+	}
 }
 
 func (s *Server) library(w http.ResponseWriter, r *http.Request) {

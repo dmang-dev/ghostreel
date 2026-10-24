@@ -16,6 +16,7 @@ Usage:
   ghostreel dump-map <map|replay> -o map.json     decode a map (also writes a hillshade PNG)
   ghostreel serve [--addr :8080]                  serve the viewer and its API
   ghostreel accuracy <replay> [--engine x.pb.gz]  compare a timeline with engine ground truth
+  ghostreel assets [unit type...]                 convert 3D models from the local game data
 
 Run "ghostreel <command> -h" for a command's flags.
 `
@@ -31,6 +32,7 @@ func main() {
 		"dump-map":      cmdDumpMap,
 		"serve":         cmdServe,
 		"accuracy":      cmdAccuracy,
+		"assets":        cmdAssets,
 	}
 	cmd, ok := cmds[os.Args[1]]
 	if !ok {

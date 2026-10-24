@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/OWNER/ghostreel/internal/app"
+	"github.com/OWNER/ghostreel/internal/assets"
 	"github.com/OWNER/ghostreel/internal/server"
 )
 
@@ -21,6 +22,7 @@ func cmdServe(args []string) error {
 	replays := fs.String("replays", "", "folders of replays to list in the viewer, "+string(os.PathListSeparator)+"-separated")
 	static := fs.String("static", filepath.Join("viewer", "dist"), "built viewer to serve (npm run build in viewer/)")
 	commands := fs.Bool("commands", false, "keep player commands in timelines (slow on long games)")
+	gameData := fs.String("gamedata", assets.FindInstall(), "game installation for 3D models (the folder with .build.info); empty disables them")
 	rf := addResolverFlags(fs)
 	fs.Parse(reorder(fs, args))
 
@@ -32,6 +34,19 @@ func cmdServe(args []string) error {
 	}
 	svc.Log = func(format string, a ...any) { log.Printf(format, a...) }
 	srv := &server.Server{App: svc, Library: filepath.SplitList(*replays)}
+	if *gameData != "" {
+		go func() {
+			l, err := assets.Open(*gameData, svc.CacheDir)
+			if err != nil {
+				log.Printf("3D models unavailable: %v", err)
+				return
+			}
+			srv.SetAssets(l)
+			log.Printf("3D models from %s (build %s)", *gameData, l.Build())
+		}()
+	} else {
+		log.Printf("no game installation found: the 3D view uses stand-in shapes (set --gamedata)")
+	}
 	if fi, err := os.Stat(*static); err == nil && fi.IsDir() {
 		srv.Static = os.DirFS(*static)
 	} else {

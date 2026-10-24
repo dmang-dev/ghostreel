@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -336,4 +337,31 @@ func (l *Library) IconPNG(unit string) ([]byte, error) {
 		return nil, fmt.Errorf("%w (icon %s is not in the game data)", ErrNoModel, path)
 	}
 	return b, nil
+}
+
+// FindInstall returns the game installation folder (the one holding
+// .build.info): $GHOSTREEL_GAMEDATA, else the platform's default install
+// location. It returns "" when none is found.
+func FindInstall() string {
+	cands := filepath.SplitList(os.Getenv("GHOSTREEL_GAMEDATA"))
+	switch runtime.GOOS {
+	case "windows":
+		for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles"} {
+			if p := os.Getenv(env); p != "" {
+				cands = append(cands, filepath.Join(p, "StarCraft II"))
+			}
+		}
+	case "darwin":
+		cands = append(cands, "/Applications/StarCraft II")
+	default:
+		if home, err := os.UserHomeDir(); err == nil {
+			cands = append(cands, filepath.Join(home, "StarCraftII"))
+		}
+	}
+	for _, c := range cands {
+		if _, err := os.Stat(filepath.Join(c, ".build.info")); err == nil {
+			return c
+		}
+	}
+	return ""
 }
