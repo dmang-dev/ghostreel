@@ -99,3 +99,24 @@ func TestLadderModels(t *testing.T) {
 		t.Logf("%-24s %7d bytes, %d textures, anims %v", u, len(b), g.textures, g.animNames())
 	}
 }
+
+func TestTerrainTextures(t *testing.T) {
+	l := openLib(t)
+	var ok int
+	ids := []string{"AiurTempleJungle6", "CharRock", "Elsecaro1", "ShakurasSandDark", "AgriaRock", "KorhalCity6"}
+	for _, id := range ids {
+		b, err := l.TerrainPNG(id)
+		if errors.Is(err, casc.ErrNotLocal) {
+			continue
+		}
+		if err != nil {
+			t.Errorf("%s: %v", id, err)
+			continue
+		}
+		ok++
+		t.Logf("%s: %d bytes", id, len(b))
+	}
+	if ok == 0 {
+		t.Error("no terrain texture converted")
+	}
+}

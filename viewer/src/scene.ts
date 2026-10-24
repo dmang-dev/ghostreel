@@ -50,6 +50,7 @@ const NEUTRAL = {
 const DEATH_WINDOW = 112; // loops a death marker stays visible (5 s on the clock)
 const AIR_HEIGHT = 4; // cells above the ground for flying units in 3D
 const FOG_DARK = 0.62; // how much unseen ground is darkened
+const GROUND_TILE = 8; // cells per repeat of the ground texture
 const EVICT_FRAMES = 600; // drop a unit's model after this many frames unused
 // Models give way to stand-ins when they'd be a few pixels tall, and past a
 // count where skinning every unit costs more than it shows.
@@ -71,6 +72,8 @@ export class Scene {
   private fogMesh2?: THREE.Mesh;
   private fogMesh3?: THREE.Mesh;
   private terrainTex?: THREE.CanvasTexture;
+  private groundDetail?: THREE.Texture;
+  private detailGain = 1;
   private fogTex?: THREE.DataTexture;
   private fogData?: Uint8Array;
 
@@ -160,6 +163,7 @@ export class Scene {
     }));
     this.clearInstances();
     this.setDoodads(undefined);
+    this.setGroundDetail(undefined);
 
     this.fogData = new Uint8Array(width * height * 4);
     this.fogTex?.dispose();
@@ -192,6 +196,7 @@ export class Scene {
     // 3D: the same texture on a heightfield, lit.
     const field = this.heightfield();
     this.terrain3 = new THREE.Mesh(field, new THREE.MeshLambertMaterial({ map: this.terrainTex }));
+    this.applyGroundDetail();
 
     // Fog overlays: black, with the fog texture as per-cell opacity.
     const fogMat = () => new THREE.MeshBasicMaterial({
@@ -206,6 +211,49 @@ export class Scene {
     this.fogMesh3.renderOrder = 1;
     this.scene.add(this.terrain2, this.terrain3, this.fogMesh2, this.fogMesh3);
     this.applyMode();
+  }
+
+  /**
+   * Tiles a ground texture (the map's base terrain layer) over the 3D
+   * terrain, colored by the terrain image's shading. The game blends several
+   * layers by painted masks; those aren't decoded yet, so one layer stands
+   * in for all of them.
+   */
+  setGroundDetail(tex: THREE.Texture | undefined): void {
+    this.groundDetail?.dispose();
+    this.groundDetail = tex;
+    if (tex) {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      this.detailGain = Math.min(3, 0.5 / Math.max(averageLuminance(tex.image as CanvasImageSource & { width: number; height: number }), 0.05));
+    }
+    this.applyGroundDetail();
+  }
+
+  private applyGroundDetail(): void {
+    const mat = this.terrain3?.material as THREE.MeshLambertMaterial | undefined;
+    if (!mat) return;
+    const tex = this.groundDetail;
+    mat.onBeforeCompile = (shader) => {
+      if (!tex) return;
+      shader.uniforms.detailMap = { value: tex };
+      // One texture repeat per GROUND_TILE cells.
+      shader.uniforms.detailRepeat = { value: new THREE.Vector2(this.worldW / GROUND_TILE, this.worldH / GROUND_TILE) };
+      shader.uniforms.detailGain = { value: this.detailGain };
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform sampler2D detailMap;\nuniform vec2 detailRepeat;\nuniform float detailGain;")
+        .replace(
+          "#include <map_fragment>",
+          `#include <map_fragment>
+  // The texture at a steady brightness, with the terrain image's shading
+  // (low ground darker, cliffs shaded) applied gently.
+  vec3 detail = texture2D( detailMap, vMapUv * detailRepeat ).rgb * detailGain;
+  float shade = 0.6 + 0.4 * clamp( dot( diffuseColor.rgb, vec3( 0.299, 0.587, 0.114 ) ) / 0.42, 0.0, 1.6 );
+  diffuseColor.rgb = mix( diffuseColor.rgb, detail * shade, 0.85 );`,
+        );
+    };
+    mat.customProgramCacheKey = () => (tex ? "ground-detail" : "ground");
+    mat.needsUpdate = true;
   }
 
   /** A plane with one vertex per terrain corner, raised to the map's heights. */
@@ -762,4 +810,20 @@ class Meshes {
       m.dispose();
     }
   }
+}
+
+/** Mean luminance (0..1, linear) of an image, from a small downscaled copy. */
+function averageLuminance(img: CanvasImageSource & { width: number; height: number }): number {
+  const c = document.createElement("canvas");
+  c.width = c.height = 16;
+  const ctx = c.getContext("2d");
+  if (!ctx || !img.width) return 0.5;
+  ctx.drawImage(img, 0, 0, 16, 16);
+  const d = ctx.getImageData(0, 0, 16, 16).data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const lin = (v: number) => Math.pow(v / 255, 2.2);
+    sum += 0.299 * lin(d[i]) + 0.587 * lin(d[i + 1]) + 0.114 * lin(d[i + 2]);
+  }
+  return sum / 256;
 }

@@ -718,6 +718,13 @@ let doodadsFor = "";
 async function loadDoodads(): Promise<void> {
   if (!cur?.map || scene.mode !== "3d" || !unitModels.available || doodadsFor === cur.summary.id) return;
   const id = (doodadsFor = cur.summary.id);
+  const ground = cur.map.terrainTextures?.[0];
+  if (ground) {
+    new THREE.TextureLoader().load(`/api/assets/terrain/${encodeURIComponent(ground)}`, (tex) => {
+      if (cur?.summary.id === id) scene.setGroundDetail(tex);
+      else tex.dispose();
+    });
+  }
   try {
     const list = await api.fetchDoodads(id);
     if (cur?.summary.id !== id) return;

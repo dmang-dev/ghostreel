@@ -20,6 +20,7 @@
 //	GET  /api/assets/death/{type}  binary glTF of its death model (404 when none)
 //	GET  /api/assets/icon/{type}   PNG command-card icon (404 when none)
 //	GET  /api/assets/model/{id}    binary glTF of a model by id, ?v= variation (doodads)
+//	GET  /api/assets/terrain/{id}  PNG terrain texture layer (map JSON's terrainTextures)
 package server
 
 import (
@@ -151,6 +152,7 @@ func (s *Server) Handler() http.Handler {
 		return l.UnitGLB(t, true)
 	}))
 	mux.HandleFunc("GET /api/assets/icon/{type}", s.asset("image/png", (*assets.Library).IconPNG))
+	mux.HandleFunc("GET /api/assets/terrain/{type}", s.asset("image/png", (*assets.Library).TerrainPNG))
 	mux.HandleFunc("GET /api/assets/model/{type}", func(w http.ResponseWriter, r *http.Request) {
 		v, _ := strconv.Atoi(r.URL.Query().Get("v"))
 		s.asset("model/gltf-binary", func(l *assets.Library, id string) ([]byte, error) {

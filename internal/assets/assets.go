@@ -44,6 +44,7 @@ type Library struct {
 	actors   *catalog
 	models   *catalog
 	buttons  *catalog
+	terrain  *catalog          // CTerrainTex: terrain texture layers
 	actorOf  map[string]string // unit type → actor id
 
 	mu      sync.Mutex
@@ -69,7 +70,7 @@ func Open(installDir, cacheDir string) (*Library, error) {
 	}
 	l := &Library{
 		st: st, cacheDir: cacheDir, files: map[string]string{},
-		actors: newCatalog(), models: newCatalog(), buttons: newCatalog(),
+		actors: newCatalog(), models: newCatalog(), buttons: newCatalog(), terrain: newCatalog(),
 		actorOf: map[string]string{}, pending: map[string]*result{},
 	}
 	l.build = strings.Fields(st.Config["build-name"] + " unknown")[0]
@@ -102,6 +103,7 @@ func Open(installDir, cacheDir string) (*Library, error) {
 			{"actordata.xml", l.actors, func(c string) bool { return c == "CActorUnit" }},
 			{"modeldata.xml", l.models, func(c string) bool { return c == "CModel" }},
 			{"buttondata.xml", l.buttons, func(c string) bool { return c == "CButton" }},
+			{"terraintexdata.xml", l.terrain, func(c string) bool { return c == "CTerrainTex" }},
 		} {
 			b, err := st.ReadFile(dir + f.file)
 			if err != nil {
@@ -358,6 +360,31 @@ func (l *Library) texture(path string) image.Image {
 	return nil
 }
 
+// TerrainPNG returns a terrain texture layer (a CTerrainTex id, as a map's
+// t3Terrain.xml names them) as PNG.
+func (l *Library) TerrainPNG(id string) ([]byte, error) {
+	if !safeName.MatchString(id) {
+		return nil, ErrNoModel
+	}
+	path, ok := l.terrain.field("CTerrainTex", id, "Texture")
+	if !ok || path == "" {
+		return nil, ErrNoModel
+	}
+	return l.encodePNG(path)
+}
+
+func (l *Library) encodePNG(path string) ([]byte, error) {
+	img := l.texture(path)
+	if img == nil {
+		return nil, fmt.Errorf("%w (%s is not in the game data)", ErrNoModel, path)
+	}
+	var out bytes.Buffer
+	if err := png.Encode(&out, img); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
 // IconPNG returns a unit type's command-card icon as PNG.
 func (l *Library) IconPNG(unit string) ([]byte, error) {
 	if !safeName.MatchString(unit) {
@@ -367,15 +394,7 @@ func (l *Library) IconPNG(unit string) ([]byte, error) {
 	if !ok || path == "" {
 		return nil, ErrNoModel
 	}
-	img := l.texture(path)
-	if img == nil {
-		return nil, fmt.Errorf("%w (icon %s is not in the game data)", ErrNoModel, path)
-	}
-	var out bytes.Buffer
-	if err := png.Encode(&out, img); err != nil {
-		return nil, err
-	}
-	return out.Bytes(), nil
+	return l.encodePNG(path)
 }
 
 // FindInstall returns the game installation folder (the one holding

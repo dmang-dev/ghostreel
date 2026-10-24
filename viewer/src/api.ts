@@ -49,6 +49,8 @@ export interface MapData {
   height: number;
   playable: MapRect;
   tileset: string;
+  /** Terrain texture layers (ids for /api/assets/terrain), base first. */
+  terrainTextures?: string[];
   startLocations: { X: number; Y: number }[] | null;
   objects: MapObject[];
   heights?: number[];
