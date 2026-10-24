@@ -61,6 +61,8 @@ type MapHandle struct {
 	Ext    string // "s2ma"
 	Region string // two-letter depot region, e.g. "EU"
 	Digest string // hex SHA-256
+	// DepotURL is the region's depot server base URL (from s2prot), or empty.
+	DepotURL string
 }
 
 // FileName is the cache file name, e.g. "f0091d….s2ma".
@@ -236,11 +238,14 @@ func mapHandle(r *rep.Rep) *MapHandle {
 		if h.Type != "s2ma" || h.StandardData() != "" {
 			continue
 		}
-		region := ""
+		mh := &MapHandle{Ext: h.Type, Digest: h.Digest}
 		if h.Region != nil {
-			region = h.Region.Code
+			mh.Region = h.Region.Code
+			if h.Region.DepotURL != nil {
+				mh.DepotURL = h.Region.DepotURL.String()
+			}
 		}
-		return &MapHandle{Ext: h.Type, Region: region, Digest: h.Digest}
+		return mh
 	}
 	return nil
 }

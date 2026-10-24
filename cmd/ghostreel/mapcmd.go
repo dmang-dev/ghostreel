@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -10,24 +11,77 @@ import (
 	"image"
 	"image/png"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/OWNER/ghostreel/internal/mapcache"
 	"github.com/OWNER/ghostreel/internal/mapfile"
+	"github.com/OWNER/ghostreel/internal/replay"
 )
+
+// resolverFlags are the map-lookup flags shared by commands that take a replay.
+type resolverFlags struct {
+	manual   string
+	network  bool
+	maps     string
+	cacheDir string
+}
+
+func addResolverFlags(fs *flag.FlagSet) *resolverFlags {
+	rf := &resolverFlags{}
+	fs.StringVar(&rf.manual, "map", "", "use this map file instead of looking the replay's map up")
+	fs.BoolVar(&rf.network, "network", false, "allow downloading maps from Blizzard's depot (logged)")
+	fs.StringVar(&rf.maps, "maps", "", "extra map folders, "+string(os.PathListSeparator)+"-separated")
+	fs.StringVar(&rf.cacheDir, "cache", "", "where downloaded maps are kept (default: user cache dir)")
+	return rf
+}
+
+func (rf *resolverFlags) resolver() *mapcache.Resolver {
+	r := mapcache.Default()
+	r.AllowNetwork = rf.network
+	if rf.maps != "" {
+		r.MapDirs = append(filepath.SplitList(rf.maps), r.MapDirs...)
+	}
+	if rf.cacheDir != "" {
+		r.DownloadDir = rf.cacheDir
+	}
+	r.Log = func(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...) }
+	return r
+}
 
 func cmdDumpMap(args []string) error {
 	fs := flag.NewFlagSet("dump-map", flag.ExitOnError)
 	out := fs.String("o", "", "output JSON (default: <map>.json); the hillshade goes next to it as .png")
 	doodads := fs.Bool("doodads", false, "include doodads in the JSON")
 	layers := fs.Bool("layers", false, "also write one PNG per t3CellFlags bit, cliff levels and the minimap (debug)")
+	rf := addResolverFlags(fs)
 	fs.Parse(reorder(args))
 	if fs.NArg() != 1 {
-		return errors.New("dump-map: need exactly one map file")
+		return errors.New("dump-map: need exactly one map or replay file")
 	}
-	path := fs.Arg(0)
+	path, title := fs.Arg(0), ""
+	if strings.EqualFold(filepath.Ext(path), ".SC2Replay") {
+		r, err := replay.Open(path)
+		if err != nil {
+			return err
+		}
+		mp, how, err := rf.resolver().Resolve(context.Background(), &r.Info, rf.manual)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("map for %s: %s (%s)\n", filepath.Base(path), mp, how)
+		if *out == "" {
+			*out = trimExt(path) + ".map.json"
+		}
+		path = mp
+		title = r.Info.MapTitle // depot files are named by hash
+	}
 	m, err := mapfile.Open(path)
 	if err != nil {
 		return err
+	}
+	if title != "" {
+		m.Name = title
 	}
 	if *out == "" {
 		*out = trimExt(path) + ".json"
