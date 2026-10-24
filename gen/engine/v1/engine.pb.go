@@ -88,8 +88,12 @@ type Samples struct {
 	Loops          uint32          `protobuf:"varint,7,opt,name=loops,proto3" json:"loops,omitempty"` // game length
 	UnitTypes      []*UnitTypeInfo `protobuf:"bytes,8,rep,name=unit_types,json=unitTypes,proto3" json:"unit_types,omitempty"`
 	Frames         []*Frame        `protobuf:"bytes,9,rep,name=frames,proto3" json:"frames,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The game's own pathing and placement grids at the start (from
+	// RequestGameInfo), kept to check how ghostreel derives them from map files.
+	Pathing       *Grid `protobuf:"bytes,10,opt,name=pathing,proto3" json:"pathing,omitempty"`
+	Placement     *Grid `protobuf:"bytes,11,opt,name=placement,proto3" json:"placement,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Samples) Reset() {
@@ -185,6 +189,81 @@ func (x *Samples) GetFrames() []*Frame {
 	return nil
 }
 
+func (x *Samples) GetPathing() *Grid {
+	if x != nil {
+		return x.Pathing
+	}
+	return nil
+}
+
+func (x *Samples) GetPlacement() *Grid {
+	if x != nil {
+		return x.Placement
+	}
+	return nil
+}
+
+// A 1-bit-per-cell grid as the API returns it (row 0 first, MSB first).
+type Grid struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Width         uint32                 `protobuf:"varint,1,opt,name=width,proto3" json:"width,omitempty"`
+	Height        uint32                 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
+	Bits          []byte                 `protobuf:"bytes,3,opt,name=bits,proto3" json:"bits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Grid) Reset() {
+	*x = Grid{}
+	mi := &file_engine_v1_engine_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Grid) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Grid) ProtoMessage() {}
+
+func (x *Grid) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Grid.ProtoReflect.Descriptor instead.
+func (*Grid) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Grid) GetWidth() uint32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *Grid) GetHeight() uint32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *Grid) GetBits() []byte {
+	if x != nil {
+		return x.Bits
+	}
+	return nil
+}
+
 // From the client's own game data for this build.
 type UnitTypeInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -197,7 +276,7 @@ type UnitTypeInfo struct {
 
 func (x *UnitTypeInfo) Reset() {
 	*x = UnitTypeInfo{}
-	mi := &file_engine_v1_engine_proto_msgTypes[1]
+	mi := &file_engine_v1_engine_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -209,7 +288,7 @@ func (x *UnitTypeInfo) String() string {
 func (*UnitTypeInfo) ProtoMessage() {}
 
 func (x *UnitTypeInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[1]
+	mi := &file_engine_v1_engine_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -222,7 +301,7 @@ func (x *UnitTypeInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitTypeInfo.ProtoReflect.Descriptor instead.
 func (*UnitTypeInfo) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{1}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *UnitTypeInfo) GetId() uint32 {
@@ -256,7 +335,7 @@ type Frame struct {
 
 func (x *Frame) Reset() {
 	*x = Frame{}
-	mi := &file_engine_v1_engine_proto_msgTypes[2]
+	mi := &file_engine_v1_engine_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -268,7 +347,7 @@ func (x *Frame) String() string {
 func (*Frame) ProtoMessage() {}
 
 func (x *Frame) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[2]
+	mi := &file_engine_v1_engine_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -281,7 +360,7 @@ func (x *Frame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Frame.ProtoReflect.Descriptor instead.
 func (*Frame) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{2}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Frame) GetLoop() uint32 {
@@ -319,7 +398,7 @@ type UnitSample struct {
 
 func (x *UnitSample) Reset() {
 	*x = UnitSample{}
-	mi := &file_engine_v1_engine_proto_msgTypes[3]
+	mi := &file_engine_v1_engine_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -331,7 +410,7 @@ func (x *UnitSample) String() string {
 func (*UnitSample) ProtoMessage() {}
 
 func (x *UnitSample) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[3]
+	mi := &file_engine_v1_engine_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -344,7 +423,7 @@ func (x *UnitSample) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitSample.ProtoReflect.Descriptor instead.
 func (*UnitSample) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{3}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UnitSample) GetTag() uint64 {
@@ -437,7 +516,7 @@ type Order struct {
 
 func (x *Order) Reset() {
 	*x = Order{}
-	mi := &file_engine_v1_engine_proto_msgTypes[4]
+	mi := &file_engine_v1_engine_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -449,7 +528,7 @@ func (x *Order) String() string {
 func (*Order) ProtoMessage() {}
 
 func (x *Order) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[4]
+	mi := &file_engine_v1_engine_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -462,7 +541,7 @@ func (x *Order) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Order.ProtoReflect.Descriptor instead.
 func (*Order) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{4}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Order) GetAbilityId() uint32 {
@@ -504,7 +583,7 @@ var File_engine_v1_engine_proto protoreflect.FileDescriptor
 
 const file_engine_v1_engine_proto_rawDesc = "" +
 	"\n" +
-	"\x16engine/v1/engine.proto\x12\tengine.v1\"\xe2\x02\n" +
+	"\x16engine/v1/engine.proto\x12\tengine.v1\"\xbc\x03\n" +
 	"\aSamples\x12?\n" +
 	"\x0eschema_version\x18\x01 \x01(\x0e2\x18.engine.v1.SchemaVersionR\rschemaVersion\x12\x1f\n" +
 	"\vreplay_hash\x18\x02 \x01(\tR\n" +
@@ -517,7 +596,14 @@ const file_engine_v1_engine_proto_rawDesc = "" +
 	"\x05loops\x18\a \x01(\rR\x05loops\x126\n" +
 	"\n" +
 	"unit_types\x18\b \x03(\v2\x17.engine.v1.UnitTypeInfoR\tunitTypes\x12(\n" +
-	"\x06frames\x18\t \x03(\v2\x10.engine.v1.FrameR\x06frames\"Y\n" +
+	"\x06frames\x18\t \x03(\v2\x10.engine.v1.FrameR\x06frames\x12)\n" +
+	"\apathing\x18\n" +
+	" \x01(\v2\x0f.engine.v1.GridR\apathing\x12-\n" +
+	"\tplacement\x18\v \x01(\v2\x0f.engine.v1.GridR\tplacement\"H\n" +
+	"\x04Grid\x12\x14\n" +
+	"\x05width\x18\x01 \x01(\rR\x05width\x12\x16\n" +
+	"\x06height\x18\x02 \x01(\rR\x06height\x12\x12\n" +
+	"\x04bits\x18\x03 \x01(\fR\x04bits\"Y\n" +
 	"\fUnitTypeInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12%\n" +
@@ -564,26 +650,29 @@ func file_engine_v1_engine_proto_rawDescGZIP() []byte {
 }
 
 var file_engine_v1_engine_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_engine_v1_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_engine_v1_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_engine_v1_engine_proto_goTypes = []any{
 	(SchemaVersion)(0),   // 0: engine.v1.SchemaVersion
 	(*Samples)(nil),      // 1: engine.v1.Samples
-	(*UnitTypeInfo)(nil), // 2: engine.v1.UnitTypeInfo
-	(*Frame)(nil),        // 3: engine.v1.Frame
-	(*UnitSample)(nil),   // 4: engine.v1.UnitSample
-	(*Order)(nil),        // 5: engine.v1.Order
+	(*Grid)(nil),         // 2: engine.v1.Grid
+	(*UnitTypeInfo)(nil), // 3: engine.v1.UnitTypeInfo
+	(*Frame)(nil),        // 4: engine.v1.Frame
+	(*UnitSample)(nil),   // 5: engine.v1.UnitSample
+	(*Order)(nil),        // 6: engine.v1.Order
 }
 var file_engine_v1_engine_proto_depIdxs = []int32{
 	0, // 0: engine.v1.Samples.schema_version:type_name -> engine.v1.SchemaVersion
-	2, // 1: engine.v1.Samples.unit_types:type_name -> engine.v1.UnitTypeInfo
-	3, // 2: engine.v1.Samples.frames:type_name -> engine.v1.Frame
-	4, // 3: engine.v1.Frame.units:type_name -> engine.v1.UnitSample
-	5, // 4: engine.v1.UnitSample.orders:type_name -> engine.v1.Order
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	3, // 1: engine.v1.Samples.unit_types:type_name -> engine.v1.UnitTypeInfo
+	4, // 2: engine.v1.Samples.frames:type_name -> engine.v1.Frame
+	2, // 3: engine.v1.Samples.pathing:type_name -> engine.v1.Grid
+	2, // 4: engine.v1.Samples.placement:type_name -> engine.v1.Grid
+	5, // 5: engine.v1.Frame.units:type_name -> engine.v1.UnitSample
+	6, // 6: engine.v1.UnitSample.orders:type_name -> engine.v1.Order
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_engine_v1_engine_proto_init() }
@@ -597,7 +686,7 @@ func file_engine_v1_engine_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_engine_v1_engine_proto_rawDesc), len(file_engine_v1_engine_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

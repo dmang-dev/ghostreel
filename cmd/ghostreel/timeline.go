@@ -3,15 +3,24 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/OWNER/ghostreel/internal/command"
+	"github.com/OWNER/ghostreel/internal/engine"
+	"github.com/OWNER/ghostreel/internal/mapfile"
 	"github.com/OWNER/ghostreel/internal/replay"
 	"github.com/OWNER/ghostreel/internal/timeline"
 )
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
 
 const generator = "ghostreel dev"
 
@@ -19,19 +28,52 @@ func cmdDumpTimeline(args []string) error {
 	fs := flag.NewFlagSet("dump-timeline", flag.ExitOnError)
 	out := fs.String("o", "", "output file (default: <replay>.pb, or .json with --json)")
 	asJSON := fs.Bool("json", false, "write protobuf JSON instead of binary (for debugging)")
-	noCmds := fs.Bool("no-commands", false, "leave player commands out (skips decoding game events; much faster on long games)")
+	noCmds := fs.Bool("no-commands", false, "leave player commands out of the event feed")
+	tier := fs.String("tier", "command", "reconstruction: tracker, or command (follows players' orders; needs the map for pathing)")
+	eng := fs.String("engine", "", "engine recording to make the timeline exact (default: <replay>.engine.pb.gz if present)")
+	rf := addResolverFlags(fs)
 	fs.Parse(reorder(fs, args))
 	if fs.NArg() != 1 {
 		return errors.New("dump-timeline: need exactly one replay")
 	}
 	path := fs.Arg(0)
-	r, err := replay.OpenWith(path, replay.Options{SkipGameEvents: *noCmds})
+	if *eng == "" {
+		if p := strings.TrimSuffix(path, ".SC2Replay") + ".engine.pb.gz"; fileExists(p) {
+			*eng = p
+		}
+	}
+	needGame := !*noCmds || (*tier == "command" && *eng == "")
+	r, err := replay.OpenWith(path, replay.Options{SkipGameEvents: !needGame})
 	if err != nil {
 		return err
 	}
 	tl, err := timeline.Build(&r.Info, r.Events, timeline.Options{Generator: generator, SkipCommands: *noCmds})
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
+	}
+	switch {
+	case *eng != "":
+		s, err := engine.ReadSamples(*eng)
+		if err != nil {
+			return err
+		}
+		if err := timeline.ApplyEngine(tl, s); err != nil {
+			return err
+		}
+	case *tier == "command":
+		opts := command.Options{}
+		res := rf.resolver()
+		if mp, _, err := res.Resolve(context.Background(), &r.Info, rf.manual); err == nil {
+			if m, err := mapfile.Open(mp); err == nil {
+				opts.Grid = command.Grid(m)
+			}
+		}
+		if opts.Grid == nil {
+			fmt.Fprintln(os.Stderr, "map not found: command tier will move units in straight lines")
+		}
+		command.Apply(tl, r.Events, opts)
+	case *tier != "tracker":
+		return fmt.Errorf("unknown tier %q", *tier)
 	}
 	var data []byte
 	if *asJSON {
@@ -52,8 +94,9 @@ func cmdDumpTimeline(args []string) error {
 	if err := os.WriteFile(*out, data, 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("%s: %d units, %d tracks, %d snapshots, %d events → %s (%d KiB)\n",
-		path, len(tl.Units), len(tl.Tracks), len(tl.Snapshots), len(tl.Events), *out, len(data)/1024)
+	fmt.Printf("%s: %s tier, %d units, %d tracks, %d snapshots, %d events → %s (%d KiB)\n",
+		path, strings.ToLower(strings.TrimPrefix(tl.Meta.Fidelity.String(), "SOURCE_")),
+		len(tl.Units), len(tl.Tracks), len(tl.Snapshots), len(tl.Events), *out, len(data)/1024)
 	return nil
 }
 

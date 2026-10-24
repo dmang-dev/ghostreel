@@ -28,6 +28,17 @@ message Samples {
   uint32 loops = 7; // game length
   repeated UnitTypeInfo unit_types = 8;
   repeated Frame frames = 9;
+  // The game's own pathing and placement grids at the start (from
+  // RequestGameInfo), kept to check how ghostreel derives them from map files.
+  Grid pathing = 10;
+  Grid placement = 11;
+}
+
+// A 1-bit-per-cell grid as the API returns it (row 0 first, MSB first).
+message Grid {
+  uint32 width = 1;
+  uint32 height = 2;
+  bytes bits = 3;
 }
 
 // From the client's own game data for this build.

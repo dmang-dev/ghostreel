@@ -77,6 +77,14 @@ func Export(ctx context.Context, c *Client, replay []byte, o ExportOptions) (*en
 		return nil, fmt.Errorf("start replay: %w", err)
 	}
 
+	gi, err := c.Call(ctx, &sc2.Request{Request: &sc2.Request_GameInfo{GameInfo: &sc2.RequestGameInfo{}}})
+	if err != nil {
+		return nil, fmt.Errorf("game info: %w", err)
+	}
+	raw := gi.GetGameInfo().GetStartRaw()
+	out.Pathing = grid(raw.GetPathingGrid())
+	out.Placement = grid(raw.GetPlacementGrid())
+
 	data, err := c.Call(ctx, &sc2.Request{Request: &sc2.Request_Data{Data: &sc2.RequestData{UnitTypeId: proto.Bool(true)}}})
 	if err != nil {
 		return nil, fmt.Errorf("game data: %w", err)
@@ -140,4 +148,11 @@ func frame(loop uint32, units []*sc2.Unit) *enginev1.Frame {
 		f.Units = append(f.Units, s)
 	}
 	return f
+}
+
+func grid(img *sc2.ImageData) *enginev1.Grid {
+	if img == nil || img.GetBitsPerPixel() != 1 {
+		return nil
+	}
+	return &enginev1.Grid{Width: uint32(img.GetSize().GetX()), Height: uint32(img.GetSize().GetY()), Bits: img.GetData()}
 }

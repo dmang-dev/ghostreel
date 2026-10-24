@@ -59,6 +59,8 @@ type Report struct {
 	ByType map[string]*Stats // by engine unit type name (moving and still)
 	// ByClass groups by the timeline's unit class (army, worker, building…).
 	ByClass map[string]*Stats
+	// MovingByOwner splits the moving-unit errors by player.
+	MovingByOwner map[int32]*Stats
 
 	Frames int
 	// Unmatched counts engine units with no timeline unit of the same tag, by
@@ -71,7 +73,7 @@ type Report struct {
 
 // Compare evaluates tl at every engine frame.
 func Compare(tl *pb.Timeline, s *enginev1.Samples) *Report {
-	r := &Report{ByType: map[string]*Stats{}, ByClass: map[string]*Stats{}, Unmatched: map[string]int{}}
+	r := &Report{ByType: map[string]*Stats{}, ByClass: map[string]*Stats{}, MovingByOwner: map[int32]*Stats{}, Unmatched: map[string]int{}}
 	ix := timeline.NewIndex(tl)
 	byTag := make(map[uint32]*pb.Unit, len(tl.Units))
 	for _, u := range tl.Units {
@@ -109,6 +111,12 @@ func Compare(tl *pb.Timeline, s *enginev1.Samples) *Report {
 			r.All.add(e)
 			if p, ok := prev[us.Tag]; ok && math.Hypot(float64(p.x-us.X), float64(p.y-us.Y)) > 0.25 {
 				r.Moving.add(e)
+				os := r.MovingByOwner[us.Owner]
+				if os == nil {
+					os = &Stats{}
+					r.MovingByOwner[us.Owner] = os
+				}
+				os.add(e)
 			}
 			st := r.ByType[name]
 			if st == nil {
@@ -132,6 +140,9 @@ func Compare(tl *pb.Timeline, s *enginev1.Samples) *Report {
 		st.finish()
 	}
 	for _, st := range r.ByClass {
+		st.finish()
+	}
+	for _, st := range r.MovingByOwner {
 		st.finish()
 	}
 	return r
