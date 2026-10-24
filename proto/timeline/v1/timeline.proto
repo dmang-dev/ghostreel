@@ -92,6 +92,7 @@ message UnitType {
   bool movable = 7; // buildings that can lift off or uproot
   bool known = 8;   // false when sizes are defaults for an unknown type
   float speed = 9;  // cells per game second (Normal speed); 0 = never moves
+  float sight = 10; // vision radius in cells (for fog of war)
 }
 
 message Unit {

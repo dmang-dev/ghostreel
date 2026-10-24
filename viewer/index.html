@@ -18,6 +18,10 @@
         <span id="title" class="title"></span>
         <span id="tier" class="badge" hidden></span>
         <span class="spacer"></span>
+        <button id="mode3d" title="Switch between 2D and 3D (3)">3D</button>
+        <select id="fog" title="Fog of war: show what one player could see (V)">
+          <option value="0">Fog: off</option>
+        </select>
         <label class="toggle"><input type="checkbox" id="labels" checked /> Labels</label>
         <select id="terrain-mode" title="Terrain layer">
           <option value="shade">Shaded terrain</option>
@@ -61,6 +65,8 @@
             <tr><td>Home / End</td><td>Start / end</td></tr>
             <tr><td>Click</td><td>Inspect a unit; drag to pan, wheel to zoom</td></tr>
             <tr><td>Esc</td><td>Clear selection</td></tr>
+            <tr><td>3</td><td>2D / 3D (3D: right-drag or Shift-drag to rotate)</td></tr>
+            <tr><td>V</td><td>Fog of war: cycle player views</td></tr>
             <tr><td>L / M / F</td><td>Labels / map art / FPS counter</td></tr>
           </table>
         </div>

@@ -75,7 +75,8 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   const art = map && minimap ? minimapTerrain(map, minimap) : null;
   cur = { summary, model, map, minimap, width, height, playable, shaded, art };
 
-  scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded);
+  scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded, map?.heights);
+  buildFogOptions(model);
   scene.fit(playable.Left, playable.Bottom, playable.Right, playable.Top);
   selected = undefined;
   loop = 0;
@@ -531,6 +532,13 @@ window.addEventListener("keydown", (e) => {
     case "M":
       setTerrainMode(terrainMode === "shade" ? "minimap" : "shade");
       break;
+    case "3":
+      toggle3D();
+      break;
+    case "v":
+    case "V":
+      cycleFog();
+      break;
     case "f":
     case "F":
       $("fps").hidden = !$("fps").hidden;
@@ -681,3 +689,34 @@ function showTier(fidelity: api.Summary["fidelity"]): void {
   el.className = `badge ${t.cls}`;
   el.hidden = false;
 }
+
+// ---------------------------------------------------------------- 3D and fog of war
+
+function toggle3D(): void {
+  scene.setMode(scene.mode === "2d" ? "3d" : "2d");
+  $("mode3d").textContent = scene.mode === "2d" ? "3D" : "2D";
+  minimapAt = 0;
+}
+$("mode3d").onclick = toggle3D;
+
+function buildFogOptions(model: Model): void {
+  const sel = $<HTMLSelectElement>("fog");
+  sel.replaceChildren(new Option("Fog: off", "0"));
+  for (const p of model.tl.meta?.players ?? []) sel.append(new Option(`Fog: ${p.name}'s view`, String(p.id)));
+  sel.value = "0";
+  scene.setFogPlayer(0);
+}
+
+function setFog(p: number): void {
+  scene.setFogPlayer(p);
+  $<HTMLSelectElement>("fog").value = String(p);
+}
+$<HTMLSelectElement>("fog").onchange = (e) => setFog(Number((e.target as HTMLSelectElement).value));
+
+function cycleFog(): void {
+  const ids = [0, ...(cur?.model.tl.meta?.players ?? []).map((p) => p.id)];
+  setFog(ids[(ids.indexOf(scene.fogPlayer) + 1) % ids.length]);
+}
+
+// Debug handle for the console (and tests): the scene and current replay.
+(window as unknown as { ghostreel: unknown }).ghostreel = { scene, get cur() { return cur; } };

@@ -601,6 +601,7 @@ type UnitType struct {
 	Movable       bool                   `protobuf:"varint,7,opt,name=movable,proto3" json:"movable,omitempty"` // buildings that can lift off or uproot
 	Known         bool                   `protobuf:"varint,8,opt,name=known,proto3" json:"known,omitempty"`     // false when sizes are defaults for an unknown type
 	Speed         float32                `protobuf:"fixed32,9,opt,name=speed,proto3" json:"speed,omitempty"`    // cells per game second (Normal speed); 0 = never moves
+	Sight         float32                `protobuf:"fixed32,10,opt,name=sight,proto3" json:"sight,omitempty"`   // vision radius in cells (for fog of war)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -694,6 +695,13 @@ func (x *UnitType) GetKnown() bool {
 func (x *UnitType) GetSpeed() float32 {
 	if x != nil {
 		return x.Speed
+	}
+	return 0
+}
+
+func (x *UnitType) GetSight() float32 {
+	if x != nil {
+		return x.Sight
 	}
 	return 0
 }
@@ -1906,7 +1914,7 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\x06result\x18\x04 \x01(\tR\x06result\x12\x14\n" +
 	"\x05color\x18\x05 \x01(\rR\x05color\x12\x17\n" +
 	"\astart_x\x18\x06 \x01(\x02R\x06startX\x12\x17\n" +
-	"\astart_y\x18\a \x01(\x02R\x06startY\"\xfe\x01\n" +
+	"\astart_y\x18\a \x01(\x02R\x06startY\"\x94\x02\n" +
 	"\bUnitType\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12,\n" +
 	"\x05class\x18\x02 \x01(\x0e2\x16.timeline.v1.UnitClassR\x05class\x12\x16\n" +
@@ -1918,7 +1926,9 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\x03air\x18\x06 \x01(\bR\x03air\x12\x18\n" +
 	"\amovable\x18\a \x01(\bR\amovable\x12\x14\n" +
 	"\x05known\x18\b \x01(\bR\x05known\x12\x14\n" +
-	"\x05speed\x18\t \x01(\x02R\x05speed\"\x81\x03\n" +
+	"\x05speed\x18\t \x01(\x02R\x05speed\x12\x14\n" +
+	"\x05sight\x18\n" +
+	" \x01(\x02R\x05sight\"\x81\x03\n" +
 	"\x04Unit\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x10\n" +
 	"\x03tag\x18\x02 \x01(\rR\x03tag\x12\x14\n" +

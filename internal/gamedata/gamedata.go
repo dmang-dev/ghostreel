@@ -43,6 +43,8 @@ type Unit struct {
 	// timeline must not pin them to their placement cell.
 	Movable bool
 	Air     bool
+	// Sight is the vision radius in cells (for fog of war).
+	Sight float64
 	// Known is false when the type wasn't in the table and defaults were used.
 	Known bool
 }
@@ -75,9 +77,12 @@ func (Stub) Unit(_ int, name string) Unit {
 		if u.Class == ClassBuilding && u.Radius == 0 {
 			u.Radius = float64(u.FootprintW) / 2
 		}
+		u.Sight = sightFor(u)
 		return u
 	}
-	return guess(name)
+	u := guess(name)
+	u.Sight = sightFor(u)
+	return u
 }
 
 // guess classifies unknown names by the conventions Blizzard's data follows.
@@ -192,4 +197,35 @@ var table = map[string]Unit{
 
 	// UI-only units that show up in tracker events.
 	"InvisibleTargetDummy": hidden(), "BroodlingEscort": hidden(),
+}
+
+// sightOverrides lists vision radii that differ from the class default
+// (current-patch values, rounded).
+var sightOverrides = map[string]float64{
+	"CommandCenter": 11, "OrbitalCommand": 11, "PlanetaryFortress": 11, "Nexus": 11,
+	"Hatchery": 12, "Lair": 12, "Hive": 12, "MissileTurret": 11, "PhotonCannon": 11,
+	"SporeCrawler": 11, "SpineCrawler": 11, "Bunker": 10, "SensorTower": 12,
+	"SiegeTank": 11, "SiegeTankSieged": 11, "Ghost": 11, "Thor": 11, "Raven": 11,
+	"Observer": 11, "ObserverSiegeMode": 13.75, "Overlord": 11, "Overseer": 11,
+	"OverseerSiegeMode": 13.75, "Colossus": 10, "Tempest": 12, "Carrier": 12,
+	"Battlecruiser": 12, "Viper": 11, "BroodLord": 12, "Mothership": 14, "Oracle": 10,
+	"Larva": 5, "Egg": 5, "Zergling": 8, "Broodling": 7, "Interceptor": 7,
+}
+
+// sightFor fills in a type's vision radius.
+func sightFor(u Unit) float64 {
+	if s, ok := sightOverrides[u.Name]; ok {
+		return s
+	}
+	switch {
+	case u.Class == ClassWorker:
+		return 8
+	case u.Class == ClassResource || u.Class == ClassNeutral || u.Class == ClassHidden:
+		return 0
+	case u.Class == ClassBuilding:
+		return 9
+	case u.Air:
+		return 10
+	}
+	return 9
 }

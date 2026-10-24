@@ -119,7 +119,7 @@ func (b *builder) typeOf(name string) (uint32, gamedata.Unit) {
 	b.tl.UnitTypes = append(b.tl.UnitTypes, &pb.UnitType{
 		Name: name, Class: pbClass(u.Class), Radius: float32(u.Radius),
 		FootprintW: uint32(u.FootprintW), FootprintH: uint32(u.FootprintH),
-		Air: u.Air, Movable: u.Movable, Known: u.Known, Speed: float32(u.Speed),
+		Air: u.Air, Movable: u.Movable, Known: u.Known, Speed: float32(u.Speed), Sight: float32(u.Sight),
 	})
 	return id, u
 }
