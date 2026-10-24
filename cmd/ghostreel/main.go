@@ -8,6 +8,9 @@ import (
 	"os"
 )
 
+// version is set at release builds (-ldflags "-X main.version=v1.0.0").
+var version = "dev"
+
 const usage = `ghostreel — replay viewer toolkit
 
 Usage:
@@ -17,6 +20,7 @@ Usage:
   ghostreel serve [--addr :8080]                  serve the viewer and its API
   ghostreel accuracy <replay> [--engine x.pb.gz]  compare a timeline with engine ground truth
   ghostreel assets [unit type...]                 convert 3D models from the local game data
+  ghostreel version                               print the version
 
 Run "ghostreel <command> -h" for a command's flags.
 `
@@ -33,6 +37,10 @@ func main() {
 		"serve":         cmdServe,
 		"accuracy":      cmdAccuracy,
 		"assets":        cmdAssets,
+		"version": func([]string) error {
+			fmt.Println("ghostreel", version)
+			return nil
+		},
 	}
 	cmd, ok := cmds[os.Args[1]]
 	if !ok {

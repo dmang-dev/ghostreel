@@ -19,8 +19,8 @@ jobs:
       - run: go vet ./...
       # Real replays are never committed, so replay-backed tests skip here.
       - run: go test ./...
-      # The core must stay cgo-free so it can compile to WebAssembly later.
-      - run: CGO_ENABLED=0 GOOS=js GOARCH=wasm go build ./internal/...
+      # The core must stay cgo-free: it also runs in the browser as WebAssembly.
+      - run: CGO_ENABLED=0 GOOS=js GOARCH=wasm go build ./internal/... ./cmd/ghostreel-wasm
 
   proto:
     runs-on: ubuntu-latest
@@ -48,4 +48,10 @@ jobs:
       - run: npm test
         working-directory: viewer
       - run: npm run build
+        working-directory: viewer
+      # The browser-only build compiles the Go core too.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: npm run build:web
         working-directory: viewer

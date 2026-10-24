@@ -12,7 +12,19 @@
     "name": "ghostreel contributors"
   },
   "info": {
+    "companyName": "ghostreel contributors",
     "productName": "ghostreel",
-    "comments": "Replay viewer. Not affiliated with Blizzard Entertainment."
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © ghostreel contributors. Apache-2.0.",
+    "comments": "Replay viewer. Not affiliated with Blizzard Entertainment.",
+    "fileAssociations": [
+      {
+        "ext": "SC2Replay",
+        "name": "ghostreel.SC2Replay",
+        "description": "SC2 replay",
+        "iconName": "replayicon",
+        "role": "Viewer"
+      }
+    ]
   }
 }

@@ -1,0 +1,161 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Builds every release artifact when a version tag (v1.2.3) is pushed and
+# collects them in a draft GitHub release for a maintainer to review and
+# publish. Nothing from the game is bundled: models, textures and maps are
+# read from each user's own install at run time.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cli:
+    name: CLI (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: windows, goarch: amd64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      # `ghostreel serve` finds the viewer in viewer/dist next to itself.
+      - name: Build the viewer
+        working-directory: viewer
+        run: npm ci && npm run build
+      - name: Build and package
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          ext=""; [ "$GOOS" = windows ] && ext=.exe
+          out="ghostreel_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
+          mkdir -p "$out/viewer"
+          flags="-s -w -X main.version=${GITHUB_REF_NAME}"
+          go build -trimpath -ldflags "$flags" -o "$out/ghostreel$ext" ./cmd/ghostreel
+          go build -trimpath -ldflags "$flags" -o "$out/ghostreel-engine$ext" ./cmd/ghostreel-engine
+          cp -r viewer/dist "$out/viewer/dist"
+          cp LICENSE README.md "$out/"
+          if [ "$GOOS" = windows ]; then zip -qr "$out.zip" "$out"; else tar czf "$out.tar.gz" "$out"; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ghostreel_*.*
+
+  web:
+    name: Browser build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      - name: Build
+        working-directory: viewer
+        run: npm ci && npm run build:web
+      - name: Package
+        run: cd viewer/dist-web && zip -qr "../../ghostreel_${GITHUB_REF_NAME}_web.zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: ghostreel_*_web.zip
+
+  desktop:
+    name: Desktop (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, platform: windows/amd64 }
+          - { os: macos-latest, platform: darwin/universal }
+          # webkit2gtk-4.0, which Wails v2 links by default, is in 22.04.
+          - { os: ubuntu-22.04, platform: linux/amd64 }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: desktop/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
+      # The installer's version comes from wails.json; keep it in step with the tag.
+      - name: Set the version
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          if [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            node -e "const f='desktop/wails.json',j=require('./'+f);j.info.productVersion=process.argv[1];require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')" "${BASH_REMATCH[0]}"
+          fi
+      - name: Build
+        working-directory: desktop
+        run: |
+          # The Windows runners ship NSIS, which builds the installer.
+          extra=""; [ "$RUNNER_OS" = Windows ] && extra="-nsis"
+          wails build -clean -platform ${{ matrix.platform }} $extra
+      - name: Package
+        run: |
+          base="ghostreel-desktop_${GITHUB_REF_NAME}"
+          cd desktop/build/bin || exit 1
+          case "$RUNNER_OS" in
+            Windows)
+              mv ./*installer.exe "../../../${base}_windows_amd64_setup.exe"
+              7z a "../../../${base}_windows_amd64_portable.zip" ghostreel-desktop.exe ;;
+            macOS)
+              app=$(ls -d ./*.app | head -1)
+              ditto -c -k --keepParent "$app" "../../../${base}_macos_universal.zip" ;;
+            Linux)
+              tar czf "../../../${base}_linux_amd64.tar.gz" ghostreel-desktop ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: ghostreel-desktop_*
+
+  release:
+    needs: [cli, web, desktop]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Checksums
+        run: cd artifacts && sha256sum * > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: artifacts/*

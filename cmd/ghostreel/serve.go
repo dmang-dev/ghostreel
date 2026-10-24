@@ -47,7 +47,15 @@ func cmdServe(args []string) error {
 	} else {
 		log.Printf("no game installation found: the 3D view uses stand-in shapes (set --gamedata)")
 	}
-	if fi, err := os.Stat(*static); err == nil && fi.IsDir() {
+	if !isDir(*static) && !explicit(fs, "static") {
+		// A release archive keeps the viewer next to the executable.
+		if exe, err := os.Executable(); err == nil {
+			if dir := filepath.Join(filepath.Dir(exe), "viewer", "dist"); isDir(dir) {
+				*static = dir
+			}
+		}
+	}
+	if isDir(*static) {
 		srv.Static = os.DirFS(*static)
 	} else {
 		log.Printf("no viewer build at %s: serving the API only (or run the Vite dev server)", *static)
@@ -65,6 +73,18 @@ func cmdServe(args []string) error {
 		return nil
 	}
 	return err
+}
+
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
+}
+
+// explicit reports whether a flag was given on the command line.
+func explicit(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) { set = set || f.Name == name })
+	return set
 }
 
 func onOff(b bool) string {

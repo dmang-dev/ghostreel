@@ -32,3 +32,5 @@ testdata/replays/engine/
 testdata/casc/
 viewer/public-web/
 viewer/dist-web/
+desktop/build/windows/installer/wails_tools.nsh
+desktop/build/windows/installer/tmp/
