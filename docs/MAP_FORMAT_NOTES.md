@@ -30,7 +30,7 @@ The parser scans for the two printable strings followed by bounds inside the map
 
 ## `t3Terrain.xml` and `t3TextureMasks`
 
-`<heightMap tileSet=…>` holds `<vertData>` (above) and `<textureList>`, 64 `CTerrainTex` ids, 8 per texture set; set 0 is the terrain's own. `t3TextureMasks` (`MASK`, version 0x66, u32 texel width/height at offsets 12/16, 8 texels per cell, 64-byte header) is stored in 64×64-texel blocks of 8×8 cells, 16 KiB each, in `blockTextureSetList` order. The layout inside a block is not decoded yet: neither 4 interleaved bytes per texel nor 8 BC4-compressed 64×64 layers gives clean masks.
+`<heightMap tileSet=…>` holds `<vertData>` (above) and `<textureList>`, 64 `CTerrainTex` ids, 8 per texture set; set 0 is the terrain's own. `t3TextureMasks` (`MASK`, version 0x66, 64-byte header; u32 at 16 = texel height) holds 8 layers, one weight byte per texel. Each layer is 4 texels per cell across and 8 up. The weights of a texel sum to 255, and layer *i* paints texture *i* of `textureList`. A layer is stored as 32×32-byte tiles in strips two tiles high: tile *t* of a strip is column *t*/2, row *t*%2. Strips run left to right; strip rows run from the bottom of the map up; layers follow one another. (The u32 at 12 is twice the layer width.) Textures repeat across the map as `uvtiling` on `<heightMap>` says: x and y repeats, then offsets.
 
 ## `t3SyncCliffLevel`
 
