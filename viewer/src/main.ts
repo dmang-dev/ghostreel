@@ -155,7 +155,9 @@ let frameMs = 0;
 let panelsAt = 0;
 
 function tick(now: number): void {
-  const dt = Math.min((now - last) / 1000, 0.25);
+  // Keep real-time pace even at low frame rates; only a long stall (tab in
+  // the background) is clipped so playback doesn't jump ahead.
+  const dt = Math.min((now - last) / 1000, 1);
   last = now;
   if (cur && playing) {
     loop += dt * LOOPS_PER_CLOCK_SECOND * speed;
