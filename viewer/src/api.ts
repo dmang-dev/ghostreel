@@ -3,6 +3,10 @@
 // Client for the ghostreel HTTP API (internal/server). The same API backs
 // `ghostreel serve` and the desktop app, so the viewer has one code path.
 
+import type { Doodad } from "./doodads";
+
+export type { Doodad };
+
 export interface Summary {
   id: string;
   name: string;
@@ -20,9 +24,6 @@ export interface Summary {
   fidelity: "tracker" | "command" | "engine";
   players: string[];
 }
-
-export type { Doodad } from "./doodads";
-import type { Doodad } from "./doodads";
 
 export interface MapRect {
   Left: number;

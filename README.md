@@ -32,6 +32,16 @@ go run ./cmd/ghostreel serve --replays "/path/to/your/Replays/Multiplayer"
 
 Then open <http://127.0.0.1:8080/>. The server only listens on localhost by default.
 
+### 3D view
+
+Press **3** (or the 3D button) to switch views. **V** cycles fog of war through each player's vision. In 3D, drag to pan, right-drag (or Shift-drag) to rotate and tilt, and scroll to zoom.
+
+With a StarCraft II installation on the same machine, the 3D view uses the game's own unit models, animations, doodads and ground textures. They are converted from your install on first use and cached locally. The server looks in the default install folder; point it elsewhere with `--gamedata <folder with .build.info>` or `GHOSTREEL_GAMEDATA`. Without an install, units are drawn as plain shapes.
+
+```bash
+go run ./cmd/ghostreel assets            # convert every ladder unit's model now and report gaps
+```
+
 ### Command line
 
 ```bash
@@ -94,6 +104,7 @@ Tests that need real replays and maps look in `testdata/replays/` and `testdata/
 | `internal/mapfile` | Decodes map files |
 | `internal/mapcache` | Finds a replay's map |
 | `internal/gamedata` | Unit sizes and speeds (a small built-in table for now) |
+| `internal/casc`, `internal/m3`, `internal/dds`, `internal/assets` | Reading the local game install: CASC storage, `.m3` models → glTF, textures, GameData catalogs |
 | `internal/selection`, `internal/pathing`, `internal/command` | The command tier: selections, paths, following orders |
 | `internal/engine`, `cmd/ghostreel-engine` | The engine-tier exporter (s2client API) |
 | `internal/accuracy` | Measures a timeline against engine ground truth |
@@ -109,12 +120,12 @@ Design notes are in [`PLAN.md`](PLAN.md), [`docs/DECISIONS.md`](docs/DECISIONS.m
 The code is Apache-2.0. StarCraft II's art, data and maps belong to Blizzard and are **never** part of this repository:
 
 - Maps are read from your own game install or cache, or downloaded from Blizzard's map server at your request. They are stored only in your local cache.
-- The viewer draws units as plain shapes with type names. Unit models and icons will come from your own install, extracted locally, in a later release.
+- 3D models, textures and icons are converted from your own game install on your machine and cached there (in the ghostreel cache folder). Nothing converted is uploaded or shipped.
 - Replays and maps used by tests stay in the git-ignored `testdata/` folder.
 - Screenshots are not committed if they show map art. To make your own, open one of your replays and switch the terrain to "Shaded terrain", which is computed from height data and contains no Blizzard art.
 
 ## Roadmap
 
 - **Phase 2, accuracy (done):** the `ghostreel-engine` exporter for exact positions and ground truth, and the command tier. Next for the command tier: units blocking each other (sieged tanks on ramps), fights themselves (kiting, chasing), and ground truth for current game versions and for Zerg players (needs a Windows or macOS client, and recorded games where the Zerg side is a player rather than the AI).
-- **Phase 3, 3D:** a local asset extractor for unit models, terrain textures and animations, and a 3D view with fog of war.
+- **Phase 3, 3D (done):** the 3D view with the game's own models and animations, doodads, ground texture and fog of war. Next: blending the terrain's texture layers (the mask format isn't decoded yet), cliff meshes, and checking a current Windows install.
 - **Phase 4:** a browser-only build (WebAssembly), installers and plugin hooks.

@@ -74,7 +74,7 @@ flowchart LR
 | --- | --- | --- |
 | Core library + CLI | Go: `s2prot`, `icza/mpq`, own map parsers | Native fit with s2prot; one static binary |
 | Timeline format | Protobuf (or FlatBuffers for zero-copy seeks) | Language-neutral, versioned schema |
-| Asset extractor | C++ CLI on CascLib, outputs glTF + PNG | Keeps the native CASC dependency out of the core |
+| Asset extractor | C++ CLI on CascLib, outputs glTF + PNG | Keeps the native CASC dependency out of the core. *Built instead as a pure-Go CASC reader inside the core, converting on demand; see docs/DECISIONS.md, Phase 3.* |
 | Viewer | TypeScript + three.js (2D via orthographic camera) | One renderer for 2D and 3D; runs in a browser |
 | Desktop shell | Wails (Go backend + web frontend) | Reuses the Go core directly; no Electron |
 | Web build | Go core compiled to WASM | Drag-and-drop replays with no install, assets permitting |

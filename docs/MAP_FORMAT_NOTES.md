@@ -24,9 +24,13 @@ The parser scans for the two printable strings followed by bounds inside the map
 
 ## `t3SyncHeightMap` (gameplay heights)
 
-`SMAP`, version 0x66, u32 w, u32 h (**vertices**: cells + 1 each way), header up to `len − w·h·4` (64 bytes so far). The header contains three u32 4096 values, which are probably the scale. Then one u32 per vertex, value ÷ 4096 = height in game units (flat ground ≈ 8–16). This matches the z of command target points.
+`SMAP`, version 0x66, u32 w, u32 h (**vertices**: cells + 1 each way), header up to `len − w·h·4` (64 bytes so far). The header contains three u32 4096 values. Then one u32 per vertex, value ÷ 32768 = height in game units **above an unrecorded base** (2 units per cliff level). (Phase 0 read ÷ 4096, which made terrain 8 times too tall; fixed in Phase 3.) The base comes from the visual height map below; command target points then match within about 0.1.
 
-`t3HeightMap` (`HMAP`, version 0x65) is the visual height map with 6 bytes per vertex in an unknown layout. It isn't used. The sync map is what the game uses for gameplay.
+`t3HeightMap` (`HMAP`, version 0x65) is the visual height map: a 32-byte header, then 6 bytes per vertex: u16 (unknown), u16 quantized height, u16 cliff level. Height = q × `quantizeScale` + `standardHeight` − `quantizeBias`, from `<vertData>` in `t3Terrain.xml`. It is used only to find the sync map's base; the sync map is what the game uses for gameplay.
+
+## `t3Terrain.xml` and `t3TextureMasks`
+
+`<heightMap tileSet=…>` holds `<vertData>` (above) and `<textureList>`, 64 `CTerrainTex` ids, 8 per texture set; set 0 is the terrain's own. `t3TextureMasks` (`MASK`, version 0x66, u32 texel width/height at offsets 12/16, 8 texels per cell, 64-byte header) is stored in 64×64-texel blocks of 8×8 cells, 16 KiB each, in `blockTextureSetList` order. The layout inside a block is not decoded yet: neither 4 interleaved bytes per texel nor 8 BC4-compressed 64×64 layers gives clean masks.
 
 ## `t3SyncCliffLevel`
 

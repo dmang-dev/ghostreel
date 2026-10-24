@@ -120,3 +120,29 @@ Still open:
 - **Siege Tanks on Ultralove** remain the largest single error (25.9 cells on attack orders). The real tanks get stuck at a ramp, most likely behind sieged tanks, which units can't push past. The tier doesn't model units blocking each other.
 - **Fights themselves** (kiting, chasing).
 - **Medivac boost** is classified but not applied.
+
+## Phase 3 (2026-10-24): 3D
+
+### Deviations from the plan
+
+- **CASC is read in Go, not by a C++ extractor.** PLAN.md put CascLib in a separate C++ CLI to keep native code out of the core. No C++ toolchain was available, and a Go port keeps the core cgo-free and one binary, so `internal/casc` ports the parts of CascLib (MIT) needed: `.build.info`, the build config, ENCODING, the `.idx` indexes, BLTE (plain and zlib frames) and the MNDX root that names files. Encrypted ('E') frames aren't supported; none of the files used here are encrypted.
+- **No separate extraction step.** Models convert on demand when the viewer first asks for a unit type (`/api/assets/...`), and the result is cached under the ghostreel cache folder per game build. `ghostreel assets` warms that cache and lists gaps.
+- **Format reference.** `internal/m3` follows the structure layouts documented by the m3studio / m3addon Blender add-ons (GPL-2). Only the file format facts were used; no code was copied, so the package stays Apache-2.0.
+
+### Facts checked against real files (build 75689, the Linux package)
+
+- 21,308 `.m3` files; every one of the 2,947 unit and building models present parses. MODL versions 23–29, vertex layout from `vertex_flags`, faces local to regions, bone lookups per region. Bind matrices (IREF) are column-major, the same as glTF. Bones' default transforms are not the bind pose, so animations always drive the pose.
+- Models face −y in their own space; the viewer turns them so a facing of 0 points +x like the timeline.
+- Unit types resolve through `CActorUnit` (by `unitName` or id; morphed forms such as `BarracksFlying` or `RoachBurrowed` through the base actor's `UnitBirth`/`UnitCreation`/`MorphTo` create events) → `CModel` (template inheritance, `##token##` substitution, numbered `_00` variations) → file. `RequiredAnims` `.m3a` files supply missing sequences, matched by bone name.
+- **Exit gate:** every unit type in the ladder table converts with a Stand animation, and every moving ground unit with Walk (`internal/assets` `TestLadderModels`). Exceptions, by data: the Interceptor has no skeletal animation, the sieged tank rests in its bind pose (it animates only to fire), and Disruptors hover rather than walk. The **Archon**'s model is listed but stripped from this package, so it couldn't be checked here; that needs a full Windows or macOS install.
+- The headless package strips most full-size textures (about 27% present) but keeps 90% of the low-detail `.lvl0` copies (e.g. 64×32 for the Marine), which the converter falls back to. Expect sharper textures from a full install.
+- Materials: for opaque materials the diffuse alpha is the team-color mask. Blended materials take opacity from the alpha layer, folded into the base color's alpha at export. Additive and unshaded layers (glows) are drawn unlit from their own or the emissive texture.
+- **Terrain heights were 8× too tall.** `t3SyncHeightMap` is fixed point with 15 fractional bits, not 12. Its zero isn't stored; the visual `t3HeightMap` (6 bytes per vertex: unknown u16, quantized height u16, cliff level u16, dequantized with `quantizeBias`/`quantizeScale`/`standardHeight` from `t3Terrain.xml`) has absolute heights and gives the base. Checked against the heights of command target points in replays: within 0.03–0.14 on average (Abyssal Reef, Ley Lines). The Magannatha replay disagrees by 2 with both height maps and the doodads, so it was most likely played on another version of that map.
+- Doodads (`ObjectDoodad`) name `CModel` ids directly; 96% of Persephone's 4,334 resolve. The rest are projected decals and splats with no geometry, which aren't drawn.
+
+### Not done
+
+- **Terrain texture blending.** `t3TextureMasks` is 64×64-texel blocks of 8×8 cells (16 KiB per block, so 8 layers × 2 KiB), but neither plain nor block-compressed layouts decoded cleanly. The 3D ground tiles the base layer (`textureList` entry 0, via `CTerrainTex`) shaded by the terrain image instead.
+- Cliff meshes (the heightfield's walls stand in), water, creep, particle effects, attachments (weapons on separate models), per-actor scale, and lighting per tileset.
+- **Performance** was only measured on a software renderer (Microsoft Basic Render Driver: 55 ms per frame with 96 skinned models), which says little about a GPU. Models give way to stand-ins below 3 pixels per cell and beyond 400 on screen.
+
