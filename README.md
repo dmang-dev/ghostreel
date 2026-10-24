@@ -12,6 +12,26 @@ ghostreel is a working name. The project is not affiliated with or endorsed by B
 >
 > The inspect panel shows when a unit's position was last actually observed.
 
+## Demo
+
+A 30-minute Terran vs Zerg game on Ley Lines. These recordings use only what ghostreel computes itself (Shaded terrain and stand-in shapes), so they contain no game art. With StarCraft II installed, the 3D view shows the game's own models and ground textures instead.
+
+**Playback:** the Zerg army hits the Terran natural at 9:14. Units follow their players' orders; deaths leave red rings, and the yellow ring on the minimap marks the battle.
+
+![2D playback of a battle](docs/media/playback.gif)
+
+**3D:** the same fight on the map's heightfield, camera orbiting.
+
+![3D view of the same battle](docs/media/3d.gif)
+
+**Fog of war:** everything, then what the Terran player could see, then the Zerg player.
+
+![Fog of war for each player](docs/media/fog.gif)
+
+**Analysis:** army value and income over the game, then the build order and the battles found.
+
+![Economy charts, build order and battles](docs/media/analysis.gif)
+
 ## Getting it
 
 Releases have a Windows installer (it opens `.SC2Replay` files on double-click), a macOS app, a Linux build, command-line archives, and a browser build that runs entirely in the page. See the **[user guide](docs/USER_GUIDE.md)** for installing, controls, maps and the 3D view.
