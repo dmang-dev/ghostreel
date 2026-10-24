@@ -163,18 +163,33 @@ func (m *Map) HeightAt(x, y int) float32 {
 }
 
 // Pathable reports whether ground units can walk on a cell: inside the
-// playable bounds and not a cliff edge. Rocks and doodad blockers are not in
-// this grid (they come from Objects); see docs/MAP_FORMAT_NOTES.md.
+// playable bounds and not inside a cliff. Rocks, minerals and other blockers
+// are not in this grid (they come from Objects or the replay); see
+// docs/MAP_FORMAT_NOTES.md.
+//
+// Bit 0 of t3CellFlags marks a band around every cliff, but the band's outer
+// ring (on both the high and the low side) is still walkable: only cells
+// whose four neighbors all carry the bit are cliff. Checked against the
+// game's own pathing grid (see DECISIONS.md).
 func (m *Map) Pathable(x, y int) bool {
 	if !m.inPlayable(x, y) {
 		return false
 	}
-	if m.CellFlags == nil {
+	if m.CellFlags == nil || !m.cliffBand(x, y) {
 		return true
 	}
-	return m.CellFlags[y*m.Width+x]&flagUnpathable == 0
+	for _, d := range [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+		nx, ny := x+d[0], y+d[1]
+		if nx >= 0 && ny >= 0 && nx < m.Width && ny < m.Height && !m.cliffBand(nx, ny) {
+			return true
+		}
+	}
+	return false
 }
 
-// flagUnpathable (bit 0) marks cliff-edge cells. Bit 1 is set on nearly every
-// cell of the maps studied; bits 2-7 were never set.
-const flagUnpathable = 0x01
+func (m *Map) cliffBand(x, y int) bool { return m.CellFlags[y*m.Width+x]&flagCliffBand != 0 }
+
+// flagCliffBand (bit 0) marks the band of cells around cliffs. Bit 1 is set
+// on nearly every cell; bit 2 appears on a few maps near cliffs (meaning
+// unknown).
+const flagCliffBand = 0x01

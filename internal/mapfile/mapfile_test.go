@@ -54,7 +54,10 @@ func syntheticMap() fakeArchive {
 	flags := append([]byte("LFCT"), u32s(0x66, 0, 0, 0, 0, w, h)...)
 	for i := 0; i < w*h; i++ {
 		f := byte(2)
-		if i == 5 { // cell (1,1) is a cliff edge
+		// A plus-shaped cliff band around cell (1,1): only (1,1) is inside it;
+		// the band's rim cells still touch plain ground.
+		switch i {
+		case 1, 4, 5, 6, 9:
 			f |= 1
 		}
 		flags = append(flags, f)
@@ -99,7 +102,7 @@ func TestDecodeSynthetic(t *testing.T) {
 	if len(m.CliffLevels) != 12 || m.CliffLevels[11] != 11 {
 		t.Errorf("cliffs = %v", m.CliffLevels)
 	}
-	if m.Pathable(1, 1) || !m.Pathable(2, 1) || m.Pathable(0, 0) {
+	if m.Pathable(1, 1) || !m.Pathable(2, 1) || m.Pathable(0, 0) { // (2,1) is band rim: walkable
 		t.Errorf("pathable: (1,1) cliff=%v (2,1)=%v (0,0) outside=%v", m.Pathable(1, 1), m.Pathable(2, 1), m.Pathable(0, 0))
 	}
 	if len(m.Objects) != 4 || m.Objects[1].Rotation != 1.5 || m.Objects[0].Y != 1.5 {
