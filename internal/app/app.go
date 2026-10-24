@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package app is the layer frontends talk to: it loads a replay, builds or
-// reuses its cached timeline, resolves and decodes its map, and keeps the
-// results for serving. Both `ghostreel serve` and the desktop app use it
-// through the HTTP API in package server.
+// Package app is the layer frontends talk to: it loads a replay, resolves
+// its map, builds (or reuses a cached) timeline at the best fidelity
+// available, and keeps the results for serving. Both `ghostreel serve` and
+// the desktop app use it through the HTTP API in package server.
 package app
 
 import (
@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/OWNER/ghostreel/internal/command"
+	"github.com/OWNER/ghostreel/internal/engine"
 	"github.com/OWNER/ghostreel/internal/mapcache"
 	"github.com/OWNER/ghostreel/internal/mapfile"
 	"github.com/OWNER/ghostreel/internal/replay"
@@ -27,17 +29,26 @@ import (
 )
 
 // CacheVersion is part of every cached timeline's file name. Bump it whenever
-// the builder's output changes so stale timelines are rebuilt.
-const CacheVersion = "tl1"
+// the builders' output changes so stale timelines are rebuilt.
+const CacheVersion = "tl2"
+
+// Tiers a Service can build.
+const (
+	TierTracker = "tracker"
+	TierCommand = "command"
+)
 
 // Service loads replays. It is safe for concurrent use.
 type Service struct {
-	// CacheDir holds timelines/<hash>-<CacheVersion>.pb and user-picked maps.
-	// Empty disables caching.
+	// CacheDir holds timelines/<hash>-<version>-<tier>.pb and user-picked
+	// maps. Empty disables caching.
 	CacheDir string
 	Resolver *mapcache.Resolver
-	// Commands keeps player commands in timelines. Off by default: decoding
-	// them dominates load time on long games and the viewer doesn't need them.
+	// Tier is the reconstruction to use when no engine recording exists:
+	// TierCommand (follows players' orders; needs game events, so loading
+	// is slower) or TierTracker. Empty means TierTracker.
+	Tier string
+	// Commands keeps player commands in the event feed.
 	Commands bool
 	Log      func(format string, args ...any)
 
@@ -51,17 +62,23 @@ type Loaded struct {
 	Name      string // file name the replay came from
 	Info      replay.Info
 	Timeline  []byte // binary timeline
+	Fidelity  string // "tracker", "command" or "engine"
 	FromCache bool
 
 	Map     []byte // mapfile.Export JSON; nil when no map was found
 	Minimap []byte // PNG; nil when unavailable
 	MapHow  mapcache.How
 	MapErr  string // why the map is missing, for the UI
+
+	data       []byte // the replay itself, to rebuild after a map change
+	mapPath    string
+	enginePath string // ground-truth recording next to the replay, if any
 }
 
-// New returns a service with the default cache directory and map resolver.
+// New returns a service with the default cache directory and map resolver,
+// building command-tier timelines.
 func New() *Service {
-	s := &Service{Resolver: mapcache.Default()}
+	s := &Service{Resolver: mapcache.Default(), Tier: TierCommand}
 	if dir, err := os.UserCacheDir(); err == nil {
 		s.CacheDir = filepath.Join(dir, "ghostreel")
 	}
@@ -90,67 +107,116 @@ func (s *Service) put(l *Loaded) {
 	s.loaded[l.ID] = l
 }
 
-// LoadFile loads a replay from disk.
+// LoadFile loads a replay from disk. An engine recording saved next to it
+// (<replay>.engine.pb.gz, from ghostreel-engine) makes the timeline exact.
 func (s *Service) LoadFile(ctx context.Context, path string) (*Loaded, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return s.LoadBytes(ctx, filepath.Base(path), data)
+	eng := strings.TrimSuffix(path, filepath.Ext(path)) + ".engine.pb.gz"
+	if _, err := os.Stat(eng); err != nil {
+		eng = ""
+	}
+	return s.load(ctx, filepath.Base(path), data, eng)
 }
 
 // LoadBytes loads a replay from its contents (an upload or a dropped file).
 func (s *Service) LoadBytes(ctx context.Context, name string, data []byte) (*Loaded, error) {
+	return s.load(ctx, name, data, "")
+}
+
+func (s *Service) load(ctx context.Context, name string, data []byte, enginePath string) (*Loaded, error) {
 	sum := sha256.Sum256(data)
 	id := hex.EncodeToString(sum[:])
 	if l := s.Get(id); l != nil {
 		return l, nil
 	}
-	l := &Loaded{ID: id, Name: name}
-
-	cachePath := ""
-	if s.CacheDir != "" {
-		suffix := CacheVersion
-		if s.Commands {
-			suffix += "c"
-		}
-		cachePath = filepath.Join(s.CacheDir, "timelines", id+"-"+suffix+".pb")
+	r, err := replay.DecodeWith(bytes.NewReader(data), replay.Options{InfoOnly: true})
+	if err != nil {
+		return nil, err
 	}
-	if cachePath != "" {
-		if tl, err := os.ReadFile(cachePath); err == nil {
-			r, err := replay.DecodeWith(bytes.NewReader(data), replay.Options{InfoOnly: true})
-			if err != nil {
-				return nil, err
-			}
-			l.Info, l.Timeline, l.FromCache = r.Info, tl, true
-			s.logf("timeline for %s from cache", name)
-		}
-	}
-	if l.Timeline == nil {
-		r, err := replay.DecodeWith(bytes.NewReader(data), replay.Options{SkipGameEvents: !s.Commands})
-		if err != nil {
-			return nil, err
-		}
-		r.Info.Hash = id
-		tl, err := timeline.Build(&r.Info, r.Events, timeline.Options{Generator: "ghostreel " + CacheVersion, SkipCommands: !s.Commands})
-		if err != nil {
-			return nil, err
-		}
-		if l.Timeline, err = timeline.Marshal(tl); err != nil {
-			return nil, err
-		}
-		l.Info = r.Info
-		if cachePath != "" {
-			if err := writeFileAtomic(cachePath, l.Timeline); err != nil {
-				s.logf("timeline cache: %v", err)
-			}
-		}
-	}
+	l := &Loaded{ID: id, Name: name, Info: r.Info, data: data, enginePath: enginePath}
 	l.Info.Hash = id
-
 	s.attachMap(ctx, l, "", s.Resolver)
+	if err := s.buildTimeline(l); err != nil {
+		return nil, err
+	}
 	s.put(l)
 	return l, nil
+}
+
+// fidelity is the tier buildTimeline will produce for l.
+func (s *Service) fidelity(l *Loaded) string {
+	switch {
+	case l.enginePath != "":
+		return "engine"
+	case s.Tier == TierCommand:
+		return TierCommand
+	}
+	return TierTracker
+}
+
+// buildTimeline (re)builds l's timeline, using the cache when possible. The
+// command tier depends on the map (for pathing), so its cache key records
+// whether a map was used.
+func (s *Service) buildTimeline(l *Loaded) error {
+	fid := s.fidelity(l)
+	key := fid
+	if fid == TierCommand && l.mapPath == "" {
+		key += "-nomap"
+	}
+	if s.Commands {
+		key += "-cmds"
+	}
+	cachePath := ""
+	if s.CacheDir != "" && fid != "engine" {
+		cachePath = filepath.Join(s.CacheDir, "timelines", l.ID+"-"+CacheVersion+"-"+key+".pb")
+		if tl, err := os.ReadFile(cachePath); err == nil {
+			l.Timeline, l.Fidelity, l.FromCache = tl, fid, true
+			s.logf("timeline for %s from cache", l.Name)
+			return nil
+		}
+	}
+	needGame := s.Commands || fid == TierCommand
+	r, err := replay.DecodeWith(bytes.NewReader(l.data), replay.Options{SkipGameEvents: !needGame})
+	if err != nil {
+		return err
+	}
+	r.Info.Hash = l.ID
+	tl, err := timeline.Build(&r.Info, r.Events, timeline.Options{Generator: "ghostreel " + CacheVersion, SkipCommands: !s.Commands})
+	if err != nil {
+		return err
+	}
+	switch fid {
+	case "engine":
+		smp, err := engine.ReadSamples(l.enginePath)
+		if err == nil {
+			err = timeline.ApplyEngine(tl, smp)
+		}
+		if err != nil {
+			s.logf("%s: engine recording not used: %v", l.Name, err)
+			fid = TierTracker
+		}
+	case TierCommand:
+		opts := command.Options{}
+		if l.mapPath != "" {
+			if m, err := mapfile.Open(l.mapPath); err == nil {
+				opts.Grid = command.Grid(m)
+			}
+		}
+		command.Apply(tl, r.Events, opts)
+	}
+	if l.Timeline, err = timeline.Marshal(tl); err != nil {
+		return err
+	}
+	l.Fidelity, l.FromCache = fid, false
+	if cachePath != "" {
+		if err := writeFileAtomic(cachePath, l.Timeline); err != nil {
+			s.logf("timeline cache: %v", err)
+		}
+	}
+	return nil
 }
 
 // DownloadMap retries the map lookup with depot downloads allowed for this
@@ -169,13 +235,7 @@ func (s *Service) DownloadMap(ctx context.Context, id string) (*Loaded, error) {
 	}
 	r := *s.Resolver
 	r.AllowNetwork = true
-	cp := *l
-	s.attachMap(ctx, &cp, "", &r)
-	if cp.Map == nil {
-		return nil, errors.New(cp.MapErr)
-	}
-	s.put(&cp)
-	return &cp, nil
+	return s.replaceMap(ctx, l, "", &r)
 }
 
 // CanDownload reports whether DownloadMap could find this replay's map.
@@ -201,10 +261,21 @@ func (s *Service) SetMap(ctx context.Context, id string, name string, data []byt
 	if err := writeFileAtomic(p, data); err != nil {
 		return nil, err
 	}
+	return s.replaceMap(ctx, l, p, s.Resolver)
+}
+
+// replaceMap attaches a newly found map and, when the timeline depends on
+// it, rebuilds the timeline.
+func (s *Service) replaceMap(ctx context.Context, l *Loaded, manual string, r *mapcache.Resolver) (*Loaded, error) {
 	cp := *l
-	s.attachMap(ctx, &cp, p, s.Resolver)
+	s.attachMap(ctx, &cp, manual, r)
 	if cp.Map == nil {
 		return nil, errors.New(cp.MapErr)
+	}
+	if s.fidelity(&cp) == TierCommand {
+		if err := s.buildTimeline(&cp); err != nil {
+			return nil, err
+		}
 	}
 	s.put(&cp)
 	return &cp, nil
@@ -213,7 +284,7 @@ func (s *Service) SetMap(ctx context.Context, id string, name string, data []byt
 // attachMap resolves and decodes the map; failures are recorded, not fatal,
 // so the viewer can still play on a blank grid.
 func (s *Service) attachMap(ctx context.Context, l *Loaded, manual string, r *mapcache.Resolver) {
-	l.Map, l.Minimap, l.MapErr, l.MapHow = nil, nil, "", ""
+	l.Map, l.Minimap, l.MapErr, l.MapHow, l.mapPath = nil, nil, "", "", ""
 	if r == nil {
 		l.MapErr = "map lookup disabled"
 		return
@@ -247,7 +318,7 @@ func (s *Service) attachMap(ctx context.Context, l *Loaded, manual string, r *ma
 			l.Minimap = buf.Bytes()
 		}
 	}
-	l.MapHow = how
+	l.MapHow, l.mapPath = how, path
 }
 
 func writeFileAtomic(path string, data []byte) error {

@@ -191,3 +191,4 @@ button:disabled { opacity: 0.4; cursor: default; }
   .badge, .toggle { display: none; }
   .banner { max-width: calc(100% - 20px); min-width: 0; }
 }
+.badge.exact { border-color: #2d5a3a; color: #6fd394; }

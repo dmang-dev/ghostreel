@@ -16,6 +16,7 @@ import {
   TimelineSchema,
   SchemaVersion,
   UnitClass,
+  Source,
 } from "./gen/timeline/v1/timeline_pb";
 
 export const LOOPS_PER_CLOCK_SECOND = 22.4;
@@ -248,14 +249,17 @@ export class Model {
     positionAt(this.tracks[u.id], this.types[t]?.speed ?? 0, loop, out);
   }
 
-  /** Loop of the last keyframe at or before loop (when the unit was last actually seen). */
+  /**
+   * Loop of the last observed position at or before loop: a tracker sample,
+   * birth, death or engine frame. Command-tier estimates don't count.
+   */
   lastSeen(id: number, loop: number): number | undefined {
     const keys = this.tracks[id];
     if (!keys) return undefined;
     let best: number | undefined;
     for (const k of keys) {
       if (k.loop > loop) break;
-      best = k.loop;
+      if (k.source !== Source.COMMAND) best = k.loop;
     }
     return best;
   }

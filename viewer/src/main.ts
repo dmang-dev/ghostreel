@@ -85,7 +85,7 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   $("title").textContent = `${meta.mapTitle} — ${players} — ${formatClock(meta.loops)}`;
   $("title").title = `${summary.name}\nSC2 ${meta.version}` +
     (meta.protocolApproxFrom ? `\nDecoded with the protocol of build ${meta.protocolApproxFrom} (not exact)` : "");
-  $("tier").hidden = false;
+  showTier(summary.fidelity);
   $("empty").hidden = true;
   $("feed").hidden = false;
   $("minimap").hidden = false;
@@ -110,9 +110,12 @@ async function replaceMap(get: (id: string) => Promise<api.Summary>, label: stri
   $("loading").hidden = false;
   try {
     const summary = await get(c.summary.id);
-    const [map, minimap] = await Promise.all([api.fetchMap(summary.id), api.fetchMinimap(summary.id)]);
+    // The command tier depends on the map, so the timeline may have changed too.
+    const [tlBytes, map, minimap] = await Promise.all([
+      api.fetchTimeline(summary.id), api.fetchMap(summary.id), api.fetchMinimap(summary.id),
+    ]);
     const at = loop;
-    show(summary, c.model, map, minimap);
+    show(summary, new Model(decodeTimeline(tlBytes)), map, minimap);
     loop = at;
   } catch (e) {
     showError(`That map didn't work: ${(e as Error).message}`);
@@ -651,3 +654,30 @@ window.ghostreelBench = (frames = 600) => {
   }
   return +((performance.now() - t0) / 600).toFixed(3);
 };
+
+const TIERS = {
+  tracker: {
+    label: "Tracker tier · positions approximate",
+    help: "Births, deaths and buildings are exact. Unit positions are exact only when the replay sampled them (mostly in fights) and at death; in between, units hold their last known position.",
+    cls: "",
+  },
+  command: {
+    label: "Command tier · positions estimated",
+    help: "Units follow the players' recorded orders over the map (workers mine, groups move around cliffs), corrected whenever the replay sampled a position. Players without recorded orders (the built-in AI) stay at tracker accuracy.",
+    cls: "",
+  },
+  engine: {
+    label: "Engine tier · exact positions",
+    help: "Positions were recorded by playing this replay in the real game (ghostreel-engine).",
+    cls: "exact",
+  },
+} as const;
+
+function showTier(fidelity: api.Summary["fidelity"]): void {
+  const t = TIERS[fidelity] ?? TIERS.tracker;
+  const el = $("tier");
+  el.textContent = t.label;
+  el.title = t.help;
+  el.className = `badge ${t.cls}`;
+  el.hidden = false;
+}

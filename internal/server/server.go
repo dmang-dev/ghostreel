@@ -59,6 +59,8 @@ type Summary struct {
 	MapHow    string `json:"mapHow,omitempty"`
 	MapError  string `json:"mapError,omitempty"`
 	FromCache bool   `json:"fromCache"`
+	// Fidelity is the tier the timeline was built at: tracker, command or engine.
+	Fidelity string `json:"fidelity"`
 	// CanDownload: the map is missing but Blizzard's depot has it.
 	CanDownload bool     `json:"canDownload"`
 	Players     []string `json:"players"`
@@ -68,7 +70,7 @@ func summarize(l *app.Loaded) Summary {
 	s := Summary{
 		ID: l.ID, Name: l.Name, MapTitle: l.Info.MapTitle, Duration: replay.FormatClock(l.Info.Loops),
 		Version: l.Info.Version, Approx: l.Info.ProtocolApproxFrom, HasMap: l.Map != nil,
-		MapHow: string(l.MapHow), MapError: l.MapErr, FromCache: l.FromCache, CanDownload: l.CanDownload(),
+		MapHow: string(l.MapHow), MapError: l.MapErr, FromCache: l.FromCache, CanDownload: l.CanDownload(), Fidelity: l.Fidelity,
 	}
 	for _, p := range l.Info.Players {
 		s.Players = append(s.Players, p.Name)

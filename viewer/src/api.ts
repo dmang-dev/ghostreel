@@ -16,6 +16,8 @@ export interface Summary {
   fromCache: boolean;
   /** The map is missing but Blizzard's depot has it. */
   canDownload: boolean;
+  /** Tier the timeline was built at. */
+  fidelity: "tracker" | "command" | "engine";
   players: string[];
 }
 
