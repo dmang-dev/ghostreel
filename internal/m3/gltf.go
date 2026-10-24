@@ -7,15 +7,17 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"image"
+	"image/png"
 	"math"
 	"sort"
 )
 
 // GLBOptions controls the glTF export.
 type GLBOptions struct {
-	// Texture returns PNG bytes for a material's diffuse texture path, or nil
-	// when it is not available (the material is then left untextured).
-	Texture func(path string) []byte
+	// Texture returns a decoded texture by path, or nil when it is not
+	// available (the material then goes without it).
+	Texture func(path string) image.Image
 	// Sequences, when non-nil, selects the animations to keep by name.
 	Sequences func(name string) bool
 }
@@ -156,17 +158,44 @@ func (m *Model) GLB(opt GLBOptions) ([]byte, error) {
 		gm := map[string]any{
 			"name":        mt.Name,
 			"doubleSided": mt.TwoSided,
-			"extras":      map[string]any{"blendMode": mt.BlendMode, "unshaded": mt.Unshaded},
+			"extras":      map[string]any{"blendMode": mt.BlendMode, "unshaded": mt.Unshaded, "alphaLayer": mt.Alpha != ""},
 		}
 		pbr := map[string]any{"metallicFactor": 0, "roughnessFactor": 0.8}
 		if mt.BlendMode != 0 {
 			gm["alphaMode"] = "BLEND"
 		}
-		if mt.Diffuse != "" && opt.Texture != nil {
-			if png := opt.Texture(mt.Diffuse); png != nil {
-				images = append(images, map[string]any{"bufferView": w.view(png, 0), "mimeType": "image/png"})
-				textures = append(textures, map[string]any{"source": len(images) - 1, "sampler": 0})
-				pbr["baseColorTexture"] = map[string]any{"index": len(textures) - 1}
+		addTexture := func(img image.Image) int {
+			var buf bytes.Buffer
+			if png.Encode(&buf, img) != nil {
+				return -1
+			}
+			images = append(images, map[string]any{"bufferView": w.view(buf.Bytes(), 0), "mimeType": "image/png"})
+			textures = append(textures, map[string]any{"source": len(images) - 1, "sampler": 0})
+			return len(textures) - 1
+		}
+		load := func(path string) image.Image {
+			if path == "" || opt.Texture == nil {
+				return nil
+			}
+			return opt.Texture(path)
+		}
+		if diff := load(mt.Diffuse); diff != nil {
+			// Blended materials take their opacity from the alpha layer; the
+			// diffuse alpha means something else (the team-color mask on
+			// opaque ones).
+			if mt.BlendMode != 0 {
+				if a := load(mt.Alpha); a != nil {
+					diff = withAlpha(diff, a, mt.AlphaChannel)
+				}
+			}
+			if i := addTexture(diff); i >= 0 {
+				pbr["baseColorTexture"] = map[string]any{"index": i}
+			}
+		}
+		if em := load(mt.Emissive); em != nil {
+			if i := addTexture(em); i >= 0 {
+				gm["emissiveTexture"] = map[string]any{"index": i}
+				gm["emissiveFactor"] = []float32{1, 1, 1}
 			}
 		}
 		gm["pbrMetallicRoughness"] = pbr
@@ -326,4 +355,25 @@ func cleanKeys(ms, vals []float32, width int) ([]float32, []float32) {
 		vs = append(vs, v...)
 	}
 	return ts, vs
+}
+
+// withAlpha returns color's RGB with its alpha taken from one channel of
+// another texture, sampled nearest-neighbour when the sizes differ.
+func withAlpha(color, alpha image.Image, channel byte) image.Image {
+	cb, ab := color.Bounds(), alpha.Bounds()
+	out := image.NewNRGBA(image.Rect(0, 0, cb.Dx(), cb.Dy()))
+	for y := 0; y < cb.Dy(); y++ {
+		ay := ab.Min.Y + y*ab.Dy()/cb.Dy()
+		for x := 0; x < cb.Dx(); x++ {
+			r, g, b, a := color.At(cb.Min.X+x, cb.Min.Y+y).RGBA()
+			if a > 0 { // un-premultiply
+				r, g, b = r*0xffff/a, g*0xffff/a, b*0xffff/a
+			}
+			ar, ag, abl, aa := alpha.At(ab.Min.X+x*ab.Dx()/cb.Dx(), ay).RGBA()
+			v := map[byte]uint32{'R': ar, 'G': ag, 'B': abl, 'A': aa}[channel]
+			o := out.PixOffset(x, y)
+			out.Pix[o], out.Pix[o+1], out.Pix[o+2], out.Pix[o+3] = uint8(r>>8), uint8(g>>8), uint8(b>>8), uint8(v>>8)
+		}
+	}
+	return out
 }

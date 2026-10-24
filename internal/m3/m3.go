@@ -66,11 +66,16 @@ type Mesh struct {
 
 // Material is a standard material reduced to what a simple renderer needs.
 type Material struct {
-	Name      string
-	Diffuse   string // texture path, "" when the color layer has no bitmap
-	BlendMode uint32 // 0 opaque, 1 alpha blend, 2 add, 3 alpha add, 4 mod, 5 mod2x
-	TwoSided  bool
-	Unshaded  bool
+	Name     string
+	Diffuse  string // texture path, "" when the color layer has no bitmap
+	Emissive string // texture of the first emissive layer
+	// Alpha is the texture of the first alpha layer (opacity of blended
+	// materials) and AlphaChannel the channel it reads: 'A', 'R', 'G' or 'B'.
+	Alpha        string
+	AlphaChannel byte
+	BlendMode    uint32 // 0 opaque, 1 alpha blend, 2 add, 3 alpha add, 4 mod, 5 mod2x
+	TwoSided     bool
+	Unshaded     bool
 }
 
 // Sequence is one named animation ("Stand", "Walk", "Attack", ...).
@@ -632,16 +637,29 @@ func (f *file) materials(m *Model, refsOff, stdOff int) error {
 		}
 		flags := le.Uint32(f.b[o+16:])
 		mt := Material{Name: name, BlendMode: le.Uint32(f.b[o+20:]), TwoSided: flags&0x8 != 0, Unshaded: flags&0x10 != 0}
+		// The layer references: diffuse, decal, specular, gloss (since
+		// v16), emissive 1 and 2, environment, environment mask, alpha 1, ...
 		diff := o + 52
 		if mver >= 20 {
 			diff += 12
 		}
-		if lays, _, err := f.elems(f.ref(diff), "LAYR"); err != nil {
+		gloss := 0
+		if mver >= 16 {
+			gloss = 12
+		}
+		var ch uint32
+		if mt.Diffuse, _, err = f.layer(diff); err != nil {
 			return err
-		} else if len(lays) > 0 {
-			if mt.Diffuse, err = f.str(lays[0] + 4); err != nil {
-				return err
-			}
+		}
+		if mt.Emissive, _, err = f.layer(diff + 36 + gloss); err != nil {
+			return err
+		}
+		if mt.Alpha, ch, err = f.layer(diff + 84 + gloss); err != nil {
+			return err
+		}
+		mt.AlphaChannel = map[uint32]byte{3: 'R', 4: 'G', 5: 'B'}[ch]
+		if mt.AlphaChannel == 0 {
+			mt.AlphaChannel = 'A'
 		}
 		remap[i] = len(m.Materials)
 		m.Materials = append(m.Materials, mt)
@@ -655,6 +673,17 @@ func (f *file) materials(m *Model, refsOff, stdOff int) error {
 	}
 	m.Meshes = kept
 	return nil
+}
+
+// layer reads a material layer reference: its bitmap path ("" for none)
+// and which color channels it uses (0 RGB, 1 RGBA, 2 A, 3 R, 4 G, 5 B).
+func (f *file) layer(off int) (string, uint32, error) {
+	lays, _, err := f.elems(f.ref(off), "LAYR")
+	if err != nil || len(lays) == 0 {
+		return "", 0, err
+	}
+	path, err := f.str(lays[0] + 4)
+	return path, le.Uint32(f.b[lays[0]+44:]), err
 }
 
 func (f *file) sequences(m *Model, seqOff, stcOff, stgOff int) error {

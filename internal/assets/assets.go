@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"image"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -25,7 +26,7 @@ import (
 )
 
 // Version is part of the cache path; bump it when the conversion changes.
-const Version = "a1"
+const Version = "a2"
 
 // mods are the dependencies of a ladder map, lowest priority first.
 var mods = []string{"core", "liberty", "libertymulti", "swarm", "swarmmulti", "void", "voidmulti"}
@@ -293,14 +294,14 @@ func (l *Library) convert(name string, anims []string) ([]byte, error) {
 		m.MergeAnimations(a)
 	}
 	return m.GLB(m3.GLBOptions{
-		Texture:   l.texturePNG,
+		Texture:   l.texture,
 		Sequences: func(s string) bool { return !skipSequence.MatchString(s) },
 	})
 }
 
-// texturePNG decodes a texture to PNG. Installations without full-quality
-// textures (the Linux headless build) still ship the low-detail .lvl0 copy.
-func (l *Library) texturePNG(path string) []byte {
+// texture decodes a texture. Installations without full-quality textures
+// (the Linux headless build) still ship the low-detail .lvl0 copy.
+func (l *Library) texture(path string) image.Image {
 	base := strings.TrimSuffix(path, filepath.Ext(path))
 	for _, cand := range []string{base + ".dds", base + ".lvl0"} {
 		name, ok := l.file(cand)
@@ -311,13 +312,8 @@ func (l *Library) texturePNG(path string) []byte {
 		if err != nil {
 			continue
 		}
-		img, err := dds.Decode(b, maxTexture)
-		if err != nil {
-			continue
-		}
-		var out bytes.Buffer
-		if png.Encode(&out, img) == nil {
-			return out.Bytes()
+		if img, err := dds.Decode(b, maxTexture); err == nil {
+			return img
 		}
 	}
 	return nil
@@ -332,11 +328,15 @@ func (l *Library) IconPNG(unit string) ([]byte, error) {
 	if !ok || path == "" {
 		return nil, ErrNoModel
 	}
-	b := l.texturePNG(path)
-	if b == nil {
+	img := l.texture(path)
+	if img == nil {
 		return nil, fmt.Errorf("%w (icon %s is not in the game data)", ErrNoModel, path)
 	}
-	return b, nil
+	var out bytes.Buffer
+	if err := png.Encode(&out, img); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }
 
 // FindInstall returns the game installation folder (the one holding
