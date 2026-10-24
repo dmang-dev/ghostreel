@@ -66,6 +66,7 @@ type Loaded struct {
 	FromCache bool
 
 	Map     []byte // mapfile.Export JSON; nil when no map was found
+	Doodads []byte // JSON list of the map's doodads (mapfile.Object); nil without a map
 	Minimap []byte // PNG; nil when unavailable
 	MapHow  mapcache.How
 	MapErr  string // why the map is missing, for the UI
@@ -311,6 +312,15 @@ func (s *Service) attachMap(ctx context.Context, l *Loaded, manual string, r *ma
 	if l.Map, err = json.Marshal(m.Export(false)); err != nil {
 		l.Map, l.MapErr = nil, err.Error()
 		return
+	}
+	doodads := []mapfile.Object{}
+	for _, o := range m.Objects {
+		if o.Kind == mapfile.ObjectDoodad {
+			doodads = append(doodads, o)
+		}
+	}
+	if l.Doodads, err = json.Marshal(doodads); err != nil {
+		l.Doodads = nil
 	}
 	if m.Minimap != nil {
 		var buf bytes.Buffer

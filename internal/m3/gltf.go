@@ -13,6 +13,10 @@ import (
 	"sort"
 )
 
+// ErrNoGeometry is returned for models with nothing to draw (projected
+// decals, effect emitters).
+var ErrNoGeometry = errors.New("m3: model has no geometry")
+
 // GLBOptions controls the glTF export.
 type GLBOptions struct {
 	// Texture returns a decoded texture by path, or nil when it is not
@@ -93,7 +97,7 @@ func (w *glbWriter) floats(fs []float32, typ string, target int, minmax bool) in
 // materials the texture's alpha channel is the team-color mask, not opacity.
 func (m *Model) GLB(opt GLBOptions) ([]byte, error) {
 	if len(m.Vertices) == 0 || len(m.Meshes) == 0 {
-		return nil, errors.New("m3: model has no geometry")
+		return nil, ErrNoGeometry
 	}
 	w := &glbWriter{}
 	nodes := []map[string]any{{"name": "root", "rotation": zUpToYUp, "children": []int{}}}

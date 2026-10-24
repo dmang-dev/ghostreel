@@ -43,7 +43,8 @@ const MODEL_FACING = Math.PI / 2;
 export class UnitModels {
   available = false;
   private readonly loader = new GLTFLoader();
-  private readonly templates = new Map<string, Template | null | Promise<void>>();
+  private readonly templates = new Map<string, Template | null>();
+  private readonly pending = new Map<string, Promise<Template | null>>();
   /** Called when a template finishes loading, so the view can redraw. */
   onLoad?: () => void;
 
@@ -68,14 +69,26 @@ export class UnitModels {
     if (!this.available) return null;
     const key = death ? `death/${type}` : `unit/${type}`;
     const t = this.templates.get(key);
-    if (t === undefined) {
-      this.templates.set(key, this.load(key));
-      return undefined;
-    }
-    return t instanceof Promise ? undefined : t;
+    if (t === undefined) void this.template(key);
+    return t;
   }
 
-  private async load(key: string): Promise<void> {
+  /**
+   * Loads a template by API path under /api/assets ("unit/Marine",
+   * "model/Rock?v=2"), once; null when the server has none.
+   */
+  template(key: string): Promise<Template | null> {
+    const done = this.templates.get(key);
+    if (done !== undefined) return Promise.resolve(done);
+    let p = this.pending.get(key);
+    if (!p) {
+      p = this.load(key);
+      this.pending.set(key, p);
+    }
+    return p;
+  }
+
+  private async load(key: string): Promise<Template | null> {
     let tpl: Template | null = null;
     try {
       const r = await fetch(`${this.base}/api/assets/${key}`);
@@ -84,7 +97,9 @@ export class UnitModels {
       console.warn(`model ${key}:`, e);
     }
     this.templates.set(key, tpl);
+    this.pending.delete(key);
     this.onLoad?.();
+    return tpl;
   }
 
   private async parse(buf: ArrayBuffer): Promise<Template> {

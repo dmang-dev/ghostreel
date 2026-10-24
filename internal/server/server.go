@@ -11,6 +11,7 @@
 //	GET  /api/r/{id}/timeline      binary timeline (application/x-protobuf)
 //	GET  /api/r/{id}/map           map JSON (404 when no map)
 //	GET  /api/r/{id}/minimap       PNG (404 when none)
+//	GET  /api/r/{id}/doodads       JSON list of the map's doodads (404 when no map)
 //	POST /api/r/{id}/map           body = map bytes, X-Filename header → Summary
 //	POST /api/r/{id}/download-map  fetch the map from Blizzard's depot (user-initiated) → Summary
 //	GET  /api/startup              Summary of a replay opened at launch, or null
@@ -18,6 +19,7 @@
 //	GET  /api/assets/unit/{type}   binary glTF of a unit type's model (404 when none)
 //	GET  /api/assets/death/{type}  binary glTF of its death model (404 when none)
 //	GET  /api/assets/icon/{type}   PNG command-card icon (404 when none)
+//	GET  /api/assets/model/{id}    binary glTF of a model by id, ?v= variation (doodads)
 package server
 
 import (
@@ -30,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -109,6 +112,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/r/{id}/minimap", s.blob(func(l *app.Loaded) ([]byte, string) {
 		return l.Minimap, "image/png"
 	}))
+	mux.HandleFunc("GET /api/r/{id}/doodads", s.blob(func(l *app.Loaded) ([]byte, string) {
+		return l.Doodads, "application/json"
+	}))
 	mux.HandleFunc("POST /api/r/{id}/map", s.setMap)
 	mux.HandleFunc("POST /api/r/{id}/download-map", func(w http.ResponseWriter, r *http.Request) {
 		l, err := s.App.DownloadMap(r.Context(), r.PathValue("id"))
@@ -145,6 +151,12 @@ func (s *Server) Handler() http.Handler {
 		return l.UnitGLB(t, true)
 	}))
 	mux.HandleFunc("GET /api/assets/icon/{type}", s.asset("image/png", (*assets.Library).IconPNG))
+	mux.HandleFunc("GET /api/assets/model/{type}", func(w http.ResponseWriter, r *http.Request) {
+		v, _ := strconv.Atoi(r.URL.Query().Get("v"))
+		s.asset("model/gltf-binary", func(l *assets.Library, id string) ([]byte, error) {
+			return l.ModelGLB(id, v)
+		})(w, r)
+	})
 	if s.Static != nil {
 		mux.Handle("/", http.FileServerFS(s.Static))
 	}

@@ -98,6 +98,7 @@ export class Scene {
   /** Game models, when the server has game data. */
   models?: UnitModels;
   private readonly instances = new Map<number, { inst: UnitInstance; type: string; death: boolean }>();
+  private doodads?: THREE.Group;
   private frame = 0;
 
   private drawn: DrawnUnit[] = [];
@@ -158,6 +159,7 @@ export class Scene {
       facing: 0, moving: false, attacking: false,
     }));
     this.clearInstances();
+    this.setDoodads(undefined);
 
     this.fogData = new Uint8Array(width * height * 4);
     this.fogTex?.dispose();
@@ -248,6 +250,7 @@ export class Scene {
     if (this.terrain3) this.terrain3.visible = three;
     this.meshes2?.setVisible(!three);
     this.meshes3?.setVisible(three);
+    if (this.doodads) this.doodads.visible = three;
     this.selection2.visible = this.selection3.visible = false;
     this.updateFogVisibility();
   }
@@ -256,6 +259,20 @@ export class Scene {
     const on = this.fogPlayer !== 0;
     if (this.fogMesh2) this.fogMesh2.visible = on && this.mode === "2d";
     if (this.fogMesh3) this.fogMesh3.visible = on && this.mode === "3d";
+  }
+
+  /** Shows a map's doodads in 3D (see doodads.ts); undefined removes them. */
+  setDoodads(group: THREE.Group | undefined): void {
+    if (this.doodads) {
+      this.scene.remove(this.doodads);
+      // Geometry and materials belong to the shared model templates.
+      this.doodads.traverse((o) => (o as THREE.InstancedMesh).isInstancedMesh && (o as THREE.InstancedMesh).dispose());
+    }
+    this.doodads = group;
+    if (group) {
+      group.visible = this.mode === "3d";
+      this.scene.add(group);
+    }
   }
 
   setFogPlayer(p: number): void {

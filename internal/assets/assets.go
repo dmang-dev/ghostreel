@@ -190,15 +190,17 @@ func (l *Library) file(path string) (string, bool) {
 	return "", false
 }
 
-// ModelPath returns the storage name of a unit type's .m3 file.
-func (l *Library) ModelPath(unit string, death bool) (string, error) {
-	id, ok := l.modelID(unit, death)
-	if !ok || id == "" {
-		return "", ErrNoModel
-	}
+// modelFile returns the storage name of a CModel's .m3 file; variation picks
+// one of the numbered files of models that have several.
+func (l *Library) modelFile(id string, variation int) (string, error) {
 	path, ok := l.models.field("CModel", id, "Model")
 	if !ok || path == "" || strings.Contains(path, "##") {
 		return "", fmt.Errorf("%w (model %q has no file)", ErrNoModel, id)
+	}
+	if variation > 0 {
+		if name, ok := l.file(strings.TrimSuffix(path, ".m3") + fmt.Sprintf("_%02d.m3", variation)); ok {
+			return name, nil
+		}
 	}
 	name, ok := l.file(path)
 	if !ok {
@@ -207,7 +209,29 @@ func (l *Library) ModelPath(unit string, death bool) (string, error) {
 	return name, nil
 }
 
+// ModelPath returns the storage name of a unit type's .m3 file.
+func (l *Library) ModelPath(unit string, death bool) (string, error) {
+	id, ok := l.modelID(unit, death)
+	if !ok || id == "" {
+		return "", ErrNoModel
+	}
+	return l.modelFile(id, 0)
+}
+
 var safeName = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
+// ModelGLB returns a model by its CModel id (map doodads name models
+// directly) as binary glTF, converting it on first use.
+func (l *Library) ModelGLB(id string, variation int) ([]byte, error) {
+	if !safeName.MatchString(id) || variation < 0 || variation > 99 {
+		return nil, ErrNoModel
+	}
+	key := fmt.Sprintf("model.%s.%d", id, variation)
+	return l.cached(key, func() (string, []string, error) {
+		name, err := l.modelFile(id, variation)
+		return name, l.models.list("CModel", id, "RequiredAnims"), err
+	})
+}
 
 // UnitGLB returns a unit type's model (or its death model) as binary glTF,
 // converting it on first use.
@@ -219,6 +243,19 @@ func (l *Library) UnitGLB(unit string, death bool) ([]byte, error) {
 	if death {
 		key += ".death"
 	}
+	return l.cached(key, func() (string, []string, error) {
+		name, err := l.ModelPath(unit, death)
+		if err != nil {
+			return "", nil, err
+		}
+		id, _ := l.modelID(unit, death)
+		return name, l.models.list("CModel", id, "RequiredAnims"), nil
+	})
+}
+
+// cached converts a model once, keeping the result on disk under key.
+// resolve names the .m3 file and the animation files it requires.
+func (l *Library) cached(key string, resolve func() (string, []string, error)) ([]byte, error) {
 	return l.once(key, func() ([]byte, error) {
 		cache := ""
 		if l.cacheDir != "" {
@@ -227,12 +264,14 @@ func (l *Library) UnitGLB(unit string, death bool) ([]byte, error) {
 				return b, nil
 			}
 		}
-		name, err := l.ModelPath(unit, death)
+		name, anims, err := resolve()
 		if err != nil {
 			return nil, err
 		}
-		id, _ := l.modelID(unit, death)
-		b, err := l.convert(name, l.models.list("CModel", id, "RequiredAnims"))
+		b, err := l.convert(name, anims)
+		if errors.Is(err, m3.ErrNoGeometry) {
+			return nil, fmt.Errorf("%w (%s has no geometry)", ErrNoModel, name)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("assets: %s: %w", name, err)
 		}

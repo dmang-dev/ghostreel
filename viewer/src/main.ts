@@ -4,8 +4,10 @@
 // three.js scene.
 
 import "./style.css";
+import * as THREE from "three";
 import * as api from "./api";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, decodeTimeline, formatClock, isAlive, ownerAt, typeAt } from "./model";
+import { buildDoodads } from "./doodads";
 import { UnitModels } from "./models";
 import { Scene } from "./scene";
 import { blankGrid, hillshade, minimapTerrain } from "./terrain";
@@ -85,6 +87,8 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   cur = { summary, model, map, minimap, width, height, playable, shaded, art };
 
   scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded, map?.heights);
+  doodadsFor = "";
+  void loadDoodads();
   buildFogOptions(model);
   scene.fit(playable.Left, playable.Bottom, playable.Right, playable.Top);
   selected = undefined;
@@ -705,6 +709,24 @@ function toggle3D(): void {
   scene.setMode(scene.mode === "2d" ? "3d" : "2d");
   $("mode3d").textContent = scene.mode === "2d" ? "3D" : "2D";
   minimapAt = 0;
+  void loadDoodads();
+}
+
+// Doodads load the first time a replay is shown in 3D (their models are
+// converted on the server on first use, so the 2D view never waits for them).
+let doodadsFor = "";
+async function loadDoodads(): Promise<void> {
+  if (!cur?.map || scene.mode !== "3d" || !unitModels.available || doodadsFor === cur.summary.id) return;
+  const id = (doodadsFor = cur.summary.id);
+  try {
+    const list = await api.fetchDoodads(id);
+    if (cur?.summary.id !== id) return;
+    const group = new THREE.Group();
+    scene.setDoodads(group);
+    await buildDoodads(group, list, unitModels);
+  } catch (e) {
+    console.warn("doodads:", e);
+  }
 }
 $("mode3d").onclick = toggle3D;
 

@@ -21,6 +21,9 @@ export interface Summary {
   players: string[];
 }
 
+export type { Doodad } from "./doodads";
+import type { Doodad } from "./doodads";
+
 export interface MapRect {
   Left: number;
   Bottom: number;
@@ -114,6 +117,13 @@ export async function setMapFile(id: string, file: File): Promise<Summary> {
 
 export async function fetchTimeline(id: string): Promise<Uint8Array> {
   return new Uint8Array(await (await check(await fetch(`/api/r/${id}/timeline`))).arrayBuffer());
+}
+
+/** The map's doodads, for the 3D view (empty when there is no map). */
+export async function fetchDoodads(id: string): Promise<Doodad[]> {
+  const resp = await fetch(`/api/r/${id}/doodads`);
+  if (resp.status === 404) return [];
+  return (await (await check(resp)).json()) ?? [];
 }
 
 export async function fetchMap(id: string): Promise<MapData | null> {
