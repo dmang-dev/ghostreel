@@ -11,6 +11,7 @@
 package mapfile
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"image"
@@ -91,6 +92,21 @@ func Open(path string) (*Map, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	mp.Name = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	return mp, nil
+}
+
+// OpenBytes decodes a map from its contents; name is its file name.
+func OpenBytes(name string, data []byte) (*Map, error) {
+	m, err := mpq.New(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
+	defer m.Close()
+	mp, err := Decode(m)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
+	mp.Name = strings.TrimSuffix(filepath.Base(name), filepath.Ext(name))
 	return mp, nil
 }
 

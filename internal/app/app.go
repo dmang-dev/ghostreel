@@ -71,9 +71,10 @@ type Loaded struct {
 	MapHow  mapcache.How
 	MapErr  string // why the map is missing, for the UI
 
-	data       []byte // the replay itself, to rebuild after a map change
-	mapPath    string
-	enginePath string // ground-truth recording next to the replay, if any
+	data       []byte       // the replay itself, to rebuild after a map change
+	mapFile    *mapfile.Map // the decoded map, for the command tier's pathing
+	noLookup   bool         // map lookup is disabled (the browser build)
+	enginePath string       // ground-truth recording next to the replay, if any
 }
 
 // New returns a service with the default cache directory and map resolver,
@@ -164,7 +165,7 @@ func (s *Service) fidelity(l *Loaded) string {
 func (s *Service) buildTimeline(l *Loaded) error {
 	fid := s.fidelity(l)
 	key := fid
-	if fid == TierCommand && l.mapPath == "" {
+	if fid == TierCommand && l.mapFile == nil {
 		key += "-nomap"
 	}
 	if s.Commands {
@@ -201,10 +202,8 @@ func (s *Service) buildTimeline(l *Loaded) error {
 		}
 	case TierCommand:
 		opts := command.Options{}
-		if l.mapPath != "" {
-			if m, err := mapfile.Open(l.mapPath); err == nil {
-				opts.Grid = command.Grid(m)
-			}
+		if l.mapFile != nil {
+			opts.Grid = command.Grid(l.mapFile)
 		}
 		command.Apply(tl, r.Events, opts)
 	}
@@ -241,7 +240,7 @@ func (s *Service) DownloadMap(ctx context.Context, id string) (*Loaded, error) {
 
 // CanDownload reports whether DownloadMap could find this replay's map.
 func (l *Loaded) CanDownload() bool {
-	return l.Map == nil && l.Info.MapHandle != nil && l.Info.MapHandle.DepotURL != ""
+	return l.Map == nil && !l.noLookup && l.Info.MapHandle != nil && l.Info.MapHandle.DepotURL != ""
 }
 
 // SetMap loads a replay's map from a file the user picked.
@@ -250,19 +249,27 @@ func (s *Service) SetMap(ctx context.Context, id string, name string, data []byt
 	if l == nil {
 		return nil, fmt.Errorf("replay %s is not loaded", id)
 	}
-	if s.CacheDir == "" {
-		return nil, errors.New("no cache directory to store the map in")
+	m, err := mapfile.OpenBytes(name, data)
+	if err != nil {
+		return nil, fmt.Errorf("could not read map %s: %v", filepath.Base(name), err)
 	}
-	sum := sha256.Sum256(data)
-	ext := strings.ToLower(filepath.Ext(name))
-	if ext != ".sc2map" && ext != ".s2ma" {
-		ext = ".s2ma"
+	if s.CacheDir != "" {
+		// Keep a copy with the other maps (best effort: the browser build
+		// has nowhere to write, and needs none).
+		sum := sha256.Sum256(data)
+		ext := strings.ToLower(filepath.Ext(name))
+		if ext != ".sc2map" && ext != ".s2ma" {
+			ext = ".s2ma"
+		}
+		p := filepath.Join(s.CacheDir, "maps", "picked", hex.EncodeToString(sum[:8])+ext)
+		if err := writeFileAtomic(p, data); err != nil {
+			s.logf("keeping picked map: %v", err)
+		}
 	}
-	p := filepath.Join(s.CacheDir, "maps", "picked", hex.EncodeToString(sum[:8])+ext)
-	if err := writeFileAtomic(p, data); err != nil {
-		return nil, err
-	}
-	return s.replaceMap(ctx, l, p, s.Resolver)
+	cp := *l
+	s.clearMap(&cp)
+	s.useMap(&cp, m, mapcache.HowManual, filepath.Base(name))
+	return s.commitMap(&cp)
 }
 
 // replaceMap attaches a newly found map and, when the timeline depends on
@@ -270,22 +277,29 @@ func (s *Service) SetMap(ctx context.Context, id string, name string, data []byt
 func (s *Service) replaceMap(ctx context.Context, l *Loaded, manual string, r *mapcache.Resolver) (*Loaded, error) {
 	cp := *l
 	s.attachMap(ctx, &cp, manual, r)
+	return s.commitMap(&cp)
+}
+
+// commitMap stores a copy of a loaded replay with its new map, rebuilding
+// the timeline when it depends on the map.
+func (s *Service) commitMap(cp *Loaded) (*Loaded, error) {
 	if cp.Map == nil {
 		return nil, errors.New(cp.MapErr)
 	}
-	if s.fidelity(&cp) == TierCommand {
-		if err := s.buildTimeline(&cp); err != nil {
+	if s.fidelity(cp) == TierCommand {
+		if err := s.buildTimeline(cp); err != nil {
 			return nil, err
 		}
 	}
-	s.put(&cp)
-	return &cp, nil
+	s.put(cp)
+	return cp, nil
 }
 
 // attachMap resolves and decodes the map; failures are recorded, not fatal,
 // so the viewer can still play on a blank grid.
 func (s *Service) attachMap(ctx context.Context, l *Loaded, manual string, r *mapcache.Resolver) {
-	l.Map, l.Minimap, l.MapErr, l.MapHow, l.mapPath = nil, nil, "", "", ""
+	s.clearMap(l)
+	l.noLookup = r == nil
 	if r == nil {
 		l.MapErr = "map lookup disabled"
 		return
@@ -301,12 +315,23 @@ func (s *Service) attachMap(ctx context.Context, l *Loaded, manual string, r *ma
 		l.MapErr = fmt.Sprintf("could not read map %s: %v", filepath.Base(path), err)
 		return
 	}
+	s.useMap(l, m, how, filepath.Base(path))
+}
+
+func (s *Service) clearMap(l *Loaded) {
+	l.Map, l.Doodads, l.Minimap, l.MapErr, l.MapHow, l.mapFile = nil, nil, nil, "", "", nil
+}
+
+// useMap attaches a decoded map after checking it fits the replay; file
+// names it in messages.
+func (s *Service) useMap(l *Loaded, m *mapfile.Map, how mapcache.How, file string) {
+	var err error
 	if l.Info.MapTitle != "" {
 		m.Name = l.Info.MapTitle
 	}
 	if m.Width != l.Info.MapWidth || m.Height != l.Info.MapHeight {
 		l.MapErr = fmt.Sprintf("map %s is %d×%d but the replay was played on %d×%d; pick the right map",
-			filepath.Base(path), m.Width, m.Height, l.Info.MapWidth, l.Info.MapHeight)
+			file, m.Width, m.Height, l.Info.MapWidth, l.Info.MapHeight)
 		return
 	}
 	if l.Map, err = json.Marshal(m.Export(false)); err != nil {
@@ -328,7 +353,7 @@ func (s *Service) attachMap(ctx context.Context, l *Loaded, manual string, r *ma
 			l.Minimap = buf.Bytes()
 		}
 	}
-	l.MapHow, l.mapPath = how, path
+	l.MapHow, l.mapFile = how, m
 }
 
 func writeFileAtomic(path string, data []byte) error {
