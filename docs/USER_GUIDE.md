@@ -61,6 +61,7 @@ Click a unit to inspect it; the panel says when its position was last actually o
 | 3 | 2D / 3D (in 3D, right-drag or Shift-drag to rotate and tilt) |
 | V | Fog of war: cycle through each player's vision |
 | B | Events / build order / battles |
+| D | Director camera on or off |
 | L / M / F | Labels / map art / frame-rate counter |
 
 The minimap moves the camera when clicked. Bars under the scrubber show deaths; yellow bands are battles; ticks at the top are upgrades (short) and expansions (long).
@@ -89,6 +90,20 @@ The desktop app and `ghostreel serve` look for a replay's map in this order:
 If none has it, the replay plays on a blank grid. For ladder and custom maps, **Download from Blizzard** fetches the map from Blizzard's map server and checks it against the hash in the replay. Nothing is downloaded unless you click it.
 
 In the browser, none of that is possible: browsers can't read your Battle.net cache, and Blizzard's map server doesn't allow web pages to fetch from it. Drop the map file after the replay instead. For ladder maps it is the `.s2ma` in the Battle.net cache. The **Where ghostreel looked** details name the file the replay expects.
+
+## Hotspots, the director, and video export
+
+**Hotspots** (a tab in the events panel) are the moments worth watching: battles, army wipes, worker raids, bases destroyed, high-value kills, loaded transports shot down, siege lines broken, fights in two places at once, first blood and the end. Each has a tier, **major** or **minor**: major means big in resources lost or among the game's best moments.
+
+**Director** (button, or **D**) puts the camera on autopilot. It moves to each hotspot a few seconds before it starts, with a caption saying what's happening (gold bar for major, blue for minor). Between hotspots it follows wherever units are dying, then each player's main army in turn. Drag or zoom to take the camera back. The director follows the replay clock, so it works at any speed and while scrubbing.
+
+**Export video** saves an MP4 of the game as you see it: terrain, units, labels, an overlay with each player's supply, income and army, the clock, the minimap, and the director's captions.
+
+- **Highlight reel:** the top 5, 8 or 12 hotspots that don't overlap, each with a title card and a few seconds before and after.
+- **Whole game:** start to finish.
+- **Options:** speed 1×–8× (1× is real time), 720p or 1080p, and the director's camera or the current view.
+
+The video is made in the app, frame by frame, as fast as your computer can draw it, and then saved as a download. A graphics card helps; on a machine without one it managed about 11 frames a second, roughly a third of real time at 30 fps. It needs WebCodecs, which Chrome, Edge, the Windows app and (recent) macOS have. The Linux app's WebKitGTK doesn't, so on Linux use `ghostreel serve` with Chrome or the browser build.
 
 ## 3D
 

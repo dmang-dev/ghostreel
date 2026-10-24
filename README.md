@@ -64,9 +64,9 @@ cd viewer && npm ci && npm run build:web
 
 `viewer/dist-web/` is a static site: the Go core runs in the page as WebAssembly, so replays are never uploaded. Browsers can't reach the Battle.net cache or Blizzard's map server, so you drop the map file after the replay. There are no game models in this build.
 
-### Build orders and battles
+### Build orders, hotspots and video
 
-Press **B** to switch the events panel to the build order, battles, economy charts, expansions or supply blocks. Rows jump to their moment. Both come from analysis plugins (`internal/analysis`); [CONTRIBUTING.md](CONTRIBUTING.md) shows how to add one.
+Press **B** to switch the events panel to the build order, battles, hotspots, economy charts, expansions or supply blocks. Press **D** for the **director**, a camera that pans to each hotspot (major and minor fights, raids, bases lost...) and follows the action in between. **Export video** saves the game, or a highlight reel of the top hotspots, as an MP4, made in the app with WebCodecs (no FFmpeg). Rows jump to their moment. Both come from analysis plugins (`internal/analysis`); [CONTRIBUTING.md](CONTRIBUTING.md) shows how to add one.
 
 ### 3D view
 
@@ -144,7 +144,7 @@ Tests that need real replays and maps look in `testdata/replays/` and `testdata/
 | `internal/selection`, `internal/pathing`, `internal/command` | The command tier: selections, paths, following orders |
 | `internal/engine`, `cmd/ghostreel-engine` | The engine-tier exporter (s2client API) |
 | `internal/accuracy` | Measures a timeline against engine ground truth |
-| `internal/analysis` | Analysis plugins: build orders, battles |
+| `internal/analysis` | Analysis plugins: build orders, battles, hotspots, economy, expansions, supply blocks |
 | `internal/app`, `internal/server` | The layer and HTTP API that every frontend uses |
 | `cmd/ghostreel-wasm` | The same API as WebAssembly, for the browser build |
 | `proto/` | The timeline format ([docs](docs/TIMELINE_FORMAT.md)) |
