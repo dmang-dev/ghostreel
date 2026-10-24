@@ -42,7 +42,7 @@ func syntheticMap() fakeArchive {
 	heights := append([]byte("SMAP"), u32s(0x66, w+1, h+1)...)
 	heights = append(heights, make([]byte, 64-len(heights))...)
 	for i := 0; i < (w+1)*(h+1); i++ {
-		heights = append(heights, u32s(uint32(8*4096+i*2048))...) // 8.0 + i/2
+		heights = append(heights, u32s(uint32(8*32768+i*16384))...) // 8.0 + i/2
 	}
 
 	cliffs := append([]byte("CLIF"), u32s(0x64, w, h)...)

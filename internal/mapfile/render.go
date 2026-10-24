@@ -8,6 +8,9 @@ import (
 	"math"
 )
 
+// reliefScale exaggerates slopes in the hillshade.
+const reliefScale = 6
+
 // Hillshade renders the height map at scale pixels per cell, lit from the
 // north-west, with cliff levels tinting the base color so plateaus read at a
 // glance. Image row 0 is the top of the map (high y).
@@ -26,13 +29,14 @@ func (m *Map) Hillshade(scale int) image.Image {
 			lo, hi = min(lo, h), max(hi, h)
 		}
 	}
-	span := max(hi-lo, 1)
+	span := max(hi-lo, 0.5)
 	// Light direction (from north-west, 45° up), normalized.
 	lx, ly, lz := -0.5, 0.5, 0.7071
 	for y := 0; y < m.Height; y++ {
 		for x := 0; x < m.Width; x++ {
-			dzdx := (m.HeightAt(min(x+1, m.Width-1), y) - m.HeightAt(max(x-1, 0), y)) / 2
-			dzdy := (m.HeightAt(x, min(y+1, m.Height-1)) - m.HeightAt(x, max(y-1, 0))) / 2
+			// Slopes exaggerated so cliffs (2 units high) read clearly.
+			dzdx := (m.HeightAt(min(x+1, m.Width-1), y) - m.HeightAt(max(x-1, 0), y)) * reliefScale / 2
+			dzdy := (m.HeightAt(x, min(y+1, m.Height-1)) - m.HeightAt(x, max(y-1, 0))) * reliefScale / 2
 			nx, ny, nz := -float64(dzdx), -float64(dzdy), 1.0
 			n := math.Sqrt(nx*nx + ny*ny + nz*nz)
 			shade := math.Max(0.15, (nx*lx+ny*ly+nz*lz)/n)

@@ -14,7 +14,9 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"math"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/icza/mpq"
@@ -68,6 +70,10 @@ type Object struct {
 	X, Y, Z  float64
 	Rotation float64 `json:",omitempty"` // radians
 	Player   int     `json:",omitempty"`
+	// Doodads only: per-axis scale when not 1,1,1, and which of a model's
+	// numbered variations to show.
+	Scale     []float64 `json:",omitempty"`
+	Variation int       `json:",omitempty"`
 }
 
 // Open decodes the map at path.
@@ -143,6 +149,11 @@ func Decode(a ReadFile) (*Map, error) {
 			}
 		}
 	}
+	if base := groundBase(mp); base != 0 {
+		for i := range mp.Heights {
+			mp.Heights[i] += base
+		}
+	}
 	if d := get("Minimap.tga"); d == nil {
 		warn("Minimap.tga", errors.New("missing"))
 	} else if img, err := decodeTGA(d); err != nil {
@@ -151,6 +162,33 @@ func Decode(a ReadFile) (*Map, error) {
 		mp.Minimap = img
 	}
 	return mp, nil
+}
+
+// groundBase estimates the height of the sync height map's zero, which the
+// file doesn't record: doodads carry absolute heights and most stand on the
+// ground, so it is the median of their height above the relative terrain
+// (rounded to the game's quarter units). Without doodads it is 0, which
+// keeps relative heights right.
+func groundBase(m *Map) float32 {
+	if m.Heights == nil {
+		return 0
+	}
+	var off []float64
+	w := m.Width + 1
+	for _, o := range m.Objects {
+		if o.Kind != ObjectDoodad || o.X < 0 || o.Y < 0 || int(o.X) >= m.Width || int(o.Y) >= m.Height {
+			continue
+		}
+		x, y := int(o.X), int(o.Y)
+		fx, fy := float32(o.X)-float32(x), float32(o.Y)-float32(y)
+		h := (m.Heights[y*w+x]*(1-fx)+m.Heights[y*w+x+1]*fx)*(1-fy) + (m.Heights[(y+1)*w+x]*(1-fx)+m.Heights[(y+1)*w+x+1]*fx)*fy
+		off = append(off, o.Z-float64(h))
+	}
+	if len(off) < 20 {
+		return 0
+	}
+	sort.Float64s(off)
+	return float32(math.Round(off[len(off)/2]*4) / 4)
 }
 
 // HeightAt returns the height at a cell's center (average of its corners).

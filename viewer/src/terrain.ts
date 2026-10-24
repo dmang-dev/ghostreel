@@ -7,6 +7,7 @@
 import type { MapData } from "./api";
 
 const PX = 4; // pixels per cell
+const RELIEF = 6; // slope exaggeration in the hillshade
 
 export function hillshade(map: MapData): HTMLCanvasElement {
   const { width: w, height: h, heights, pathable, playable: p } = map;
@@ -30,13 +31,14 @@ export function hillshade(map: MapData): HTMLCanvasElement {
       if (v < lo) lo = v;
       if (v > hi) hi = v;
     }
-  const span = Math.max(hi - lo, 1);
+  const span = Math.max(hi - lo, 0.5);
   const img = ctx.createImageData(w, h);
   const [lx, ly, lz] = [-0.5, 0.5, 0.7071];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const dzdx = (at(x + 1, y) - at(x - 1, y)) / 2;
-      const dzdy = (at(x, y + 1) - at(x, y - 1)) / 2;
+      // Slopes exaggerated so cliffs (2 units high) read clearly.
+      const dzdx = ((at(x + 1, y) - at(x - 1, y)) * RELIEF) / 2;
+      const dzdy = ((at(x, y + 1) - at(x, y - 1)) * RELIEF) / 2;
       const n = Math.hypot(dzdx, dzdy, 1);
       const shade = Math.max(0.15, (-dzdx * lx - dzdy * ly + lz) / n);
       const t = Math.min(1, Math.max(0, (at(x, y) - lo) / span));

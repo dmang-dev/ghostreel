@@ -92,7 +92,9 @@ func cstring(d []byte, off int) (s string, n int, ok bool) {
 
 // parseSyncHeightMap reads t3SyncHeightMap: "SMAP", u32 version, u32 w, u32 h
 // (vertices), header padding up to len - w*h*4, then one u32 per vertex in
-// fixed point with 12 fractional bits (the same scale as command targets).
+// fixed point with 15 fractional bits. That gives heights relative to the
+// map's base level (2 units per cliff level, as in the game); see
+// groundBase for the base.
 func parseSyncHeightMap(d []byte, w, h int) ([]float32, error) {
 	if err := checkMagic(d, "SMAP"); err != nil {
 		return nil, err
@@ -107,7 +109,7 @@ func parseSyncHeightMap(d []byte, w, h int) ([]float32, error) {
 	}
 	out := make([]float32, w*h)
 	for i := range out {
-		out[i] = float32(le.Uint32(d[hdr+i*4:])) / 4096
+		out[i] = float32(le.Uint32(d[hdr+i*4:])) / 32768
 	}
 	return out, nil
 }
@@ -161,12 +163,14 @@ type xmlObjects struct {
 }
 
 type xmlObject struct {
-	Position string  `xml:"Position,attr"`
-	Rotation float64 `xml:"Rotation,attr"`
-	UnitType string  `xml:"UnitType,attr"`
-	Type     string  `xml:"Type,attr"`
-	Name     string  `xml:"Name,attr"`
-	Player   int     `xml:"Player,attr"`
+	Position  string  `xml:"Position,attr"`
+	Rotation  float64 `xml:"Rotation,attr"`
+	UnitType  string  `xml:"UnitType,attr"`
+	Type      string  `xml:"Type,attr"`
+	Name      string  `xml:"Name,attr"`
+	Player    int     `xml:"Player,attr"`
+	Scale     string  `xml:"Scale,attr"`
+	Variation int     `xml:"Variation,attr"`
 }
 
 // parseObjects reads the Objects XML (<PlacedObjects>).
@@ -190,6 +194,15 @@ func parseObjects(d []byte) ([]Object, error) {
 			}
 			if len(p) >= 3 {
 				obj.Z, _ = strconv.ParseFloat(p[2], 64)
+			}
+			if kind == ObjectDoodad {
+				obj.Variation = o.Variation
+				if sc := strings.Split(o.Scale, ","); len(sc) == 3 && o.Scale != "1,1,1" {
+					obj.Scale = make([]float64, 3)
+					for i := range sc {
+						obj.Scale[i], _ = strconv.ParseFloat(sc[i], 64)
+					}
+				}
 			}
 			out = append(out, obj)
 		}
