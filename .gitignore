@@ -21,3 +21,6 @@ desktop/frontend/dist/
 # Generated debug output
 *.pb
 out/
+
+# Local tool config
+.claude/

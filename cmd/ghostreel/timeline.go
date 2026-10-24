@@ -20,7 +20,7 @@ func cmdDumpTimeline(args []string) error {
 	out := fs.String("o", "", "output file (default: <replay>.pb, or .json with --json)")
 	asJSON := fs.Bool("json", false, "write protobuf JSON instead of binary (for debugging)")
 	noCmds := fs.Bool("no-commands", false, "leave player commands out (skips decoding game events; much faster on long games)")
-	fs.Parse(reorder(args))
+	fs.Parse(reorder(fs, args))
 	if fs.NArg() != 1 {
 		return errors.New("dump-timeline: need exactly one replay")
 	}
@@ -59,28 +59,33 @@ func cmdDumpTimeline(args []string) error {
 
 // reorder moves flags before positional arguments so "cmd file -o x" works
 // as well as "cmd -o x file" (the flag package stops at the first positional).
-func reorder(args []string) []string {
+// Whether a flag consumes the next argument is looked up in fs.
+func reorder(fs *flag.FlagSet, args []string) []string {
 	var flags, pos []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
-		if strings.HasPrefix(a, "-") && len(a) > 1 {
-			flags = append(flags, a)
-			if !strings.Contains(a, "=") && i+1 < len(args) && takesValue(a) {
-				flags = append(flags, args[i+1])
-				i++
-			}
+		if a == "--" {
+			pos = append(pos, args[i+1:]...)
+			break
+		}
+		if !strings.HasPrefix(a, "-") || len(a) == 1 {
+			pos = append(pos, a)
 			continue
 		}
-		pos = append(pos, a)
+		flags = append(flags, a)
+		name := strings.TrimLeft(a, "-")
+		if strings.Contains(name, "=") {
+			continue
+		}
+		if f := fs.Lookup(name); f != nil && !isBool(f) && i+1 < len(args) {
+			flags = append(flags, args[i+1])
+			i++
+		}
 	}
 	return append(flags, pos...)
 }
 
-// takesValue lists the CLI's flags that consume the next argument.
-func takesValue(flag string) bool {
-	switch strings.TrimLeft(flag, "-") {
-	case "o", "addr", "map", "cache", "maps":
-		return true
-	}
-	return false
+func isBool(f *flag.Flag) bool {
+	b, ok := f.Value.(interface{ IsBoolFlag() bool })
+	return ok && b.IsBoolFlag()
 }

@@ -55,7 +55,7 @@ func cmdDumpMap(args []string) error {
 	doodads := fs.Bool("doodads", false, "include doodads in the JSON")
 	layers := fs.Bool("layers", false, "also write one PNG per t3CellFlags bit, cliff levels and the minimap (debug)")
 	rf := addResolverFlags(fs)
-	fs.Parse(reorder(args))
+	fs.Parse(reorder(fs, args))
 	if fs.NArg() != 1 {
 		return errors.New("dump-map: need exactly one map or replay file")
 	}

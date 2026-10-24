@@ -54,7 +54,11 @@ So "pathable" here means inside the playable bounds and bit 0 clear. Rocks, buil
 
 ## `Minimap.tga`
 
-Uncompressed true-color TGA (type 2, 24 bpp, descriptor 0x20 = top-left origin), 256×256 or 128×256 etc. It covers the full map, not just the playable area. It is the user's own Blizzard art: it is only read locally and never committed.
+Uncompressed true-color TGA (type 2, 24 bpp, descriptor 0x20 = top-left origin). Seen sizes: 256×256, 256×128, 128×256, 1024×1024.
+
+It shows **only the playable area**, at `s = max(imageW, imageH) / 256` pixels per cell, centered in the image. The content box starts at `((imageW − playableW·s)/2, (imageH − playableH·s)/2)`. This held to the pixel on all twelve maps tested. Examples: Curious Minds, 132×124 playable in 256×128, content at (62, 2). Magannatha, 140×140 playable in 1024×1024 (s = 4), content at (232, 232).
+
+It is the user's own Blizzard art: it is only read locally and never committed.
 
 ## Export JSON (`dump-map`)
 

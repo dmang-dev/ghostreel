@@ -22,7 +22,7 @@ func cmdServe(args []string) error {
 	static := fs.String("static", filepath.Join("viewer", "dist"), "built viewer to serve (npm run build in viewer/)")
 	commands := fs.Bool("commands", false, "keep player commands in timelines (slow on long games)")
 	rf := addResolverFlags(fs)
-	fs.Parse(reorder(args))
+	fs.Parse(reorder(fs, args))
 
 	svc := app.New()
 	svc.Resolver = rf.resolver()
