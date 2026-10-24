@@ -9,6 +9,7 @@ package gamedata
 
 import (
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -162,7 +163,7 @@ var table = map[string]Unit{
 	"DisruptorPhased": army(0.5, 4.25), "Observer": air(0.5, 1.875), "ObserverSiegeMode": static(0.5),
 	"WarpPrism": air(0.875, 2.9531), "WarpPrismPhasing": static(0.875), "Phoenix": air(0.75, 4.25),
 	"VoidRay": air(1, 2.75), "Oracle": air(0.75, 4), "Tempest": air(1.25, 2.25), "Carrier": air(1.25, 1.875),
-	"Interceptor": air(0.25, 7.5), "Mothership": air(1.375, 1.875), "StasisTrap": static(0.5),
+	"Interceptor": air(0.25, 7.5), "Mothership": air(1.375, 1.875), "OracleStasisTrap": static(0.5),
 
 	"Nexus": bld(5, 5), "Pylon": bld(2, 2), "Assimilator": bld(3, 3), "AssimilatorRich": bld(3, 3),
 	"Gateway": bld(3, 3), "WarpGate": bld(3, 3), "Forge": bld(3, 3), "CyberneticsCore": bld(3, 3),
@@ -228,4 +229,17 @@ func sightFor(u Unit) float64 {
 		return 10
 	}
 	return 9
+}
+
+// Names lists the unit types this package knows (the current ladder pool's
+// units and structures), sorted, without UI-only types.
+func Names() []string {
+	var out []string
+	for n, u := range table {
+		if u.Class != ClassHidden {
+			out = append(out, n)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
