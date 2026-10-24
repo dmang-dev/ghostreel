@@ -28,6 +28,8 @@
           <option value="minimap">Map art (minimap)</option>
           <option value="ground" id="terrain-mode-ground" hidden>Ground textures</option>
         </select>
+        <button id="director" title="Director: the camera follows the action and pans to hotspots (D)">Director</button>
+        <button id="export-btn" title="Export the game or a highlight reel as an MP4 video">Export video</button>
         <button id="help-btn" title="Keyboard shortcuts">?</button>
       </header>
 
@@ -59,6 +61,30 @@
         <div id="loading" class="center" hidden><div class="spinner"></div><p id="loading-text">Loading…</p></div>
         <div id="error" class="banner error" hidden></div>
         <div id="drop" class="center" hidden><p>Drop to open</p></div>
+        <div id="caption" hidden><b></b><span></span></div>
+        <div id="export" class="panel" hidden>
+          <h3>Export video</h3>
+          <label>What <select id="export-range">
+            <option value="reel">Highlight reel (top hotspots)</option>
+            <option value="game">Whole game</option>
+          </select></label>
+          <label id="export-count-row">Clips <select id="export-count">
+            <option>5</option><option selected>8</option><option>12</option>
+          </select></label>
+          <label>Speed <select id="export-speed">
+            <option value="1">1× (real time)</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option>
+          </select></label>
+          <label>Size <select id="export-size">
+            <option value="1280x720" selected>720p</option><option value="1920x1080">1080p</option>
+          </select></label>
+          <label><input type="checkbox" id="export-director" checked /> Director camera</label>
+          <p id="export-note" class="note"></p>
+          <progress id="export-progress" max="1" value="0" hidden></progress>
+          <div class="row">
+            <button id="export-start">Export</button>
+            <button id="export-cancel">Close</button>
+          </div>
+        </div>
         <div id="help" class="panel" hidden>
           <h3>Shortcuts</h3>
           <table>
@@ -71,6 +97,7 @@
             <tr><td>3</td><td>2D / 3D (3D: right-drag or Shift-drag to rotate)</td></tr>
             <tr><td>V</td><td>Fog of war: cycle player views</td></tr>
             <tr><td>B</td><td>Events / build order / battles</td></tr>
+            <tr><td>D</td><td>Director: the camera follows the action</td></tr>
             <tr><td>L / M / F</td><td>Labels / map art / FPS counter</td></tr>
           </table>
         </div>

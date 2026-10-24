@@ -7,7 +7,10 @@ import "./style.css";
 import * as THREE from "three";
 import * as api from "./api";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, decodeTimeline, formatClock, isAlive, ownerAt, typeAt } from "./model";
+import { Director } from "./director";
 import { buildDoodads } from "./doodads";
+import { canExport, exportVideo, frameCount, plan, type ExportOptions } from "./exporter";
+import type { Marker } from "./reports";
 import { UnitModels } from "./models";
 import { ReportsView } from "./reports";
 import { Scene } from "./scene";
@@ -102,11 +105,14 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   void loadDoodads();
   reports.loops = model.loops;
   reports.set([]);
+  setHotspots([]);
+  setDirector(false);
   api.fetchAnalysis(summary.id).then(
     (r) => {
       if (cur?.summary.id !== summary.id) return;
       reports.set(r);
       drawMarks();
+      setHotspots(r.find((x) => x.plugin === "hotspots")?.markers ?? []);
     },
     (e) => console.warn("analysis:", e),
   );
@@ -204,6 +210,11 @@ function tick(now: number): void {
       setPlaying(false);
     }
   }
+  if (exporting) {
+    requestAnimationFrame(tick);
+    return; // the exporter drives the scene
+  }
+  if (directorOn && director) frameShot();
   const t0 = performance.now();
   scene.render(loop, selected);
   frameMs = frameMs * 0.9 + (performance.now() - t0) * 0.1;
@@ -611,6 +622,10 @@ window.addEventListener("keydown", (e) => {
     case "B":
       reports.cycle();
       break;
+    case "d":
+    case "D":
+      setDirector(!directorOn);
+      break;
     case "3":
       toggle3D();
       break;
@@ -825,3 +840,136 @@ function cycleFog(): void {
 
 // Debug handle for the console (and tests): the scene and current replay.
 (window as unknown as { ghostreel: unknown }).ghostreel = { scene, seek, get cur() { return cur; }, get loop() { return loop; } };
+
+// ---------------------------------------------------------------- director and video export
+
+let hotspots: Marker[] = [];
+let director: Director | undefined;
+let directorOn = false;
+let exporting = false;
+
+function setHotspots(list: Marker[]): void {
+  hotspots = list;
+  director = cur ? newDirector() : undefined;
+}
+
+function newDirector(): Director {
+  const p = cur!.playable;
+  return new Director(cur!.model, hotspots, { left: p.Left, bottom: p.Bottom, right: p.Right, top: p.Top });
+}
+
+function setDirector(on: boolean): void {
+  directorOn = on && !!director;
+  $("director").classList.toggle("on", directorOn);
+  if (!directorOn) $("caption").hidden = true;
+  director?.reset();
+}
+$("director").onclick = () => setDirector(!directorOn);
+scene.onUserMove = () => directorOn && setDirector(false);
+
+/** Points the camera where the director wants it and captions the hotspot. */
+function frameShot(): void {
+  const shot = director!.shotAt(loop);
+  scene.view.cx = shot.cx;
+  scene.view.cy = shot.cy;
+  scene.view.ppc = stage.clientHeight / shot.span;
+  scene.updateCamera();
+  const cap = $("caption");
+  const h = shot.hotspot;
+  cap.hidden = !h;
+  if (h) {
+    const [what, ...rest] = h.label.split(": ");
+    cap.querySelector("b")!.textContent = what;
+    cap.querySelector("span")!.textContent = rest.join(": ");
+    cap.classList.toggle("major", h.tier === "major");
+  }
+}
+
+function exportOptions(): ExportOptions {
+  const [w, h] = $<HTMLSelectElement>("export-size").value.split("x").map(Number);
+  return {
+    range: $<HTMLSelectElement>("export-range").value as "game" | "reel",
+    reelCount: Number($<HTMLSelectElement>("export-count").value),
+    speed: Number($<HTMLSelectElement>("export-speed").value),
+    width: w,
+    height: h,
+    fps: 30,
+    director: $<HTMLInputElement>("export-director").checked,
+  };
+}
+
+function updateExportNote(): void {
+  $("export-count-row").hidden = $<HTMLSelectElement>("export-range").value !== "reel";
+  const note = $("export-note");
+  if (!canExport()) {
+    note.textContent = "This browser can't encode video. Use Chrome, Edge, or the Windows or macOS app.";
+    return;
+  }
+  if (!cur) return;
+  const o = exportOptions();
+  if (o.range === "reel" && !hotspots.length) {
+    note.textContent = "No hotspots yet (the analysis is still running, or found none).";
+    return;
+  }
+  const frames = frameCount(plan(cur.model, hotspots, o), o);
+  note.textContent = `About ${formatClock(Math.round((frames / o.fps) * LOOPS_PER_CLOCK_SECOND))} of video, ${frames} frames.`;
+}
+for (const id of ["export-range", "export-count", "export-speed", "export-size"]) $(id).addEventListener("change", updateExportNote);
+
+let exportAbort: AbortController | undefined;
+$("export-btn").onclick = () => {
+  $("export").hidden = !$("export").hidden;
+  updateExportNote();
+};
+$("export-cancel").onclick = () => {
+  if (exportAbort) exportAbort.abort();
+  else $("export").hidden = true;
+};
+$("export-start").onclick = async () => {
+  if (!cur || exporting) return;
+  const opts = exportOptions();
+  const saved = { loop, view: { ...scene.view } };
+  setPlaying(false);
+  exporting = true;
+  exportAbort = new AbortController();
+  const bar = $<HTMLProgressElement>("export-progress");
+  bar.hidden = false;
+  bar.value = 0;
+  $<HTMLButtonElement>("export-start").disabled = true;
+  $("export-cancel").textContent = "Cancel";
+  try {
+    const blob = await exportVideo(
+      {
+        scene, model: cur.model, director: opts.director ? newDirector() : undefined, hotspots, playerColor,
+        minimap: () => {
+          minimapAt = 0;
+          drawMinimap();
+          return $<HTMLCanvasElement>("minimap");
+        },
+      },
+      opts,
+      (f) => (bar.value = f),
+      exportAbort.signal,
+    );
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const meta = cur.model.tl.meta;
+    a.download = `${meta?.mapTitle ?? "replay"} - ${(meta?.players ?? []).map((p) => p.name).join(" vs ")}${opts.range === "reel" ? " (highlights)" : ""}.mp4`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    $("export-note").textContent = `Saved ${(blob.size / 1e6).toFixed(1)} MB.`;
+  } catch (e) {
+    $("export-note").textContent = (e as Error).name === "AbortError" ? "Cancelled." : `Export failed: ${(e as Error).message}`;
+  } finally {
+    exporting = false;
+    exportAbort = undefined;
+    bar.hidden = true;
+    $<HTMLButtonElement>("export-start").disabled = false;
+    $("export-cancel").textContent = "Close";
+    Object.assign(scene.view, saved.view);
+    scene.updateCamera();
+    seek(saved.loop);
+    director?.reset();
+  }
+};
+

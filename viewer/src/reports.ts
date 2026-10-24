@@ -14,6 +14,10 @@ export interface Marker {
   r?: number;
   label: string;
   kind?: string;
+  /** Hotspots: what happened, how much it matters (0-1), "major" or "minor". */
+  category?: string;
+  score?: number;
+  tier?: string;
 }
 
 export interface Table {

@@ -108,6 +108,10 @@ export class Scene {
   fogPlayer = 0;
   showLabels = true;
   onViewChange?: () => void;
+  /** The user moved the camera (drag, rotate, zoom). */
+  onUserMove?: () => void;
+  /** Set while exporting video: render at this size, not the window's. */
+  private fixed?: { w: number; h: number };
   /** A click (not a drag) at a point in the canvas, in CSS pixels. */
   onClick?: (px: number, py: number) => void;
 
@@ -369,7 +373,7 @@ export class Scene {
 
   /** Fits a rectangle (in cells) to the viewport. */
   fit(left: number, bottom: number, right: number, top: number): void {
-    const { clientWidth: w, clientHeight: h } = this.container;
+    const { w, h } = this.size();
     this.view.cx = (left + right) / 2;
     this.view.cy = (bottom + top) / 2;
     this.view.ppc = Math.max(1, Math.min(w / (right - left), h / (top - bottom)) * 0.95);
@@ -540,7 +544,7 @@ export class Scene {
   private onScreen(d: DrawnUnit): boolean {
     const [sx, sy] = this.worldToScreen(d.x, d.y, d.air ? AIR_HEIGHT : 0);
     if (this.v.z > 1) return false; // behind the camera
-    const { clientWidth: w, clientHeight: h } = this.container;
+    const { w, h } = this.size();
     const m = 200;
     return sx > -m && sy > -m && sx < w + m && sy < h + m;
   }
@@ -650,17 +654,16 @@ export class Scene {
 
   private drawLabels(selected: number | undefined): void {
     const ctx = this.labels.getContext("2d")!;
-    const dpr = this.labels.width / Math.max(this.labels.clientWidth, 1);
+    const dpr = this.labels.width / Math.max(this.size().w, 1);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, this.labels.clientWidth, this.labels.clientHeight);
+    ctx.clearRect(0, 0, this.size().w, this.size().h);
     const model = this.model;
     if (!model) return;
     const show = this.showLabels && this.view.ppc >= 9;
     ctx.font = "11px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    const w = this.labels.clientWidth;
-    const h = this.labels.clientHeight;
+    const { w, h } = this.size();
     for (let i = 0; i < this.drawnCount; i++) {
       const d = this.drawn[i];
       if (d.hidden || (!show && d.id !== selected)) continue;
@@ -683,7 +686,7 @@ export class Scene {
 
   /** Screen position of a world point (lift: extra height above the ground in 3D). */
   worldToScreen(x: number, y: number, lift = 0): [number, number] {
-    const { clientWidth: w, clientHeight: h } = this.container;
+    const { w, h } = this.size();
     if (this.mode === "2d") {
       return [(x - this.view.cx) * this.view.ppc + w / 2, (this.view.cy - y) * this.view.ppc + h / 2];
     }
@@ -693,7 +696,7 @@ export class Scene {
 
   /** World point under a screen position (on the ground in 3D). */
   screenToWorld(px: number, py: number): [number, number] {
-    const { clientWidth: w, clientHeight: h } = this.container;
+    const { w, h } = this.size();
     if (this.mode === "2d") {
       return [(px - w / 2) / this.view.ppc + this.view.cx, this.view.cy - (py - h / 2) / this.view.ppc];
     }
@@ -734,7 +737,34 @@ export class Scene {
     return Math.max(0.5, Math.hypot(bx - ax, by - ay));
   }
 
-  private resize(): void {
+  /** The view's size in CSS pixels (the export size while exporting). */
+  size(): { w: number; h: number } {
+    return this.fixed ?? { w: this.container.clientWidth, h: this.container.clientHeight };
+  }
+
+  /** Renders at w×h (device pixels, 1:1) until endExport, for video frames. */
+  beginExport(w: number, h: number): void {
+    this.fixed = { w, h };
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(w, h, false);
+    this.labels.width = w;
+    this.labels.height = h;
+    this.updateCamera();
+  }
+
+  endExport(): void {
+    this.fixed = undefined;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.resize();
+  }
+
+  /** The canvases a video frame is made of: the 3D/2D view, then the labels. */
+  layers(): HTMLCanvasElement[] {
+    return [this.canvas, this.labels];
+  }
+
+  resize(): void {
+    if (this.fixed) return;
     const { clientWidth: w, clientHeight: h } = this.container;
     if (w === 0 || h === 0) return;
     this.renderer.setSize(w, h, false);
@@ -744,8 +774,9 @@ export class Scene {
     this.updateCamera();
   }
 
+
   updateCamera(): void {
-    const { clientWidth: w, clientHeight: h } = this.container;
+    const { w, h } = this.size();
     // 2D: orthographic box around the center.
     const hw = w / 2 / this.view.ppc;
     const hh = h / 2 / this.view.ppc;
@@ -782,7 +813,10 @@ export class Scene {
       if (!drag) return;
       const dx = e.clientX - drag.x;
       const dy = e.clientY - drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+      if (Math.abs(dx) + Math.abs(dy) > 4 && !drag.moved) {
+        drag.moved = true;
+        this.onUserMove?.();
+      }
       if (!drag.moved) return;
       if (drag.rotate) {
         this.view.yaw = drag.yaw - dx * 0.006;
@@ -810,6 +844,7 @@ export class Scene {
       "wheel",
       (e) => {
         e.preventDefault();
+        this.onUserMove?.();
         const r = el.getBoundingClientRect();
         const px = e.clientX - r.left;
         const py = e.clientY - r.top;
