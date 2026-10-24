@@ -93,6 +93,9 @@ type Options struct {
 	// They are by far the largest stream (over a million events in long bot
 	// games) and the tracker tier only uses them for the command feed.
 	SkipGameEvents bool
+	// InfoOnly decodes only the header, details and lobby (no event streams).
+	// Info.HasTracker and EventCounts are then unknown (false / empty).
+	InfoOnly bool
 }
 
 // Open decodes the replay at path.
@@ -135,7 +138,7 @@ func DecodeWith(input io.ReadSeeker, opts Options) (*Replay, error) {
 	if _, err := input.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	r, err := rep.NewEvts(input, !opts.SkipGameEvents, true, true)
+	r, err := rep.NewEvts(input, !opts.SkipGameEvents && !opts.InfoOnly, !opts.InfoOnly, !opts.InfoOnly)
 	if err != nil {
 		if errors.Is(err, rep.ErrUnsupportedRepVersion) {
 			return nil, fmt.Errorf("base build %d: %w", baseBuild, err)

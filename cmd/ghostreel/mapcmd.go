@@ -32,7 +32,7 @@ func addResolverFlags(fs *flag.FlagSet) *resolverFlags {
 	fs.StringVar(&rf.manual, "map", "", "use this map file instead of looking the replay's map up")
 	fs.BoolVar(&rf.network, "network", false, "allow downloading maps from Blizzard's depot (logged)")
 	fs.StringVar(&rf.maps, "maps", "", "extra map folders, "+string(os.PathListSeparator)+"-separated")
-	fs.StringVar(&rf.cacheDir, "cache", "", "where downloaded maps are kept (default: user cache dir)")
+	fs.StringVar(&rf.cacheDir, "cache", "", "ghostreel cache folder: downloaded maps go in <dir>/maps, timelines in <dir>/timelines (default: user cache dir)")
 	return rf
 }
 
@@ -43,7 +43,7 @@ func (rf *resolverFlags) resolver() *mapcache.Resolver {
 		r.MapDirs = append(filepath.SplitList(rf.maps), r.MapDirs...)
 	}
 	if rf.cacheDir != "" {
-		r.DownloadDir = rf.cacheDir
+		r.DownloadDir = filepath.Join(rf.cacheDir, "maps")
 	}
 	r.Log = func(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...) }
 	return r
