@@ -315,15 +315,15 @@ func (b *builder) finish() {
 		if u.hidden || len(u.keys) == 0 {
 			continue
 		}
-		setFacing(u.keys)
+		SetFacing(u.keys)
 		b.tl.Tracks = append(b.tl.Tracks, &pb.Track{UnitId: u.emitted, Keyframes: u.keys})
 	}
 	b.tl.Snapshots = snapshots(b.tl)
 }
 
-// setFacing points each keyframe toward the next position the unit moves to,
+// SetFacing points each keyframe toward the next position the unit moves to,
 // keeping the previous facing while it stands still.
-func setFacing(keys []*pb.Keyframe) {
+func SetFacing(keys []*pb.Keyframe) {
 	facing := float32(-math.Pi / 2) // face "down" the map until known, like a fresh unit
 	for i, k := range keys {
 		for j := i + 1; j < len(keys); j++ {
