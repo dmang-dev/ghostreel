@@ -3,12 +3,14 @@
 package mapfile
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"strconv"
 	"strings"
 )
@@ -114,6 +116,75 @@ func parseSyncHeightMap(d []byte, w, h int) ([]float32, error) {
 	return out, nil
 }
 
+// unmarshalXML decodes map XML, which declares us-ascii or utf-8; both read
+// fine as UTF-8.
+func unmarshalXML(d []byte, v any) error {
+	dec := xml.NewDecoder(bytes.NewReader(d))
+	dec.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
+	return dec.Decode(v)
+}
+
+type terrainXML struct {
+	bias, scale, standard float64 // t3HeightMap quantization
+	textures              []string
+}
+
+// parseTerrainXML reads what t3Terrain.xml says about the visual height map
+// (<vertData quantizeBias quantizeScale standardHeight>) and the texture
+// layers (<textureList>, 8 per texture set; the first set is the terrain's).
+func parseTerrainXML(d []byte) (terrainXML, error) {
+	var x struct {
+		HeightMap struct {
+			VertData struct {
+				Bias     float64 `xml:"quantizeBias,attr"`
+				Scale    float64 `xml:"quantizeScale,attr"`
+				Standard float64 `xml:"standardHeight,attr"`
+			} `xml:"vertData"`
+			Textures []struct {
+				I    int    `xml:"i,attr"`
+				Name string `xml:"name,attr"`
+			} `xml:"textureList>texture"`
+		} `xml:"heightMap"`
+	}
+	if err := unmarshalXML(d, &x); err != nil {
+		return terrainXML{}, err
+	}
+	v := x.HeightMap.VertData
+	t := terrainXML{bias: v.Bias, scale: v.Scale, standard: v.Standard}
+	for _, tex := range x.HeightMap.Textures {
+		if tex.I < 8 && tex.Name != "" {
+			t.textures = append(t.textures, tex.Name)
+		}
+	}
+	return t, nil
+}
+
+// parseVisualHeights reads t3HeightMap: "HMAP", u32 version, u32 w, u32 h
+// (vertices), header up to len - w*h*6, then 6 bytes per vertex: u16 (not
+// understood), u16 quantized height, u16 cliff level. Height = q * scale +
+// standardHeight - bias, with the parameters from t3Terrain.xml.
+func parseVisualHeights(d []byte, w, h int, t terrainXML) ([]float32, error) {
+	if err := checkMagic(d, "HMAP"); err != nil {
+		return nil, err
+	}
+	if t.scale == 0 {
+		return nil, fmt.Errorf("no quantization in t3Terrain.xml")
+	}
+	fw, fh := int(le.Uint32(d[8:])), int(le.Uint32(d[12:]))
+	if fw != w || fh != h {
+		return nil, fmt.Errorf("grid %dx%d, want %dx%d vertices", fw, fh, w, h)
+	}
+	hdr := len(d) - w*h*6
+	if hdr < 16 {
+		return nil, fmt.Errorf("size %d too small for %dx%d", len(d), w, h)
+	}
+	out := make([]float32, w*h)
+	for i := range out {
+		out[i] = float32(float64(le.Uint16(d[hdr+i*6+2:]))*t.scale + t.standard - t.bias)
+	}
+	return out, nil
+}
+
 // parseCliffLevels reads t3SyncCliffLevel: "CLIF", u32 version, u32 w, u32 h
 // (cells), header padding up to len - w*h*2, then one u16 per cell.
 func parseCliffLevels(d []byte, w, h int) ([]uint16, error) {
@@ -176,7 +247,7 @@ type xmlObject struct {
 // parseObjects reads the Objects XML (<PlacedObjects>).
 func parseObjects(d []byte) ([]Object, error) {
 	var x xmlObjects
-	if err := xml.Unmarshal(d, &x); err != nil {
+	if err := unmarshalXML(d, &x); err != nil {
 		return nil, err
 	}
 	var out []Object

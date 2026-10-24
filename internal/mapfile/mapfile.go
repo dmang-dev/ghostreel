@@ -29,6 +29,9 @@ type Map struct {
 	Width, Height int    // in cells
 	Playable      Rect
 	Tileset, Fog  string
+	// TerrainTextures are the terrain's texture layers (CTerrainTex ids),
+	// base layer first, from t3Terrain.xml.
+	TerrainTextures []string
 
 	// Heights holds terrain heights at cell corners: (Width+1)*(Height+1)
 	// values in game units.
@@ -149,7 +152,22 @@ func Decode(a ReadFile) (*Map, error) {
 			}
 		}
 	}
-	if base := groundBase(mp); base != 0 {
+	terrain := get("t3Terrain.xml")
+	var visual []float32
+	if terrain != nil {
+		t, err := parseTerrainXML(terrain)
+		if err != nil {
+			warn("t3Terrain.xml", err)
+		} else {
+			mp.TerrainTextures = t.textures
+			if d := get("t3HeightMap"); d != nil && mp.Heights != nil {
+				if visual, err = parseVisualHeights(d, mp.Width+1, mp.Height+1, t); err != nil {
+					warn("t3HeightMap", err)
+				}
+			}
+		}
+	}
+	if base := groundBase(mp, visual); base != 0 {
 		for i := range mp.Heights {
 			mp.Heights[i] += base
 		}
@@ -164,16 +182,23 @@ func Decode(a ReadFile) (*Map, error) {
 	return mp, nil
 }
 
-// groundBase estimates the height of the sync height map's zero, which the
-// file doesn't record: doodads carry absolute heights and most stand on the
-// ground, so it is the median of their height above the relative terrain
-// (rounded to the game's quarter units). Without doodads it is 0, which
-// keeps relative heights right.
-func groundBase(m *Map) float32 {
+// groundBase finds the height of the sync height map's zero, which that file
+// doesn't record. The visual height map (t3HeightMap) has absolute heights:
+// the base is the median difference between the two. Without it, doodads
+// stand in (they carry absolute heights and most rest on the ground). With
+// neither it is 0, which keeps relative heights right.
+func groundBase(m *Map, visual []float32) float32 {
 	if m.Heights == nil {
 		return 0
 	}
 	var off []float64
+	if len(visual) == len(m.Heights) {
+		for i := 0; i < len(visual); i += 7 {
+			off = append(off, float64(visual[i]-m.Heights[i]))
+		}
+		sort.Float64s(off)
+		return float32(math.Round(off[len(off)/2]*100) / 100)
+	}
 	w := m.Width + 1
 	for _, o := range m.Objects {
 		if o.Kind != ObjectDoodad || o.X < 0 || o.Y < 0 || int(o.X) >= m.Width || int(o.Y) >= m.Height {

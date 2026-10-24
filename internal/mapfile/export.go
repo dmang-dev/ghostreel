@@ -7,13 +7,15 @@ import "math"
 // Export is the JSON shape frontends load (see docs/MAP_FORMAT_NOTES.md).
 // Grids keep the row-0-at-the-bottom layout of Map.
 type Export struct {
-	Name           string   `json:"name"`
-	Width          int      `json:"width"`
-	Height         int      `json:"height"`
-	Playable       Rect     `json:"playable"`
-	Tileset        string   `json:"tileset"`
-	StartLocations []Point  `json:"startLocations"`
-	Objects        []Object `json:"objects"`
+	Name     string `json:"name"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+	Playable Rect   `json:"playable"`
+	Tileset  string `json:"tileset"`
+	// TerrainTextures are the terrain's texture layers, base first.
+	TerrainTextures []string `json:"terrainTextures,omitempty"`
+	StartLocations  []Point  `json:"startLocations"`
+	Objects         []Object `json:"objects"`
 	// Heights at cell corners, (width+1)*(height+1), rounded to 1/100.
 	Heights []float64 `json:"heights,omitempty"`
 	// Pathable is 1 per walkable cell, width*height.
@@ -26,7 +28,7 @@ type Export struct {
 func (m *Map) Export(withDoodads bool) *Export {
 	e := &Export{
 		Name: m.Name, Width: m.Width, Height: m.Height, Playable: m.Playable, Tileset: m.Tileset,
-		StartLocations: m.StartLocations, Warnings: m.Warnings,
+		StartLocations: m.StartLocations, Warnings: m.Warnings, TerrainTextures: m.TerrainTextures,
 		Objects: []Object{},
 	}
 	for _, o := range m.Objects {
