@@ -77,6 +77,10 @@ func TestOpenReplayAndFetch(t *testing.T) {
 	if code, _ := get(t, ts.URL+"/api/r/"+s.ID+"/map"); code != 404 {
 		t.Errorf("map without a map: %d", code)
 	}
+	code, body := get(t, ts.URL+"/api/r/"+s.ID+"/analysis")
+	if code != 200 || !strings.Contains(string(body), `"plugin":"build-order"`) || !strings.Contains(string(body), `"plugin":"battles"`) {
+		t.Errorf("analysis: %d %.200s", code, body)
+	}
 
 	// Picking the map file fixes it.
 	mapData, err := os.ReadFile(filepath.Join(testdata, "maps", "AbyssalReefAIE.SC2Map"))

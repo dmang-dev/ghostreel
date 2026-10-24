@@ -4,6 +4,7 @@
 // `ghostreel serve` and the desktop app, so the viewer has one code path.
 
 import type { Doodad } from "./doodads";
+import type { Report } from "./reports";
 import { wasmFetch } from "./wasm";
 
 export type { Doodad };
@@ -129,6 +130,11 @@ export async function setMapFile(id: string, file: File): Promise<Summary> {
 
 export async function fetchTimeline(id: string): Promise<Uint8Array> {
   return new Uint8Array(await (await check(await apiFetch(`/api/r/${id}/timeline`))).arrayBuffer());
+}
+
+/** Reports of the core's analysis plugins (build orders, battles, ...). */
+export async function fetchAnalysis(id: string): Promise<Report[]> {
+  return (await (await check(await apiFetch(`/api/r/${id}/analysis`))).json()) ?? [];
 }
 
 /** The map's doodads, for the 3D view (empty when there is no map). */

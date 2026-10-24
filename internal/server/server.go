@@ -12,6 +12,7 @@
 //	GET  /api/r/{id}/map           map JSON (404 when no map)
 //	GET  /api/r/{id}/minimap       PNG (404 when none)
 //	GET  /api/r/{id}/doodads       JSON list of the map's doodads (404 when no map)
+//	GET  /api/r/{id}/analysis      JSON reports of the analysis plugins (build orders, battles, ...)
 //	POST /api/r/{id}/map           body = map bytes, X-Filename header → Summary
 //	POST /api/r/{id}/download-map  fetch the map from Blizzard's depot (user-initiated) → Summary
 //	GET  /api/startup              Summary of a replay opened at launch, or null
@@ -116,6 +117,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/r/{id}/doodads", s.blob(func(l *app.Loaded) ([]byte, string) {
 		return l.Doodads, "application/json"
 	}))
+	mux.HandleFunc("GET /api/r/{id}/analysis", func(w http.ResponseWriter, r *http.Request) {
+		b, err := s.App.Analysis(r.PathValue("id"))
+		if err != nil {
+			httpError(w, http.StatusNotFound, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
+	})
 	mux.HandleFunc("POST /api/r/{id}/map", s.setMap)
 	mux.HandleFunc("POST /api/r/{id}/download-map", func(w http.ResponseWriter, r *http.Request) {
 		l, err := s.App.DownloadMap(r.Context(), r.PathValue("id"))

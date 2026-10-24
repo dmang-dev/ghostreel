@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/OWNER/ghostreel/internal/analysis"
 	"github.com/OWNER/ghostreel/internal/command"
 	"github.com/OWNER/ghostreel/internal/engine"
 	"github.com/OWNER/ghostreel/internal/mapcache"
@@ -74,6 +75,7 @@ type Loaded struct {
 	data       []byte       // the replay itself, to rebuild after a map change
 	mapFile    *mapfile.Map // the decoded map, for the command tier's pathing
 	noLookup   bool         // map lookup is disabled (the browser build)
+	analysis   []byte       // JSON of the plugins' reports, computed on first request
 	enginePath string       // ground-truth recording next to the replay, if any
 }
 
@@ -210,6 +212,7 @@ func (s *Service) buildTimeline(l *Loaded) error {
 	if l.Timeline, err = timeline.Marshal(tl); err != nil {
 		return err
 	}
+	l.analysis = nil
 	l.Fidelity, l.FromCache = fid, false
 	if cachePath != "" {
 		if err := writeFileAtomic(cachePath, l.Timeline); err != nil {
@@ -217,6 +220,33 @@ func (s *Service) buildTimeline(l *Loaded) error {
 		}
 	}
 	return nil
+}
+
+// Analysis runs the analysis plugins (package analysis) on a loaded
+// replay's timeline, once, and returns their reports as JSON.
+func (s *Service) Analysis(id string) ([]byte, error) {
+	l := s.Get(id)
+	if l == nil {
+		return nil, fmt.Errorf("replay %s is not loaded", id)
+	}
+	s.mu.Lock()
+	done := l.analysis
+	s.mu.Unlock()
+	if done != nil {
+		return done, nil
+	}
+	tl, err := timeline.Unmarshal(l.Timeline)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(analysis.Run(tl))
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	l.analysis = out
+	s.mu.Unlock()
+	return out, nil
 }
 
 // DownloadMap retries the map lookup with depot downloads allowed for this

@@ -193,3 +193,20 @@ button:disabled { opacity: 0.4; cursor: default; }
 }
 .badge.exact { border-color: #2d5a3a; color: #6fd394; }
 #empty .note { max-width: 520px; margin: 8px auto 0; color: var(--muted, #8b949e); font-size: 13px; line-height: 1.5; }
+
+/* Events panel tabs and analysis reports (reports.ts) */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.tabs button, .report-pick button { background: none; border: 1px solid #ffffff22; color: var(--muted); padding: 2px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+.tabs button.on, .report-pick button.on { color: inherit; background: #ffffff14; }
+#report { overflow-y: auto; min-height: 0; font-size: 12px; }
+#report table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+#report th { text-align: left; color: var(--muted); font-weight: normal; padding: 2px 4px; position: sticky; top: 0; background: var(--panel, #151a20); }
+#report td { padding: 2px 4px; }
+#report tr:not(:first-child) { cursor: pointer; opacity: 0.6; }
+#report tr.past { opacity: 1; }
+#report tr:not(:first-child):hover { background: #ffffff10; }
+.report-pick { display: flex; gap: 4px; margin-bottom: 6px; }
+.report-pick button { border-left-width: 3px; }
+.report-error { color: var(--warn); }
+.report-empty { color: var(--muted); }
+

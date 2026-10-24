@@ -9,6 +9,7 @@ import * as api from "./api";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, decodeTimeline, formatClock, isAlive, ownerAt, typeAt } from "./model";
 import { buildDoodads } from "./doodads";
 import { UnitModels } from "./models";
+import { ReportsView } from "./reports";
 import { Scene } from "./scene";
 import { blankGrid, hillshade, minimapTerrain } from "./terrain";
 
@@ -18,6 +19,9 @@ const stage = $("stage");
 const scene = new Scene(stage);
 // The scene's canvases go under the panels.
 stage.prepend(scene.canvas, stage.querySelector("canvas.labels")!);
+
+// Analysis plugins' reports share the events panel.
+const reports = new ReportsView($("feed-tabs"), $("report"), $("feed-list"), (l) => seek(l), playerColor);
 
 // Game models for the 3D view, if the server can read the game's data. It
 // opens the data in the background at startup, so ask again for a while.
@@ -89,6 +93,15 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded, map?.heights);
   doodadsFor = "";
   void loadDoodads();
+  reports.set([]);
+  api.fetchAnalysis(summary.id).then(
+    (r) => {
+      if (cur?.summary.id !== summary.id) return;
+      reports.set(r);
+      drawMarks();
+    },
+    (e) => console.warn("analysis:", e),
+  );
   buildFogOptions(model);
   scene.fit(playable.Left, playable.Bottom, playable.Right, playable.Top);
   selected = undefined;
@@ -270,6 +283,7 @@ function updatePanels(force: boolean): void {
         : "");
   }
   updateFeed(force);
+  reports.update(loop);
   updateInspect();
 }
 
@@ -381,6 +395,14 @@ function drawMarks(): void {
     const h = (n / max) * c.height * 0.9;
     ctx.fillRect(i * bw, c.height - h, Math.max(1, bw - 1), h);
   });
+  // Spans the analysis plugins found (battles...): a band across the middle.
+  ctx.fillStyle = "rgba(255,214,102,0.35)";
+  for (const m of reports.markers()) {
+    if (m.end === undefined) continue;
+    const x0 = (m.loop / model.loops) * c.width;
+    const x1 = (m.end / model.loops) * c.width;
+    ctx.fillRect(x0, c.height * 0.3, Math.max(2 * dpr, x1 - x0), c.height * 0.4);
+  }
   // Upgrades and expansions: ticks at the top in player color.
   for (const it of model.feed) {
     const isUpgrade = it.text.startsWith("Upgrade:");
@@ -431,6 +453,15 @@ function drawMinimap(): void {
     ctx.fillStyle = d.owner === 0 ? "#b5ecff" : playerColor(d.owner);
     const s = d.w ? Math.max(2, d.w * minimapScale) : 2;
     ctx.fillRect(toX(d.x) - s / 2, toY(d.y) - s / 2, s, s);
+  }
+  // Plugin markers happening now (battles): a ring where they are.
+  ctx.strokeStyle = "#ffd666";
+  ctx.lineWidth = 1.5;
+  for (const m of reports.markers()) {
+    if (!m.r || loop < m.loop || loop > (m.end ?? m.loop) + 112) continue;
+    ctx.beginPath();
+    ctx.arc(toX(m.x ?? 0), toY(m.y ?? 0), Math.max(4, m.r * minimapScale), 0, Math.PI * 2);
+    ctx.stroke();
   }
   const [x0, y0] = scene.screenToWorld(0, 0);
   const [x1, y1] = scene.screenToWorld(stage.clientWidth, stage.clientHeight);
@@ -544,6 +575,10 @@ window.addEventListener("keydown", (e) => {
     case "m":
     case "M":
       setTerrainMode(terrainMode === "shade" ? "minimap" : "shade");
+      break;
+    case "b":
+    case "B":
+      reports.cycle();
       break;
     case "3":
       toggle3D();
