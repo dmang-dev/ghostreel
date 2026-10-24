@@ -149,7 +149,52 @@ Phase 1 is the first release people can use; each later phase improves it withou
 | 4 · 1.0 release | WASM browser build, installers, user docs, contributor guide; plugin hooks (build orders, battle detection) | — |
 | 5 · Depth, then ship | More analysis plugins (expansions, supply blocks, income/army/worker graphs); 3D terrain fidelity (texture-mask blending, creep); command-tier accuracy round 3 (unit blocking, fights, Medivac boost); publish 1.0 (real repository, CI, first release) | Every change to the command tier lowers measured error; the release workflow produces installable builds on all three OSes |
 
+| 6 · Hardening and loose ends | Every item left open by Phases 0–5 (below): release verification and distribution, checks against a current full game install, command-tier round 4, 3D fidelity, analysis gaps | See each track |
+
 No dates yet: sizing depends on team size and how much `.m3` work the community add-on saves.
+
+### Phase 6: open items from earlier phases
+
+Each item names the phase that left it open (details in [docs/DECISIONS.md](docs/DECISIONS.md)). The tracks are independent and can run in parallel; within a track, items are in suggested order.
+
+**A. Release and distribution** — exit: a published release installs and opens a replay on Windows, macOS and Linux.
+
+1. Get CI and the release workflow green on real runners, including the NSIS installer step, which has never run (Phase 4: NSIS couldn't be installed locally).
+2. Install each artifact on a clean machine per OS, and check the `.SC2Replay` file association on Windows (Phase 4).
+3. Open replays from Finder on macOS: handle Wails' file-open events after start-up, not only command-line files (Phase 4).
+4. Linux packages: `.deb` and AppImage, and a build for WebKitGTK 4.1 (Ubuntu 24.04+) (Phase 4).
+5. Code signing for Windows and notarization for macOS; needs maintainers' certificates (Phase 4).
+6. Host the browser build (GitHub Pages) and shrink `ghostreel.wasm` (20.6 MB, mostly s2prot's protocol tables): load only the replay's protocol, or compress better (Phase 4).
+7. Make the repository public once 1–2 are done; add screenshots made with Shaded terrain only (Phase 1 rule).
+
+**B. Checks against a current full game install** — exit: every ladder unit type verified, and ground truth exists for current game versions and for Zerg players.
+
+1. Run `ghostreel assets` against a current Windows/macOS install: the Archon (stripped from the Linux 4.10 package) and full-resolution textures, models and ground textures (Phase 3).
+2. Record engine ground truth (`ghostreel-engine`) on current-version replays. The Linux client is 4.10 only, so this needs a Windows or macOS client (Phase 2).
+3. Include games where the Zerg side is a player rather than the AI, so creep speed can finally be measured (Phase 2).
+4. Re-check terrain heights against command target heights on those maps; Magannatha's 2-unit offset is believed to be a map-version mismatch (Phase 3).
+
+**C. Command tier, round 4** — exit (as before): every change lowers the measured error; a change that doesn't is reverted and recorded.
+
+1. Selection-tracking recall (85% of commands found): raw-API bots and control-group edge cases. Missed commands leave units parked (Phase 2/5).
+2. Fights: kiting and chasing between attack-move stops (Phase 2).
+3. Units blocking each other: crowds at ramps and in mineral lines (the Ultralove Siege Tank jam, mean 44.6 cells) (Phase 2/5).
+4. Medivac boost: classified but not applied (Phase 2).
+5. Players without orders (the built-in AI): army movement between observations. Worker mining was tried and reverted; the AI's own transfer and gather rules would need ground truth on AI behaviour first (Phase 5).
+
+**D. 3D fidelity** — exit: a ladder map in 3D reads like the game at a glance, at 60 fps on a mid-range GPU.
+
+1. A performance pass on a real GPU: so far it was measured only on a software renderer, 55 ms per frame with 96 models (Phase 3).
+2. Cliff meshes from the tile set's cliff models in place of the heightfield's walls (Phase 3/5).
+3. Water, and creep that recedes after its source dies rather than vanishing (Phase 3/5).
+4. Weapon and attachment models, per-actor scale, and lighting per tile set (Phase 3).
+5. The minimap's handling of fog-hidden units: it may lag a frame; unverified (Phase 3).
+
+**E. Analysis** — exit: the common questions about a game are answered in the panel.
+
+1. APM and actions over time: keep a per-player count of commands in the timeline (Phase 5).
+2. Production idle time, army composition over time, upgrade timings per player (Phase 5).
+3. Supply blocks to the loop, rather than to the 10 s stats interval, by tracking supply from births and deaths (Phase 5).
 
 ## Legal, licensing and risks
 
