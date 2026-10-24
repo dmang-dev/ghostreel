@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/OWNER/ghostreel/internal/casc"
+	"github.com/dmang-dev/ghostreel/internal/casc"
 )
 
 const cascDir = "../../testdata/casc"

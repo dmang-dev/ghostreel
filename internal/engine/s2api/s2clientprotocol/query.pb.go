@@ -533,9 +533,9 @@ const file_s2clientprotocol_query_proto_rawDesc = "" +
 	"target_pos\x18\x02 \x01(\v2\x17.SC2APIProtocol.Point2DR\ttargetPos\x12(\n" +
 	"\x10placing_unit_tag\x18\x03 \x01(\x04R\x0eplacingUnitTag\"V\n" +
 	"\x1eResponseQueryBuildingPlacement\x124\n" +
-	"\x06result\x18\x01 \x01(\x0e2\x1c.SC2APIProtocol.ActionResultR\x06resultB\xbb\x01\n" +
+	"\x06result\x18\x01 \x01(\x0e2\x1c.SC2APIProtocol.ActionResultR\x06resultB\xbf\x01\n" +
 	"\x12com.SC2APIProtocolB\n" +
-	"QueryProtoP\x01ZAgithub.com/OWNER/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
+	"QueryProtoP\x01ZEgithub.com/dmang-dev/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
 
 var (
 	file_s2clientprotocol_query_proto_rawDescOnce sync.Once

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // Real replays are never committed; these tests run on whatever is in

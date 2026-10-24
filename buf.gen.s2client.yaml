@@ -8,7 +8,7 @@ managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: github.com/OWNER/ghostreel/internal/engine/s2api
+      value: github.com/dmang-dev/ghostreel/internal/engine/s2api
 plugins:
   - local: protoc-gen-go
     out: internal/engine/s2api

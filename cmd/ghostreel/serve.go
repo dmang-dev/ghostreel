@@ -11,9 +11,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/OWNER/ghostreel/internal/app"
-	"github.com/OWNER/ghostreel/internal/assets"
-	"github.com/OWNER/ghostreel/internal/server"
+	"github.com/dmang-dev/ghostreel/internal/app"
+	"github.com/dmang-dev/ghostreel/internal/assets"
+	"github.com/dmang-dev/ghostreel/internal/server"
 )
 
 func cmdServe(args []string) error {

@@ -11,9 +11,9 @@ import (
 	"sort"
 	"strings"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
-	"github.com/OWNER/ghostreel/internal/gamedata"
-	"github.com/OWNER/ghostreel/internal/replay"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/gamedata"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // DefaultSnapshotInterval is the loop spacing of snapshots (~7 s on the clock).

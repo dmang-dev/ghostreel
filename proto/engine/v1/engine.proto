@@ -9,7 +9,7 @@ syntax = "proto3";
 
 package engine.v1;
 
-option go_package = "github.com/OWNER/ghostreel/gen/engine/v1;enginev1";
+option go_package = "github.com/dmang-dev/ghostreel/gen/engine/v1;enginev1";
 
 enum SchemaVersion {
   SCHEMA_VERSION_UNSPECIFIED = 0;

@@ -617,9 +617,9 @@ const file_s2clientprotocol_score_proto_rawDesc = "" +
 	"\ftotal_healed\x18\x1a \x01(\v2!.SC2APIProtocol.VitalScoreDetailsR\vtotalHealed\x12\x1f\n" +
 	"\vcurrent_apm\x18\x1b \x01(\x02R\n" +
 	"currentApm\x122\n" +
-	"\x15current_effective_apm\x18\x1c \x01(\x02R\x13currentEffectiveApmB\xbb\x01\n" +
+	"\x15current_effective_apm\x18\x1c \x01(\x02R\x13currentEffectiveApmB\xbf\x01\n" +
 	"\x12com.SC2APIProtocolB\n" +
-	"ScoreProtoP\x01ZAgithub.com/OWNER/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
+	"ScoreProtoP\x01ZEgithub.com/dmang-dev/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
 
 var (
 	file_s2clientprotocol_score_proto_rawDescOnce sync.Once

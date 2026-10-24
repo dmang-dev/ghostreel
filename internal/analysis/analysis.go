@@ -18,7 +18,7 @@ import (
 	"sort"
 	"sync"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
 )
 
 // Plugin analyzes a timeline. It must not modify the timeline, and may be

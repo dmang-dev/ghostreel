@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 func sel(remove replay.Mask, tags ...replay.Tag) *replay.Event {

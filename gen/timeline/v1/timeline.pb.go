@@ -2044,7 +2044,7 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\x11UNIT_STATE_MOVING\x10\x02\x12\x18\n" +
 	"\x14UNIT_STATE_ATTACKING\x10\x03\x12\x1b\n" +
 	"\x17UNIT_STATE_CONSTRUCTING\x10\x04\x12\x13\n" +
-	"\x0fUNIT_STATE_DEAD\x10\x05B7Z5github.com/OWNER/ghostreel/gen/timeline/v1;timelinev1b\x06proto3"
+	"\x0fUNIT_STATE_DEAD\x10\x05B;Z9github.com/dmang-dev/ghostreel/gen/timeline/v1;timelinev1b\x06proto3"
 
 var (
 	file_timeline_v1_timeline_proto_rawDescOnce sync.Once

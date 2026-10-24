@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
 )
 
 // Marshal encodes a timeline as binary protobuf.

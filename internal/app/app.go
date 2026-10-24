@@ -20,13 +20,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/OWNER/ghostreel/internal/analysis"
-	"github.com/OWNER/ghostreel/internal/command"
-	"github.com/OWNER/ghostreel/internal/engine"
-	"github.com/OWNER/ghostreel/internal/mapcache"
-	"github.com/OWNER/ghostreel/internal/mapfile"
-	"github.com/OWNER/ghostreel/internal/replay"
-	"github.com/OWNER/ghostreel/internal/timeline"
+	"github.com/dmang-dev/ghostreel/internal/analysis"
+	"github.com/dmang-dev/ghostreel/internal/command"
+	"github.com/dmang-dev/ghostreel/internal/engine"
+	"github.com/dmang-dev/ghostreel/internal/mapcache"
+	"github.com/dmang-dev/ghostreel/internal/mapfile"
+	"github.com/dmang-dev/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/timeline"
 )
 
 // CacheVersion is part of every cached timeline's file name. Bump it whenever

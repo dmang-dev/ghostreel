@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
-	"github.com/OWNER/ghostreel/internal/replay"
-	"github.com/OWNER/ghostreel/internal/timeline"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/timeline"
 )
 
 func u32(v uint32) *uint32 { return &v }

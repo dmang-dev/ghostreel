@@ -11,7 +11,7 @@ import (
 	"image/jpeg"
 	"math"
 
-	"github.com/OWNER/ghostreel/internal/mapfile"
+	"github.com/dmang-dev/ghostreel/internal/mapfile"
 )
 
 // maxGround bounds the composed ground image (pixels per side).

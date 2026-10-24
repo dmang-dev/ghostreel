@@ -80,8 +80,8 @@ package expansions
 import (
 	"fmt"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
-	"github.com/OWNER/ghostreel/internal/analysis"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/analysis"
 )
 
 func init() { analysis.Register(Plugin{}) }
@@ -106,7 +106,7 @@ func (Plugin) Analyze(tl *pb.Timeline) (*analysis.Report, error) {
 }
 ```
 
-Include it in a build by importing the package for its side effect, for example in `internal/app`: `import _ "github.com/OWNER/ghostreel/internal/analysis/expansions"`. Then:
+Include it in a build by importing the package for its side effect, for example in `internal/app`: `import _ "github.com/dmang-dev/ghostreel/internal/analysis/expansions"`. Then:
 
 - Keep `Analyze` pure. Don't modify the timeline, and don't touch the network or the file system (plugins also run in the browser).
 - A plugin that returns an error or panics shows up as a failed tab; the others still run.

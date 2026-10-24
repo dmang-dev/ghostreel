@@ -1,4 +1,4 @@
-module github.com/OWNER/ghostreel
+module github.com/dmang-dev/ghostreel
 
 go 1.27.0
 

@@ -512,8 +512,8 @@ const file_s2clientprotocol_common_proto_rawDesc = "" +
 	"\x04Zerg\x10\x02\x12\v\n" +
 	"\aProtoss\x10\x03\x12\n" +
 	"\n" +
-	"\x06Random\x10\x04B\xbc\x01\n" +
-	"\x12com.SC2APIProtocolB\vCommonProtoP\x01ZAgithub.com/OWNER/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
+	"\x06Random\x10\x04B\xc0\x01\n" +
+	"\x12com.SC2APIProtocolB\vCommonProtoP\x01ZEgithub.com/dmang-dev/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
 
 var (
 	file_s2clientprotocol_common_proto_rawDescOnce sync.Once

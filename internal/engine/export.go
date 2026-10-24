@@ -8,8 +8,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	enginev1 "github.com/OWNER/ghostreel/gen/engine/v1"
-	sc2 "github.com/OWNER/ghostreel/internal/engine/s2api/s2clientprotocol"
+	enginev1 "github.com/dmang-dev/ghostreel/gen/engine/v1"
+	sc2 "github.com/dmang-dev/ghostreel/internal/engine/s2api/s2clientprotocol"
 	"google.golang.org/protobuf/proto"
 )
 

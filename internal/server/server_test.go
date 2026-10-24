@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/OWNER/ghostreel/internal/app"
-	"github.com/OWNER/ghostreel/internal/mapcache"
-	"github.com/OWNER/ghostreel/internal/timeline"
+	"github.com/dmang-dev/ghostreel/internal/app"
+	"github.com/dmang-dev/ghostreel/internal/mapcache"
+	"github.com/dmang-dev/ghostreel/internal/timeline"
 )
 
 var testdata = filepath.Join("..", "..", "testdata")

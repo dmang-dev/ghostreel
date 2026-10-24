@@ -5,9 +5,9 @@ package timeline
 import (
 	"testing"
 
-	enginev1 "github.com/OWNER/ghostreel/gen/engine/v1"
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
-	"github.com/OWNER/ghostreel/internal/replay"
+	enginev1 "github.com/dmang-dev/ghostreel/gen/engine/v1"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 func TestApplyEngine(t *testing.T) {

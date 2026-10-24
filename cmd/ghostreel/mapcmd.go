@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/OWNER/ghostreel/internal/mapcache"
-	"github.com/OWNER/ghostreel/internal/mapfile"
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/mapcache"
+	"github.com/dmang-dev/ghostreel/internal/mapfile"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // resolverFlags are the map-lookup flags shared by commands that take a replay.

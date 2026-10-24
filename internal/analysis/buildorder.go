@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
-	"github.com/OWNER/ghostreel/internal/timeline"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/timeline"
 )
 
 func init() { Register(BuildOrder{Until: 22.4 * 60 * 10}) }

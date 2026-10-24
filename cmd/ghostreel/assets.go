@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/OWNER/ghostreel/internal/app"
-	"github.com/OWNER/ghostreel/internal/assets"
-	"github.com/OWNER/ghostreel/internal/casc"
-	"github.com/OWNER/ghostreel/internal/gamedata"
+	"github.com/dmang-dev/ghostreel/internal/app"
+	"github.com/dmang-dev/ghostreel/internal/assets"
+	"github.com/dmang-dev/ghostreel/internal/casc"
+	"github.com/dmang-dev/ghostreel/internal/gamedata"
 )
 
 // cmdAssets converts unit models from the local game data into the cache the

@@ -635,7 +635,7 @@ const file_engine_v1_engine_proto_rawDesc = "" +
 	"target_tag\x18\x05 \x01(\x04R\ttargetTag*E\n" +
 	"\rSchemaVersion\x12\x1e\n" +
 	"\x1aSCHEMA_VERSION_UNSPECIFIED\x10\x00\x12\x14\n" +
-	"\x10SCHEMA_VERSION_1\x10\x01B3Z1github.com/OWNER/ghostreel/gen/engine/v1;enginev1b\x06proto3"
+	"\x10SCHEMA_VERSION_1\x10\x01B7Z5github.com/dmang-dev/ghostreel/gen/engine/v1;enginev1b\x06proto3"
 
 var (
 	file_engine_v1_engine_proto_rawDescOnce sync.Once

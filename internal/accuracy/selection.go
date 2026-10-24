@@ -6,9 +6,9 @@ import (
 	"math"
 	"sort"
 
-	enginev1 "github.com/OWNER/ghostreel/gen/engine/v1"
-	"github.com/OWNER/ghostreel/internal/replay"
-	"github.com/OWNER/ghostreel/internal/selection"
+	enginev1 "github.com/dmang-dev/ghostreel/gen/engine/v1"
+	"github.com/dmang-dev/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/selection"
 )
 
 // SelectionReport says how well the selection tracker attributes commands to

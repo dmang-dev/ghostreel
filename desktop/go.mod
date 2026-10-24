@@ -1,9 +1,9 @@
-module github.com/OWNER/ghostreel/desktop
+module github.com/dmang-dev/ghostreel/desktop
 
 go 1.27.0
 
 require (
-	github.com/OWNER/ghostreel v0.0.0
+	github.com/dmang-dev/ghostreel v0.0.0
 	github.com/wailsapp/wails/v2 v2.17.0
 )
 
@@ -42,4 +42,4 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 )
 
-replace github.com/OWNER/ghostreel => ../
+replace github.com/dmang-dev/ghostreel => ../

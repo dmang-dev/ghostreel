@@ -933,9 +933,9 @@ const file_s2clientprotocol_error_proto_rawDesc = "" +
 	"\x10TargetIsOutOfArc\x10\xd3\x01\x12\x1d\n" +
 	"\x18CantFindTeleportLocation\x10\xd4\x01\x12\x15\n" +
 	"\x10InvalidItemClass\x10\xd5\x01\x12\x18\n" +
-	"\x13CantFindCancelOrder\x10\xd6\x01B\xbb\x01\n" +
+	"\x13CantFindCancelOrder\x10\xd6\x01B\xbf\x01\n" +
 	"\x12com.SC2APIProtocolB\n" +
-	"ErrorProtoP\x01ZAgithub.com/OWNER/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
+	"ErrorProtoP\x01ZEgithub.com/dmang-dev/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
 
 var (
 	file_s2clientprotocol_error_proto_rawDescOnce sync.Once

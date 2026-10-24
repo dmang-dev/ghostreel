@@ -26,8 +26,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/OWNER/ghostreel/internal/engine"
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/engine"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 func main() {

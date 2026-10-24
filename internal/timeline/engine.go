@@ -5,8 +5,8 @@ package timeline
 import (
 	"fmt"
 
-	enginev1 "github.com/OWNER/ghostreel/gen/engine/v1"
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
+	enginev1 "github.com/dmang-dev/ghostreel/gen/engine/v1"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
 )
 
 // ApplyEngine replaces the tracks of every unit the engine recorded with its

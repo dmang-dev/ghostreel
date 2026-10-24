@@ -3,9 +3,9 @@
 package command
 
 import (
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
-	"github.com/OWNER/ghostreel/internal/mapfile"
-	"github.com/OWNER/ghostreel/internal/pathing"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/mapfile"
+	"github.com/dmang-dev/ghostreel/internal/pathing"
 )
 
 // Grid builds the terrain grid for a replay: the map's pathable cells

@@ -1825,8 +1825,8 @@ const file_s2clientprotocol_raw_proto_rawDesc = "" +
 	"\x0fCloakedDetected\x10\x02\x12\x0e\n" +
 	"\n" +
 	"NotCloaked\x10\x03\x12\x11\n" +
-	"\rCloakedAllied\x10\x04B\xb9\x01\n" +
-	"\x12com.SC2APIProtocolB\bRawProtoP\x01ZAgithub.com/OWNER/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
+	"\rCloakedAllied\x10\x04B\xbd\x01\n" +
+	"\x12com.SC2APIProtocolB\bRawProtoP\x01ZEgithub.com/dmang-dev/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
 
 var (
 	file_s2clientprotocol_raw_proto_rawDescOnce sync.Once

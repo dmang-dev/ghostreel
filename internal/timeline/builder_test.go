@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
-	"github.com/OWNER/ghostreel/internal/replay"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // fixture is a small hand-written game covering every event kind the builder

@@ -13,7 +13,7 @@ package selection
 import (
 	"sort"
 
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // ActiveGroup is the control group ID the replay uses for the live selection.

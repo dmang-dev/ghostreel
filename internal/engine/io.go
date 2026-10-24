@@ -11,7 +11,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	enginev1 "github.com/OWNER/ghostreel/gen/engine/v1"
+	enginev1 "github.com/dmang-dev/ghostreel/gen/engine/v1"
 )
 
 // WriteSamples stores samples as gzip-compressed protobuf (.engine.pb.gz).

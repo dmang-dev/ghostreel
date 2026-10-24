@@ -6,8 +6,8 @@ import (
 	"math"
 	"sort"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
-	"github.com/OWNER/ghostreel/internal/timeline"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/timeline"
 )
 
 // An attack-move walks toward its goal but stops to fight whatever enemy

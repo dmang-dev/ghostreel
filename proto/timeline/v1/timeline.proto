@@ -12,7 +12,7 @@ syntax = "proto3";
 
 package timeline.v1;
 
-option go_package = "github.com/OWNER/ghostreel/gen/timeline/v1;timelinev1";
+option go_package = "github.com/dmang-dev/ghostreel/gen/timeline/v1;timelinev1";
 
 // Bumped on any incompatible change. Readers refuse versions they don't know.
 enum SchemaVersion {

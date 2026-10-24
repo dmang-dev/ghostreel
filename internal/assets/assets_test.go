@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/OWNER/ghostreel/internal/casc"
-	"github.com/OWNER/ghostreel/internal/gamedata"
-	"github.com/OWNER/ghostreel/internal/mapfile"
+	"github.com/dmang-dev/ghostreel/internal/casc"
+	"github.com/dmang-dev/ghostreel/internal/gamedata"
+	"github.com/dmang-dev/ghostreel/internal/mapfile"
 )
 
 const cascDir = "../../testdata/casc"

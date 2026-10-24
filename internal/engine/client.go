@@ -19,7 +19,7 @@ import (
 	"github.com/coder/websocket"
 	"google.golang.org/protobuf/proto"
 
-	sc2 "github.com/OWNER/ghostreel/internal/engine/s2api/s2clientprotocol"
+	sc2 "github.com/dmang-dev/ghostreel/internal/engine/s2api/s2clientprotocol"
 )
 
 // Client is a connection to one SC2 instance's API endpoint.

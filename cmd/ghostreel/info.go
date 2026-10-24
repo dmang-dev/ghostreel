@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 func cmdInfo(args []string) error {

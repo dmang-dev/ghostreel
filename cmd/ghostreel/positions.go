@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // printPositionStats reports how much UnitPositions sampling a replay holds:

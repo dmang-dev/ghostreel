@@ -6,9 +6,9 @@ import (
 	"math"
 	"sort"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
-	"github.com/OWNER/ghostreel/internal/gamedata"
-	"github.com/OWNER/ghostreel/internal/replay"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/gamedata"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // UnitState is one unit as it appears at a given loop.

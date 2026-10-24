@@ -40,11 +40,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/OWNER/ghostreel/internal/app"
-	"github.com/OWNER/ghostreel/internal/assets"
-	"github.com/OWNER/ghostreel/internal/casc"
-	"github.com/OWNER/ghostreel/internal/mapfile"
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/app"
+	"github.com/dmang-dev/ghostreel/internal/assets"
+	"github.com/dmang-dev/ghostreel/internal/casc"
+	"github.com/dmang-dev/ghostreel/internal/mapfile"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // MaxUpload bounds uploaded replays and maps.

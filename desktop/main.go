@@ -23,9 +23,9 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
-	"github.com/OWNER/ghostreel/internal/app"
-	"github.com/OWNER/ghostreel/internal/assets"
-	"github.com/OWNER/ghostreel/internal/server"
+	"github.com/dmang-dev/ghostreel/internal/app"
+	"github.com/dmang-dev/ghostreel/internal/assets"
+	"github.com/dmang-dev/ghostreel/internal/server"
 )
 
 // The viewer build, written here by `wails build` (see wails.json).

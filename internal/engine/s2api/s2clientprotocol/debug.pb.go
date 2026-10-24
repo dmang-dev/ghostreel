@@ -1298,9 +1298,9 @@ const file_s2clientprotocol_debug_proto_rawDesc = "" +
 	"\x12\v\n" +
 	"\aupgrade\x10\v\x12\x0e\n" +
 	"\n" +
-	"fast_build\x10\fB\xbb\x01\n" +
+	"fast_build\x10\fB\xbf\x01\n" +
 	"\x12com.SC2APIProtocolB\n" +
-	"DebugProtoP\x01ZAgithub.com/OWNER/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
+	"DebugProtoP\x01ZEgithub.com/dmang-dev/ghostreel/internal/engine/s2api/s2clientprotocol\xa2\x02\x03SXX\xaa\x02\x0eSC2APIProtocol\xca\x02\x0eSC2APIProtocol\xe2\x02\x1aSC2APIProtocol\\GPBMetadata\xea\x02\x0eSC2APIProtocol"
 
 var (
 	file_s2clientprotocol_debug_proto_rawDescOnce sync.Once

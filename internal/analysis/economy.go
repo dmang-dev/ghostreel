@@ -5,7 +5,7 @@ package analysis
 import (
 	"fmt"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
 )
 
 func init() {

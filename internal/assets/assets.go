@@ -20,9 +20,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/OWNER/ghostreel/internal/casc"
-	"github.com/OWNER/ghostreel/internal/dds"
-	"github.com/OWNER/ghostreel/internal/m3"
+	"github.com/dmang-dev/ghostreel/internal/casc"
+	"github.com/dmang-dev/ghostreel/internal/dds"
+	"github.com/dmang-dev/ghostreel/internal/m3"
 )
 
 // Version is part of the cache path; bump it when the conversion changes.

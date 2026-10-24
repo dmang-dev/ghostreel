@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // ErrNotFound means no source had the map. The error text lists what was tried.

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/OWNER/ghostreel/internal/command"
-	"github.com/OWNER/ghostreel/internal/engine"
-	"github.com/OWNER/ghostreel/internal/mapcache"
-	"github.com/OWNER/ghostreel/internal/mapfile"
-	"github.com/OWNER/ghostreel/internal/replay"
-	"github.com/OWNER/ghostreel/internal/timeline"
+	"github.com/dmang-dev/ghostreel/internal/command"
+	"github.com/dmang-dev/ghostreel/internal/engine"
+	"github.com/dmang-dev/ghostreel/internal/mapcache"
+	"github.com/dmang-dev/ghostreel/internal/mapfile"
+	"github.com/dmang-dev/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/timeline"
 )
 
 // Ground-truth recordings (from ghostreel-engine) are never committed; these

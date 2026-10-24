@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/OWNER/ghostreel/internal/replay"
+	"github.com/dmang-dev/ghostreel/internal/replay"
 )
 
 // fakeArchive serves synthetic files in place of an MPQ.

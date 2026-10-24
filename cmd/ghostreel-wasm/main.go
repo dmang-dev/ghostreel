@@ -23,8 +23,8 @@ import (
 	"net/http/httptest"
 	"syscall/js"
 
-	"github.com/OWNER/ghostreel/internal/app"
-	"github.com/OWNER/ghostreel/internal/server"
+	"github.com/dmang-dev/ghostreel/internal/app"
+	"github.com/dmang-dev/ghostreel/internal/server"
 )
 
 func main() {

@@ -5,7 +5,7 @@ package timeline
 import (
 	"math"
 
-	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
+	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
 )
 
 // SimplifyTolerance is how far (cells) a simplified track may stray from the
