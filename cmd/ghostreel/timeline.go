@@ -19,13 +19,13 @@ func cmdDumpTimeline(args []string) error {
 	fs := flag.NewFlagSet("dump-timeline", flag.ExitOnError)
 	out := fs.String("o", "", "output file (default: <replay>.pb, or .json with --json)")
 	asJSON := fs.Bool("json", false, "write protobuf JSON instead of binary (for debugging)")
-	noCmds := fs.Bool("no-commands", false, "leave player commands out of the event feed")
+	noCmds := fs.Bool("no-commands", false, "leave player commands out (skips decoding game events; much faster on long games)")
 	fs.Parse(reorder(args))
 	if fs.NArg() != 1 {
 		return errors.New("dump-timeline: need exactly one replay")
 	}
 	path := fs.Arg(0)
-	r, err := replay.Open(path)
+	r, err := replay.OpenWith(path, replay.Options{SkipGameEvents: *noCmds})
 	if err != nil {
 		return err
 	}

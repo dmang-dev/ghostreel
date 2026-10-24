@@ -87,8 +87,19 @@ type Replay struct {
 	Events []Event
 }
 
+// Options select what to decode. The zero value decodes everything.
+type Options struct {
+	// SkipGameEvents leaves out game events (commands, selections, camera).
+	// They are by far the largest stream (over a million events in long bot
+	// games) and the tracker tier only uses them for the command feed.
+	SkipGameEvents bool
+}
+
 // Open decodes the replay at path.
-func Open(path string) (*Replay, error) {
+func Open(path string) (*Replay, error) { return OpenWith(path, Options{}) }
+
+// OpenWith is Open with options.
+func OpenWith(path string, opts Options) (*Replay, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -102,7 +113,7 @@ func Open(path string) (*Replay, error) {
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	r, err := Decode(f)
+	r, err := DecodeWith(f, opts)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
@@ -112,7 +123,10 @@ func Open(path string) (*Replay, error) {
 }
 
 // Decode decodes a replay from any seekable source (Path and Hash stay empty).
-func Decode(input io.ReadSeeker) (*Replay, error) {
+func Decode(input io.ReadSeeker) (*Replay, error) { return DecodeWith(input, Options{}) }
+
+// DecodeWith is Decode with options.
+func DecodeWith(input io.ReadSeeker, opts Options) (*Replay, error) {
 	baseBuild, err := peekBaseBuild(input)
 	if err != nil {
 		return nil, err
@@ -121,7 +135,7 @@ func Decode(input io.ReadSeeker) (*Replay, error) {
 	if _, err := input.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	r, err := rep.New(input)
+	r, err := rep.NewEvts(input, !opts.SkipGameEvents, true, true)
 	if err != nil {
 		if errors.Is(err, rep.ErrUnsupportedRepVersion) {
 			return nil, fmt.Errorf("base build %d: %w", baseBuild, err)
