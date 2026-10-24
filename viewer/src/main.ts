@@ -594,6 +594,7 @@ window.addEventListener("keydown", (e) => {
 }
 
 // Library (only populated when the server was given replay folders).
+$("browser-only").hidden = !api.BROWSER_ONLY;
 api.library().then((entries) => {
   if (!entries.length) return;
   const sel = $<HTMLSelectElement>("library");

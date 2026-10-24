@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
+import { apiFetch } from "./api";
 
 /** Extras the exporter (internal/m3) writes on each animation. */
 interface ClipInfo {
@@ -53,7 +54,7 @@ export class UnitModels {
   /** Asks the server whether it has game data to convert models from. */
   async init(): Promise<boolean> {
     try {
-      const r = await fetch(`${this.base}/api/assets`);
+      const r = await apiFetch(`${this.base}/api/assets`);
       this.available = r.ok && (await r.json()).available === true;
     } catch {
       this.available = false;
@@ -91,7 +92,7 @@ export class UnitModels {
   private async load(key: string): Promise<Template | null> {
     let tpl: Template | null = null;
     try {
-      const r = await fetch(`${this.base}/api/assets/${key}`);
+      const r = await apiFetch(`${this.base}/api/assets/${key}`);
       if (r.ok) tpl = await this.parse(await r.arrayBuffer());
     } catch (e) {
       console.warn(`model ${key}:`, e);
