@@ -39,6 +39,7 @@ type death struct {
 	x, y   float64
 	owner  uint32
 	killer uint32
+	typ    *pb.UnitType
 }
 
 type battle struct {
@@ -52,17 +53,19 @@ func (b *battle) center() (float64, float64) {
 	return b.sx / n, b.sy / n
 }
 
-func (bt Battles) Analyze(tl *pb.Timeline) (*Report, error) {
-	radius, gap, minDeaths := bt.Radius, bt.Gap, bt.MinDeaths
-	if radius == 0 {
-		radius = 14
+// radius is the farthest death from the center (at least 3 cells).
+func (b *battle) radius() float64 {
+	cx, cy := b.center()
+	far := 3.0
+	for _, d := range b.deaths {
+		far = math.Max(far, math.Hypot(d.x-cx, d.y-cy))
 	}
-	if gap == 0 {
-		gap = 336
-	}
-	if minDeaths == 0 {
-		minDeaths = 6
-	}
+	return far
+}
+
+// playerDeaths lists the deaths of players' units, in order, leaving out
+// spawned and UI-only units.
+func playerDeaths(tl *pb.Timeline) []death {
 	tracks := make(map[uint32]*pb.Track, len(tl.Tracks))
 	for _, t := range tl.Tracks {
 		tracks[t.UnitId] = t
@@ -83,10 +86,16 @@ func (bt Battles) Analyze(tl *pb.Timeline) (*Report, error) {
 			continue
 		}
 		x, y, _ := timeline.PositionAt(tr, t.Speed, loop)
-		deaths = append(deaths, death{loop, float64(x), float64(y), owner, u.KillerPlayer})
+		deaths = append(deaths, death{loop, float64(x), float64(y), owner, u.KillerPlayer, t})
 	}
 	sort.Slice(deaths, func(i, j int) bool { return deaths[i].loop < deaths[j].loop })
+	return deaths
+}
 
+// cluster groups deaths (in loop order) into fights: a death joins the
+// running fight whose center is nearest within radius cells and whose last
+// death is at most gap loops before it.
+func cluster(deaths []death, radius float64, gap uint32) []*battle {
 	var open, done []*battle
 	for _, d := range deaths {
 		var best *battle
@@ -108,7 +117,7 @@ func (bt Battles) Analyze(tl *pb.Timeline) (*Report, error) {
 		best.sx += d.x
 		best.sy += d.y
 		best.deaths = append(best.deaths, d)
-		// Close battles that can no longer grow.
+		// Close fights that can no longer grow.
 		keep := open[:0]
 		for _, b := range open {
 			if d.loop-b.end > gap {
@@ -121,6 +130,21 @@ func (bt Battles) Analyze(tl *pb.Timeline) (*Report, error) {
 	}
 	done = append(done, open...)
 	sort.Slice(done, func(i, j int) bool { return done[i].start < done[j].start })
+	return done
+}
+
+func (bt Battles) Analyze(tl *pb.Timeline) (*Report, error) {
+	radius, gap, minDeaths := bt.Radius, bt.Gap, bt.MinDeaths
+	if radius == 0 {
+		radius = 14
+	}
+	if gap == 0 {
+		gap = 336
+	}
+	if minDeaths == 0 {
+		minDeaths = 6
+	}
+	done := cluster(playerDeaths(tl), radius, gap)
 
 	players := tl.GetMeta().GetPlayers()
 	rep := &Report{Title: "Battles"}
@@ -135,10 +159,8 @@ func (bt Battles) Analyze(tl *pb.Timeline) (*Report, error) {
 		}
 		lost := map[uint32]int{}
 		cx, cy := b.center()
-		far := 0.0
 		for _, d := range b.deaths {
 			lost[d.owner]++
-			far = math.Max(far, math.Hypot(d.x-cx, d.y-cy))
 		}
 		var parts []string
 		row := Row{Loop: b.start, Cells: []string{clock(b.start), clock(b.end - b.start)}}
@@ -148,7 +170,7 @@ func (bt Battles) Analyze(tl *pb.Timeline) (*Report, error) {
 		}
 		table.Rows = append(table.Rows, row)
 		rep.Markers = append(rep.Markers, Marker{
-			Loop: b.start, End: b.end, X: float32(cx), Y: float32(cy), R: float32(math.Max(far, 3)),
+			Loop: b.start, End: b.end, X: float32(cx), Y: float32(cy), R: float32(b.radius()),
 			Label: "Battle: " + strings.Join(parts, ", "), Kind: "battle",
 		})
 	}

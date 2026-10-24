@@ -148,7 +148,7 @@ func TestRunIsolatesFailures(t *testing.T) {
 	for _, p := range Plugins() {
 		ids = append(ids, p.ID())
 	}
-	if strings.Join(ids, ",") != "battles,build-order,economy,expansions,supply-blocks" {
+	if strings.Join(ids, ",") != "battles,build-order,economy,expansions,hotspots,supply-blocks" {
 		t.Errorf("built-in plugins = %v", ids)
 	}
 }
@@ -214,5 +214,103 @@ func TestSupplyBlocksAndEconomy(t *testing.T) {
 	}
 	if len(eco.Series) != 5 || eco.Series[0].Title != "Income" || len(eco.Series[0].Points) != 5 || eco.Series[0].Points[1].Value != 600 {
 		t.Errorf("economy = %+v", eco.Series)
+	}
+}
+
+func TestHotspots(t *testing.T) {
+	tl := game()
+	tl.UnitTypes = append(tl.UnitTypes,
+		&pb.UnitType{Name: "Hatchery", Class: pb.UnitClass_UNIT_CLASS_BUILDING},       // 6
+		&pb.UnitType{Name: "Medivac", Class: pb.UnitClass_UNIT_CLASS_ARMY, Air: true}) // 7
+	stat := func(loop, player, lost uint32) {
+		event(tl, loop, &pb.Event_PlayerStats{PlayerStats: &pb.PlayerStats{Player: player, LostMinerals: lost}})
+	}
+	stat(4800, 1, 0)
+	stat(4800, 2, 0)
+	// A big fight at (50, 50) from 5000: 12 deaths within 2 s, 1000 + 900 lost.
+	for i := 0; i < 12; i++ {
+		addUnit(tl, uint32(1+i%2), 0, 10, 50+float32(i%4), 50, u32(5000+uint32(i)*4))
+	}
+	stat(5200, 1, 1000)
+	stat(5200, 2, 900)
+	// A small fight far away later: 6 deaths, little lost.
+	for i := 0; i < 6; i++ {
+		addUnit(tl, uint32(1+i%2), 0, 10, 120, 120+float32(i), u32(9000+uint32(i)*30))
+	}
+	stat(9400, 1, 1100)
+	stat(9400, 2, 950)
+	// Workers raided: 5 SCVs of player 1.
+	for i := 0; i < 5; i++ {
+		addUnit(tl, 1, 2, 10, 20, 20, u32(12000+uint32(i)*20))
+	}
+	// A hatchery dies; a loaded Medivac goes down with 3 marines.
+	addUnit(tl, 2, 6, 10, 140, 30, u32(15000))
+	addUnit(tl, 1, 7, 10, 80, 80, u32(16000))
+	for i := 0; i < 3; i++ {
+		addUnit(tl, 1, 0, 10, 80, 81, u32(16010))
+	}
+	tl.Meta.Loops = 18000
+	rep, err := Hotspots{}.Analyze(tl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string][]Marker{}
+	for _, m := range rep.Markers {
+		got[m.Category] = append(got[m.Category], m)
+	}
+	if b := got["battle"]; len(b) != 2 || b[0].Tier != "major" || b[1].Tier != "minor" {
+		t.Errorf("battles = %+v", b)
+	}
+	if len(got["army_wipe"]) != 1 || len(got["worker_raid"]) != 1 || len(got["base_kill"]) != 1 ||
+		len(got["transport_kill"]) != 1 || len(got["first_blood"]) != 1 || len(got["game_end"]) != 1 {
+		t.Errorf("categories = %v", func() map[string]int {
+			n := map[string]int{}
+			for k, v := range got {
+				n[k] = len(v)
+			}
+			return n
+		}())
+	}
+	if len(got["multi_prong"]) != 0 {
+		t.Errorf("multi-prong without simultaneous fights: %+v", got["multi_prong"])
+	}
+	for _, m := range rep.Markers {
+		if m.Score <= 0 || m.Score > 1 {
+			t.Errorf("%s score %v", m.Category, m.Score)
+		}
+	}
+}
+
+// TestHotspotsReal logs the hotspots found in the replays in testdata.
+func TestHotspotsReal(t *testing.T) {
+	paths, _ := filepath.Glob(filepath.Join("..", "..", "testdata", "replays", "*.SC2Replay"))
+	if len(paths) == 0 {
+		t.Skip("no replays in testdata/replays")
+	}
+	for _, path := range paths[:min(len(paths), 6)] {
+		r, err := replay.Open(path)
+		if err != nil || !r.Info.HasTracker {
+			continue
+		}
+		tl, err := timeline.Build(&r.Info, r.Events, timeline.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		rep, err := Hotspots{}.Analyze(tl)
+		if err != nil {
+			t.Fatal(err)
+		}
+		major := 0
+		for _, m := range rep.Markers {
+			if m.Tier == "major" {
+				major++
+			}
+		}
+		t.Logf("%s: %d hotspots, %d major", filepath.Base(path), len(rep.Markers), major)
+		for _, m := range rep.Markers {
+			if m.Score >= 0.3 {
+				t.Logf("    %s %-5s %.2f %s", clock(m.Loop), m.Tier, m.Score, m.Label)
+			}
+		}
 	}
 }

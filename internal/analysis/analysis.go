@@ -51,6 +51,11 @@ type Marker struct {
 	R     float32 `json:"r,omitempty"` // radius around X, Y
 	Label string  `json:"label"`
 	Kind  string  `json:"kind,omitempty"` // free-form category, e.g. "battle"
+	// Hotspots (see hotspots.go) also carry what happened, how much it
+	// matters (0-1) and a tier: "major" or "minor".
+	Category string  `json:"category,omitempty"`
+	Score    float32 `json:"score,omitempty"`
+	Tier     string  `json:"tier,omitempty"`
 }
 
 // Table is rows of text, each tied to a loop.
