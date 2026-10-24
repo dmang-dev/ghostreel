@@ -35,7 +35,7 @@ func TestAroundWall(t *testing.T) {
 	cur := a
 	top := 0.0
 	for _, q := range p {
-		if !g.lineClear(cur, q) {
+		if !g.lineClear(cur, q, false) {
 			t.Fatalf("leg %v -> %v crosses the wall", cur, q)
 		}
 		top = math.Max(top, q.Y)
@@ -72,5 +72,57 @@ func TestBlockFootprint(t *testing.T) {
 	g.Block(2.5, 7.5, 3, 3) // odd footprint centered on a cell: cells 1..3
 	if g.Walkable(1, 6) || g.Walkable(3, 8) || !g.Walkable(4, 7) {
 		t.Error("3x3 footprint wrong")
+	}
+}
+
+func TestCliffLevelsBlockSteps(t *testing.T) {
+	// Two plateaus (levels 64 and 128) meeting along x=5, joined by a ramp
+	// cell at the top row.
+	g := New(10, 10)
+	lv := make([]uint16, 100)
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 10; x++ {
+			lv[y*10+x] = 64
+			if x >= 5 {
+				lv[y*10+x] = 128
+			}
+		}
+	}
+	lv[9*10+5] = 96 // ramp
+	g.SetLevels(lv)
+	p := g.Path(Point{2.5, 1.5}, Point{8.5, 1.5})
+	top := 0.0
+	for _, q := range p {
+		top = math.Max(top, q.Y)
+	}
+	if top < 9 {
+		t.Fatalf("path %v crossed the cliff instead of using the ramp", p)
+	}
+}
+
+func TestBigUnitsNeedRoom(t *testing.T) {
+	// A wall at x=5 with a one-cell gap at y=5 and a two-cell gap at y=8..9.
+	g := New(10, 12)
+	for y := 0; y < 12; y++ {
+		if y != 5 && y != 8 && y != 9 {
+			g.Set(5, y, false)
+		}
+	}
+	a, b := Point{2.5, 5.5}, Point{8.5, 5.5}
+	small := g.PathFor(a, b, false)
+	if len(small) != 1 {
+		t.Errorf("small unit should go straight through the gap: %v", small)
+	}
+	big := g.PathFor(a, b, true)
+	top := 0.0
+	for _, q := range big {
+		top = math.Max(top, q.Y)
+	}
+	if top < 8 {
+		t.Errorf("big unit squeezed through the 1-cell gap: %v", big)
+	}
+	g.Set(5, 8, false) // now the wide gap is only 1 cell too
+	if g.ReachableFor(a, b, true) {
+		t.Error("big unit should be walled in")
 	}
 }
