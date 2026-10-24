@@ -53,3 +53,40 @@ The plan marked several facts "(verify)". Each was checked against the corpus in
 - **Unit labels, not icons,** and footprint/radius shapes from the stub table, until the Phase 3 extractor exists.
 - **No spoilers in the inspect panel:** death time and killer appear only once the death has happened.
 - **Minimap images load with `createImageBitmap`.** `HTMLImageElement.decode()` stalled indefinitely in a background tab and froze loading.
+
+## Phase 2 (2026-10-24)
+
+### Engine tier
+
+- **`ghostreel-engine` is written in Go, over the s2client API.** Blizzard's `s2client-proto` is vendored unmodified under `third_party/` (MIT) and generated into `internal/engine/s2api`. The exporter starts SC2 as its own direct child (shared hosts may kill SC2 processes with unexpected parents), picks a free port in 5800–5899, plays the replay with fog disabled and the raw interface, and records every unit every 16 loops (0.7 s on the in-game clock). `--max-load` pauses it while the host is busy. Output is gzip-compressed `engine.v1.Samples` (`<replay>.engine.pb.gz`), about 1–5 MiB per game.
+- **Ground truth exists only for 4.10 (base 75689).** That is the only client on the sc2-headless VM, the newest Linux package Blizzard published. Pro replays (5.0.x) can't be checked until a Windows client with those versions is available. The five games measured are bot (Terran) vs built-in AI on Ley Lines, Torches, Ultralove and Persephone.
+- **Engine tags carry the replay tag in their low 32 bits.** Confirmed on all 209,298 samples of the first game: every one matched a timeline unit.
+- **Engine recordings become `SOURCE_ENGINE` keyframes** (`timeline.ApplyEngine`). The app uses them automatically when `<replay>.engine.pb.gz` sits next to a replay opened from disk.
+- **Unit speeds in the stub table match the engine's game data exactly** (SCV 2.8125, Marine 2.25, Stalker 2.9531…). A worker's gather round trip is 112 loops.
+
+### Corrections
+
+- **Pathability (corrects Phase 0).** `t3CellFlags` bit 0 marks a *band* around cliffs, and the band's outer ring is walkable on both sides. Treating every bit-0 cell as unpathable blocked 1,428 walkable cells on Ultralove, including the ramps, and sealed main bases. Only cells whose four neighbors all carry the bit are cliff. Against the game's own pathing grid (now exported too), 1.9% of walkable cells are still wrongly blocked, and every ladder map's start locations connect.
+- **Repeated commands are target updates.** A replay stores a repeated command as `CmdUpdateTargetPoint`/`CmdUpdateTargetUnit`, reusing the previous `Cmd`'s ability. Bot games have 17× more of those than full commands, so Phase 0, which ignored them, missed most orders.
+
+### Command tier
+
+- **Selection tracking** follows `SelectionDelta` (all four mask forms; selections kept in the game's subgroup order so masks address the right units) and `ControlGroupUpdate` (set, append, recall, clear, steal). Dead units leave every selection. Scored against engine orders, with commands to the same target in the same loop judged together (bots order one unit per command): 74–96% of commands exact, 94–100% precision, 85–98% recall.
+- **Movement uses timed legs, not time steps.** Each unit's plan fixes its position at any loop, so events are applied in order and the plan is committed as keyframes only up to each event.
+- **What moves units:**
+  - Targeted commands to the selection. Point targets keep a loose formation (offsets of at most 2 cells). Unit targets stop at the sum of the radii, plus a rough weapon range for enemies.
+  - Shift-queued commands (`cmdFlags & 0x2`) extend the plan.
+  - Rally points: a targeted command on selected buildings or larvae sets one, and new units follow it, traced through `creatorUnitTag` from egg to larva to hatchery.
+  - Gather orders, rallies to a mineral, and new workers with no known rally start a mining loop calibrated to 112 loops. MULEs mine the field they land at.
+- **Pathing:**
+  - A* on the walkable grid, with line-of-sight shortcuts.
+  - Every structure, of any owner, blocks its footprint while it stands, except lowered depots and lifted buildings.
+  - An unreachable goal leaves the unit where it is; this models units trapped behind walls, which really happens.
+  - Air units fly straight.
+- **Samples snap.** A tracker sample overrides the estimate at its loop; the leg before it bends toward the truth, which blends the error out. The unit then resumes its goal or mining loop.
+- **Players without game events** (the built-in AI) can't be estimated and keep their tracker tracks.
+- **Results:** on the commanded player's moving units, mean error goes from 8.7–24.2 cells to 3.2–8.0, and median from 5.1–21.7 to 2.0–3.5 (`ghostreel accuracy`; guarded by `internal/accuracy` tests). The largest remaining errors:
+  - units in fights (attack-moves stop at enemies the tier can't see);
+  - speed changes (Stimpack, creep, Medivac boost);
+  - building positions after a lift-off and landing that no sample catches.
+- **The app builds the command tier by default.** It needs game events, so first loads are slower on long games (cached afterwards). The cache key records the tier and whether a map was available; picking or downloading a map rebuilds the timeline.

@@ -4,7 +4,13 @@ An open-source StarCraft II replay viewer. It plays a `.SC2Replay` back on the m
 
 ghostreel is a working name. The project is not affiliated with or endorsed by Blizzard Entertainment.
 
-> **What you're seeing.** A replay stores player inputs, not unit positions, so a viewer has to reconstruct movement. This release uses the *tracker tier*: when units are born and die, what buildings exist and where, and player stats are all exact. Unit **positions** are exact only when the replay sampled them (every ~11 s, and only for units in fights) and at death. In between, units hold their last known position and travel to the next one at their speed. Workers and units walking across the map are mostly not sampled. The inspect panel shows when a unit's position was last actually known. More accurate tiers are planned (see [Roadmap](#roadmap)).
+> **What you're seeing.** A replay stores player inputs, not unit positions, so a viewer has to reconstruct movement. Births, deaths, buildings and player stats are always exact. How positions are filled in depends on the *tier* (the badge at the top of the viewer says which one you're seeing):
+>
+> - **Command tier** (the default): units follow the players' recorded orders along the map's paths, workers mine, new units walk to their rally point, and the estimate snaps to the real position whenever the replay sampled one. Measured against the real game, the commanded players' moving units are off by a median of 2–3.5 cells (mean 3–8). Players with no recorded orders (the built-in AI) fall back to the tracker tier.
+> - **Tracker tier:** positions are known only when the replay sampled them (every ~11 s, mostly in fights) and at death; in between, units hold their last known position. Median error on moving units is 5–22 cells.
+> - **Engine tier:** exact positions, recorded by playing the replay in the real game with `ghostreel-engine` (see below).
+>
+> The inspect panel shows when a unit's position was last actually observed.
 
 ## Running it
 
@@ -30,9 +36,21 @@ Then open <http://127.0.0.1:8080/>. The server only listens on localhost by defa
 
 ```bash
 go run ./cmd/ghostreel info my.SC2Replay                     # summary; --counts, --positions for detail
-go run ./cmd/ghostreel dump-timeline my.SC2Replay -o my.pb   # build a timeline (--json, --no-commands)
+go run ./cmd/ghostreel dump-timeline my.SC2Replay -o my.pb   # build a timeline (--tier tracker|command, --json)
 go run ./cmd/ghostreel dump-map my.SC2Replay                 # find and decode the replay's map (+ hillshade PNG)
+go run ./cmd/ghostreel accuracy my.SC2Replay                 # compare the tiers with an engine recording
 ```
+
+### Exact positions with `ghostreel-engine`
+
+Where a StarCraft II client of the replay's exact game version is installed, `ghostreel-engine` plays the replay back through Blizzard's [s2client API](https://github.com/Blizzard/s2client-proto) and records every unit's position every 16 loops:
+
+```bash
+go build -o ghostreel-engine ./cmd/ghostreel-engine
+./ghostreel-engine --sc2 ~/StarCraftII my.SC2Replay          # writes my.engine.pb.gz
+```
+
+Keep `my.engine.pb.gz` next to `my.SC2Replay`, and the viewer and `dump-timeline` use it automatically (engine tier). On a shared machine, run the exporter under `nice` and pass `--max-load` so it pauses while the host is busy. The client of the exact build is needed; Blizzard's Linux package is 4.10 (base build 75689).
 
 ## Maps
 
@@ -76,6 +94,9 @@ Tests that need real replays and maps look in `testdata/replays/` and `testdata/
 | `internal/mapfile` | Decodes map files |
 | `internal/mapcache` | Finds a replay's map |
 | `internal/gamedata` | Unit sizes and speeds (a small built-in table for now) |
+| `internal/selection`, `internal/pathing`, `internal/command` | The command tier: selections, paths, following orders |
+| `internal/engine`, `cmd/ghostreel-engine` | The engine-tier exporter (s2client API) |
+| `internal/accuracy` | Measures a timeline against engine ground truth |
 | `internal/app`, `internal/server` | The layer and HTTP API that both frontends use |
 | `proto/` | The timeline format ([docs](docs/TIMELINE_FORMAT.md)) |
 | `viewer/` | The TypeScript + three.js viewer |
@@ -94,6 +115,6 @@ The code is Apache-2.0. StarCraft II's art, data and maps belong to Blizzard and
 
 ## Roadmap
 
-- **Phase 2, accuracy:** an exporter that records exact unit positions by running the matching game build (a ground truth for measuring error). Then a *command tier* that follows players' orders over the map's pathing grid, including workers mining.
+- **Phase 2, accuracy (done):** the `ghostreel-engine` exporter for exact positions and ground truth, and the command tier. Next for the command tier: modelling attack-moves that stop at enemies, speed upgrades (Stimpack, creep), and ground truth for current game versions (needs a Windows or macOS client).
 - **Phase 3, 3D:** a local asset extractor for unit models, terrain textures and animations, and a 3D view with fog of war.
 - **Phase 4:** a browser-only build (WebAssembly), installers and plugin hooks.

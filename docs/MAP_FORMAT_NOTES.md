@@ -63,3 +63,7 @@ It is the user's own Blizzard art: it is only read locally and never committed.
 ## Export JSON (`dump-map`)
 
 `name, width, height, playable{Left,Bottom,Right,Top}, tileset, startLocations[], objects[]` (units and points), `heights[]` ((w+1)·(h+1) corner heights, 2 decimals), `pathable[]` (w·h, 1 = walkable), `warnings[]`. A hillshade PNG (4 px per cell, playable area highlighted) is written next to it.
+
+## Correction (Phase 2): bit 0 is a band, not "unpathable"
+
+Comparing with the game's own pathing grid (exported by `ghostreel-engine`) showed that bit 0 marks a **band** of cells around each cliff, and the band's outer ring is walkable on both the high and the low side. The cliff itself is the band's interior. `Map.Pathable` now treats a bit-0 cell as unwalkable only when all four of its neighbors also carry bit 0. On Ultralove this blocks 220 of 11,642 walkable cells (1.9%), down from 1,428, and ramps stay open. Some maps also set bit 2 near cliffs; its meaning is unknown.

@@ -44,3 +44,10 @@ The reference implementation is `timeline.PositionAt`. Frontends must match it s
 ## Fidelity
 
 `meta.fidelity` is the best source used anywhere in the file. A tracker-tier timeline knows exactly when units appear and die, and where buildings stand. It knows where units were only when a sample caught them (mostly in fights) and at death. Frontends should say so.
+
+## Tiers in one file
+
+A timeline can mix keyframe sources. `meta.fidelity` is the best one used:
+
+- **`SOURCE_COMMAND`:** commanded units' tracks are rebuilt from their orders. A keyframe sits at each leg boundary (departure, arrival, every corner of a path), so between two keyframes the unit either holds still or moves in a straight line at its speed. The interpolation rule above gives that motion exactly. Birth, sample and death keyframes keep `SOURCE_TRACKER`: they are observations, and the viewer's "last known position" counts only those (and engine frames). Units of players without recorded orders keep their tracker-tier tracks.
+- **`SOURCE_ENGINE`:** units the engine recorded get one keyframe per engine frame (every 16 loops by default) with the real facing, plus their tracker death keyframe.
