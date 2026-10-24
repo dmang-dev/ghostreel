@@ -1,0 +1,22 @@
+# Blizzard-owned files never get committed (see README "Assets and legal").
+testdata/replays/
+testdata/maps/
+testdata/bnetcache/
+*.SC2Replay
+*.SC2Map
+*.s2ma
+cache/
+assets-cache/
+
+# Build output
+/bin/
+/dist/
+*.exe
+viewer/node_modules/
+viewer/dist/
+desktop/build/bin/
+desktop/frontend/dist/
+
+# Generated debug output
+*.pb
+out/

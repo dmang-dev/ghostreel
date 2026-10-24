@@ -1,0 +1,11 @@
+version: v2
+clean: true
+plugins:
+  # Go: needs protoc-gen-go on PATH (go install google.golang.org/protobuf/cmd/protoc-gen-go).
+  - local: protoc-gen-go
+    out: gen
+    opt: paths=source_relative
+  # TypeScript (protobuf-es): installed by `npm ci` in viewer/.
+  - local: ["node", "viewer/node_modules/@bufbuild/protoc-gen-es/bin/protoc-gen-es"]
+    out: viewer/src/gen
+    opt: target=ts
