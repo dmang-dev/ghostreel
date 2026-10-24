@@ -160,7 +160,7 @@ The code can be fully open source; Blizzard's art and data cannot be redistribut
 | Tracker-tier motion is mostly missing outside fights | MVP looks static; users judge it on movement | Say so in the UI and docs; park workers near bases; command tier fixes it |
 | Command-tier drift in big fights | Units visibly wrong | Snap to tracker samples; label the tier in the UI; offer engine tier |
 | Locked ladder maps, unusual MPQ compression | Map parsing fails on some maps | Open files by known name; test `icza/mpq` on current ladder maps in Phase 0 |
-| Browser build can't reach the depot (plain HTTP on port 1119, no CORS) | WASM build can't auto-fetch maps | Map file picker in the browser, or an optional fetch proxy; decide in Phase 4 |
+| Browser build can't reach the depot (plain HTTP on port 1119, no CORS) | WASM build can't auto-fetch maps | Map file picker in the browser, or an optional fetch proxy. *Decided in Phase 4: the file picker (see docs/DECISIONS.md)* |
 | Patch changes to unit data or protocol | Old or new replays break | Key all data on base build; s2prot already handles protocol versions |
 | Map not in local cache, depot unreachable | Can't load terrain | Cache aggressively; fall back to a user-picked map; still render units on a blank grid |
 | Engine tier needs exact game build | Hard to set up | Optional, documented separately; never required for normal use |

@@ -146,3 +146,24 @@ Still open:
 - Cliff meshes (the heightfield's walls stand in), water, creep, particle effects, attachments (weapons on separate models), per-actor scale, and lighting per tileset.
 - **Performance** was only measured on a software renderer (Microsoft Basic Render Driver: 55 ms per frame with 96 skinned models), which says little about a GPU. Models give way to stand-ins below 3 pixels per cell and beyond 400 on screen.
 
+## Phase 4 (2026-10-24): 1.0
+
+### Browser build
+
+- **The browser runs the server's own HTTP handler.** `cmd/ghostreel-wasm` builds the Go core for `js/wasm` and answers the viewer's `/api/...` requests in memory, in a web worker so decoding never freezes the page. The viewer swaps `fetch` for the worker (`apiFetch`, `VITE_BACKEND=wasm`) and changes nothing else. The three frontends (desktop, `serve`, browser) share one API and one code path.
+- **Maps in the browser come from the user.** This settles PLAN.md's open risk: a page can read neither the Battle.net cache nor Blizzard's depot (plain HTTP on port 1119, no CORS), and a fetch proxy would mean running a server that sees users' map requests. So the browser build asks the user to drop the map file. To make that possible, the app now keeps decoded maps in memory and decodes picked maps from bytes; no part of map handling needs a file system any more.
+- **Size and speed.** `ghostreel.wasm` is 20.6 MB (4.6 MB gzipped), mostly s2prot's protocol tables. A 3-minute pro game opens in about half a second. A 30-minute bot game with 1.5 million game events took about a minute to rebuild its command tier once the map was added, roughly twice native speed.
+- **Not in the browser:** game models (no install to read), engine recordings, timeline caching, and replay folders.
+
+### Analysis plugins
+
+- A plugin reads the finished timeline and returns **generic** markers (moments or spans, optionally a place) and tables (rows tied to loops). The viewer draws any report as panel tabs, scrubber bands and minimap rings, so a plugin needs no frontend work. Plugins register from `init` and run on demand (`/api/r/{id}/analysis`, computed once per timeline). A failing or panicking plugin shows as a failed tab and doesn't affect the others.
+- **Build orders** list structures when placed and units, morphs and research when finished. Replays don't record queue times, so those are completion times; supply comes from the latest stats event, so it can lag by up to 10 s. Mode switches (lift-off, siege, burrow, warp gate) and spawned units (larvae, broodlings, interceptors, MULEs) are left out, and repeats within 2 s are merged ("Zergling ×6").
+- **Battles** are deaths of players' units within 14 cells of a running cluster's center and 15 s of its last death, kept at 6 deaths or more. Larvae, eggs and other spawned units don't count. These thresholds are judgment calls checked by eye on five pro games, not tuned against labelled data.
+
+### Installers and releases
+
+- A version tag runs `.github/workflows/release.yml`, which builds CLI archives for five platforms (with the viewer, which `serve` now also finds next to its executable), the browser build, and the desktop app: an NSIS installer on Windows, a universal app on macOS, a binary on Linux (WebKitGTK 4.0, so built on Ubuntu 22.04). Everything goes into a **draft** release with checksums.
+- The Windows installer associates `.SC2Replay` through Wails' `fileAssociations`, with a generated document icon. **Not verified locally:** NSIS couldn't be installed on the development machine (the installer's permission prompt was declined), so the installer step itself first runs in CI. Everything before it (the app build, icon and installer script generation) was checked with `wails build -nsis`.
+- **Not done:** code signing (needs maintainers' certificates), opening replays from Finder on macOS (Wails delivers those as events after start-up; the app handles command-line files only), Linux packages (.deb, AppImage).
+

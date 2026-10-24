@@ -12,7 +12,11 @@ ghostreel is a working name. The project is not affiliated with or endorsed by B
 >
 > The inspect panel shows when a unit's position was last actually observed.
 
-## Running it
+## Getting it
+
+Releases have a Windows installer (it opens `.SC2Replay` files on double-click), a macOS app, a Linux build, command-line archives, and a browser build that runs entirely in the page. See the **[user guide](docs/USER_GUIDE.md)** for installing, controls, maps and the 3D view.
+
+## Running from source
 
 ### Desktop app (Windows, macOS, Linux)
 
@@ -31,6 +35,18 @@ go run ./cmd/ghostreel serve --replays "/path/to/your/Replays/Multiplayer"
 ```
 
 Then open <http://127.0.0.1:8080/>. The server only listens on localhost by default.
+
+### Browser only (no server)
+
+```bash
+cd viewer && npm ci && npm run build:web
+```
+
+`viewer/dist-web/` is a static site: the Go core runs in the page as WebAssembly, so replays are never uploaded. Browsers can't reach the Battle.net cache or Blizzard's map server, so you drop the map file after the replay. There are no game models in this build.
+
+### Build orders and battles
+
+Press **B** to switch the events panel to the build order or the battles found in the game. Rows jump to their moment. Both come from analysis plugins (`internal/analysis`); [CONTRIBUTING.md](CONTRIBUTING.md) shows how to add one.
 
 ### 3D view
 
@@ -76,7 +92,7 @@ If none of these has it, the replay still plays on a blank grid. For ladder and 
 ## Building from source
 
 Requirements:
-- Go 1.22 or newer
+- Go (the version in `go.mod`)
 - Node 20 or newer
 - [`buf`](https://buf.build): `go install github.com/bufbuild/buf/cmd/buf@latest`
 - `protoc-gen-go`: `go install google.golang.org/protobuf/cmd/protoc-gen-go@latest`
@@ -108,12 +124,14 @@ Tests that need real replays and maps look in `testdata/replays/` and `testdata/
 | `internal/selection`, `internal/pathing`, `internal/command` | The command tier: selections, paths, following orders |
 | `internal/engine`, `cmd/ghostreel-engine` | The engine-tier exporter (s2client API) |
 | `internal/accuracy` | Measures a timeline against engine ground truth |
-| `internal/app`, `internal/server` | The layer and HTTP API that both frontends use |
+| `internal/analysis` | Analysis plugins: build orders, battles |
+| `internal/app`, `internal/server` | The layer and HTTP API that every frontend uses |
+| `cmd/ghostreel-wasm` | The same API as WebAssembly, for the browser build |
 | `proto/` | The timeline format ([docs](docs/TIMELINE_FORMAT.md)) |
 | `viewer/` | The TypeScript + three.js viewer |
 | `desktop/` | The Wails desktop app, a separate Go module |
 
-Design notes are in [`PLAN.md`](PLAN.md), [`docs/DECISIONS.md`](docs/DECISIONS.md) and [`docs/MAP_FORMAT_NOTES.md`](docs/MAP_FORMAT_NOTES.md).
+Contributing: see [`CONTRIBUTING.md`](CONTRIBUTING.md). Design notes are in [`PLAN.md`](PLAN.md), [`docs/DECISIONS.md`](docs/DECISIONS.md) and [`docs/MAP_FORMAT_NOTES.md`](docs/MAP_FORMAT_NOTES.md).
 
 ## Assets and legal
 
@@ -128,4 +146,4 @@ The code is Apache-2.0. StarCraft II's art, data and maps belong to Blizzard and
 
 - **Phase 2, accuracy (done):** the `ghostreel-engine` exporter for exact positions and ground truth, and the command tier. Next for the command tier: units blocking each other (sieged tanks on ramps), fights themselves (kiting, chasing), and ground truth for current game versions and for Zerg players (needs a Windows or macOS client, and recorded games where the Zerg side is a player rather than the AI).
 - **Phase 3, 3D (done):** the 3D view with the game's own models and animations, doodads, ground texture and fog of war. Next: blending the terrain's texture layers (the mask format isn't decoded yet), cliff meshes, and checking a current Windows install.
-- **Phase 4:** a browser-only build (WebAssembly), installers and plugin hooks.
+- **Phase 4, 1.0 (done):** the browser-only build, installers and the release workflow, analysis plugins (build orders, battles), and the [user guide](docs/USER_GUIDE.md) and [contributor guide](CONTRIBUTING.md). Next: code signing, opening replays from Finder on macOS, and more plugins.
