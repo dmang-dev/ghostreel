@@ -94,7 +94,7 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   const art = map && minimap ? minimapTerrain(map, minimap) : null;
   cur = { summary, model, map, minimap, width, height, playable, shaded, art, ground: null };
 
-  scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded, map?.heights);
+  scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded, map?.heights, map?.pathable);
   if (terrainMode === "ground") setTerrainMode("shade");
   $<HTMLOptionElement>("terrain-mode-ground").hidden = true;
   if (map) void assetsReady.then((ok) => ok && loadGround(summary.id));

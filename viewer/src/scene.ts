@@ -51,6 +51,12 @@ const DEATH_WINDOW = 112; // loops a death marker stays visible (5 s on the cloc
 const AIR_HEIGHT = 4; // cells above the ground for flying units in 3D
 const FOG_DARK = 0.62; // how much unseen ground is darkened
 const GROUND_TILE = 8; // cells per repeat of the ground texture
+// Creep radius (cells) around each source when fully spread, and the time
+// it takes to spread (loops).
+const CREEP_RADIUS: Record<string, number> = {
+  Hatchery: 12, Lair: 12, Hive: 12, CreepTumor: 10, CreepTumorBurrowed: 10, CreepTumorQueen: 10,
+};
+const CREEP_GROWTH = 22.4 * 12;
 const EVICT_FRAMES = 600; // drop a unit's model after this many frames unused
 // Models give way to stand-ins when they'd be a few pixels tall, and past a
 // count where skinning every unit costs more than it shows.
@@ -71,6 +77,12 @@ export class Scene {
   private terrain3?: THREE.Mesh;
   private fogMesh2?: THREE.Mesh;
   private fogMesh3?: THREE.Mesh;
+  private creepMesh2?: THREE.Mesh;
+  private creepMesh3?: THREE.Mesh;
+  private creepTex?: THREE.DataTexture;
+  private creepData?: Uint8Array;
+  private creepKey = "";
+  private pathable?: Uint8Array;
   private terrainTex?: THREE.CanvasTexture;
   private groundDetail?: THREE.Texture;
   private useDetail = true;
@@ -146,7 +158,10 @@ export class Scene {
     this.resize();
   }
 
-  setWorld(model: Model, width: number, height: number, terrain: HTMLCanvasElement, heights?: ArrayLike<number> | null): void {
+  setWorld(
+    model: Model, width: number, height: number, terrain: HTMLCanvasElement,
+    heights?: ArrayLike<number> | null, pathable?: ArrayLike<number> | null,
+  ): void {
     this.model = model;
     this.worldW = width;
     this.worldH = height;
@@ -171,6 +186,13 @@ export class Scene {
     this.fogTex = new THREE.DataTexture(this.fogData, width, height, THREE.RGBAFormat);
     this.fogTex.magFilter = this.fogTex.minFilter = THREE.LinearFilter;
     this.fogTex.needsUpdate = true;
+    this.pathable = pathable && pathable.length === width * height ? Uint8Array.from(pathable) : undefined;
+    this.creepData = new Uint8Array(width * height * 4);
+    this.creepTex?.dispose();
+    this.creepTex = new THREE.DataTexture(this.creepData, width, height, THREE.RGBAFormat);
+    this.creepTex.magFilter = this.creepTex.minFilter = THREE.LinearFilter;
+    this.creepTex.needsUpdate = true;
+    this.creepKey = "";
     this.setTerrain(terrain);
     this.applyMode();
   }
@@ -178,7 +200,7 @@ export class Scene {
   /** Sets the terrain image; detail tiles the 3D ground texture over it. */
   setTerrain(canvas: HTMLCanvasElement, detail = true): void {
     this.useDetail = detail;
-    for (const m of [this.terrain2, this.terrain3, this.fogMesh2, this.fogMesh3]) {
+    for (const m of [this.terrain2, this.terrain3, this.fogMesh2, this.fogMesh3, this.creepMesh2, this.creepMesh3]) {
       if (m) {
         this.scene.remove(m);
         m.geometry.dispose();
@@ -212,7 +234,19 @@ export class Scene {
     (this.fogMesh2.material as THREE.Material).depthTest = false;
     this.fogMesh3 = new THREE.Mesh(field.clone(), fogMat());
     this.fogMesh3.renderOrder = 1;
-    this.scene.add(this.terrain2, this.terrain3, this.fogMesh2, this.fogMesh3);
+    // Creep: purple over the ground where Zerg structures spread it.
+    const creepMat = () => new THREE.MeshLambertMaterial({
+      color: 0x4a1f5c, transparent: true, opacity: 0.8, alphaMap: this.creepTex, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+    });
+    this.creepMesh2 = new THREE.Mesh(flat.clone(), new THREE.MeshBasicMaterial({
+      color: 0x4a1f5c, transparent: true, opacity: 0.75, alphaMap: this.creepTex, depthTest: false,
+    }));
+    this.creepMesh2.position.copy(this.terrain2.position);
+    this.creepMesh2.renderOrder = 0.5;
+    this.creepMesh3 = new THREE.Mesh(field.clone(), creepMat());
+    this.creepMesh3.renderOrder = 0.5;
+    this.scene.add(this.terrain2, this.terrain3, this.creepMesh2, this.creepMesh3, this.fogMesh2, this.fogMesh3);
     this.applyMode();
   }
 
@@ -299,6 +333,8 @@ export class Scene {
     const three = this.mode === "3d";
     if (this.terrain2) this.terrain2.visible = !three;
     if (this.terrain3) this.terrain3.visible = three;
+    if (this.creepMesh2) this.creepMesh2.visible = !three;
+    if (this.creepMesh3) this.creepMesh3.visible = three;
     this.meshes2?.setVisible(!three);
     this.meshes3?.setVisible(three);
     if (this.doodads) this.doodads.visible = three;
@@ -378,6 +414,8 @@ export class Scene {
       }
     }
     this.drawnCount = nDrawn;
+
+    this.updateCreep(model, loop);
 
     // Pass 2: fog of war from the chosen player's units.
     const visible = this.fogPlayer ? this.computeFog(model) : undefined;
@@ -560,6 +598,44 @@ export class Scene {
 
   private clearInstances(): void {
     for (const id of [...this.instances.keys()]) this.removeInstance(id);
+  }
+
+  /**
+   * Creep around Zerg town halls and creep tumors, grown over CREEP_GROWTH
+   * after they finish and limited to walkable ground. An estimate: the game
+   * spreads creep cell by cell and lets it recede slowly after a source dies.
+   */
+  private updateCreep(model: Model, loop: number): void {
+    const parts: string[] = [];
+    const sources: { x: number; y: number; r: number }[] = [];
+    for (let i = 0; i < this.drawnCount; i++) {
+      const d = this.drawn[i];
+      const full = CREEP_RADIUS[model.types[d.type]?.name ?? ""];
+      if (!full || d.constructing) continue;
+      const u = model.units[d.id];
+      const start = u.constructed ? (u.doneLoop ?? loop) : u.bornLoop;
+      const r = Math.round(full * Math.min(1, Math.max(0.15, (loop - start) / CREEP_GROWTH)) * 2) / 2;
+      sources.push({ x: d.x, y: d.y, r });
+      parts.push(`${d.id}:${r}`);
+    }
+    const key = parts.join(",");
+    if (key === this.creepKey) return;
+    this.creepKey = key;
+    const w = this.worldW, h = this.worldH;
+    const data = this.creepData!;
+    data.fill(0);
+    for (const s of sources) {
+      const r2 = s.r * s.r;
+      for (let y = Math.max(0, Math.floor(s.y - s.r)); y <= Math.min(h - 1, Math.ceil(s.y + s.r)); y++) {
+        for (let x = Math.max(0, Math.floor(s.x - s.r)); x <= Math.min(w - 1, Math.ceil(s.x + s.r)); x++) {
+          const dx = x + 0.5 - s.x, dy = y + 0.5 - s.y;
+          if (dx * dx + dy * dy > r2) continue;
+          if (this.pathable && !this.pathable[y * w + x]) continue;
+          data[(y * w + x) * 4 + 1] = 255; // alphaMap reads green
+        }
+      }
+    }
+    this.creepTex!.needsUpdate = true;
   }
 
   /** Units drawn in the last frame (hidden ones excluded). */
