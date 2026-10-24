@@ -219,8 +219,9 @@ func convert(r *rep.Rep, approx int) *Replay {
 			evts = append(evts, e)
 		}
 	}
+	lastCmd := map[int64]*Event{} // per user, for CmdUpdateTarget* events
 	for i := range r.GameEvts {
-		if e, ok := convertGame(&r.GameEvts[i], userToPlayer); ok {
+		if e, ok := convertGame(&r.GameEvts[i], userToPlayer, lastCmd); ok {
 			evts = append(evts, e)
 		}
 	}
@@ -385,6 +386,9 @@ func convertTracker(e *s2prot.Event) (Event, bool) {
 	}
 	// UnitBorn / UnitInit share their fields.
 	out.Tag = tag()
+	if e.Value("creatorUnitTagIndex") != nil {
+		out.Creator = MakeTag(uint32(e.Int("creatorUnitTagIndex")), uint32(e.Int("creatorUnitTagRecycle")))
+	}
 	out.UnitType = e.Stringv("unitTypeName")
 	out.Player = int(e.Int("controlPlayerId"))
 	out.X, out.Y = float64(e.Int("x")), float64(e.Int("y"))
@@ -394,29 +398,129 @@ func convertTracker(e *s2prot.Event) (Event, bool) {
 // Command target coordinates are fixed point with 12 fractional bits.
 const cmdCoordScale = 4096
 
-func convertGame(e *s2prot.Event, userToPlayer map[int64]int) (Event, bool) {
-	if e.Name != "Cmd" {
-		return Event{}, false
+// cmdFlagQueued is the shift-queue bit of a command's flags.
+const cmdFlagQueued = 0x2
+
+// convertGame converts the game events the timeline uses: commands (including
+// target updates, which reuse the user's previous command) and the selection
+// and control-group changes needed to know which units a command applies to.
+func convertGame(e *s2prot.Event, userToPlayer map[int64]int, lastCmd map[int64]*Event) (Event, bool) {
+	user := e.UserID()
+	out := Event{Loop: e.Loop(), Player: userToPlayer[user]}
+	switch e.Name {
+	case "Cmd":
+		out.Kind = KindCommand
+		if e.Value("abil") != nil {
+			out.AbilityLink = e.Int("abil", "abilLink")
+			out.AbilityCmdIndex = e.Int("abil", "abilCmdIndex")
+		} else {
+			out.AbilityLink = -1 // smart (right-click) command
+		}
+		out.Queued = e.Int("cmdFlags")&cmdFlagQueued != 0
+		switch {
+		case e.Value("data", "TargetPoint") != nil:
+			setTargetPoint(&out, e, "data", "TargetPoint")
+		case e.Value("data", "TargetUnit") != nil:
+			setTargetUnit(&out, e, "data", "TargetUnit")
+		}
+		c := out
+		lastCmd[user] = &c
+		return out, true
+
+	case "CmdUpdateTargetPoint", "CmdUpdateTargetUnit":
+		prev := lastCmd[user]
+		if prev == nil {
+			return Event{}, false
+		}
+		out = *prev
+		out.Loop = e.Loop()
+		out.TargetUpdate = true
+		out.TargetTag, out.HasTarget, out.X, out.Y = 0, false, 0, 0
+		if e.Name == "CmdUpdateTargetPoint" {
+			setTargetPoint(&out, e, "target")
+		} else {
+			setTargetUnit(&out, e, "target")
+		}
+		return out, true
+
+	case "SelectionDelta":
+		out.Kind = KindSelection
+		sc := &SelectionChange{Group: int(e.Int("controlGroupId")), Remove: mask(e.Structv("delta", "removeMask"))}
+		for _, t := range e.Array("delta", "addUnitTags") {
+			sc.AddTags = append(sc.AddTags, Tag(asInt(t)))
+		}
+		for _, sg := range e.Array("delta", "addSubgroups") {
+			if m, ok := sg.(s2prot.Struct); ok {
+				sc.AddSubgroups = append(sc.AddSubgroups, Subgroup{
+					UnitLink: m.Int("unitLink"), Priority: m.Int("subgroupPriority"),
+					IntraPri: m.Int("intraSubgroupPriority"), Count: int(m.Int("count")),
+				})
+			}
+		}
+		out.Selection = sc
+		return out, true
+
+	case "ControlGroupUpdate":
+		out.Kind = KindControlGroup
+		out.ControlGroup = &ControlGroupChange{
+			Index: int(e.Int("controlGroupIndex")), Update: int(e.Int("controlGroupUpdate")),
+			Mask: mask(e.Structv("mask")),
+		}
+		return out, true
 	}
-	out := Event{Loop: e.Loop(), Kind: KindCommand, Player: userToPlayer[e.UserID()]}
-	if e.Value("abil") != nil {
-		out.AbilityLink = e.Int("abil", "abilLink")
-		out.AbilityCmdIndex = e.Int("abil", "abilCmdIndex")
-	} else {
-		out.AbilityLink = -1 // smart (right-click) command
-	}
+	return Event{}, false
+}
+
+func setTargetPoint(out *Event, e *s2prot.Event, path ...string) {
+	out.HasTarget = true
+	out.X = float64(e.Int(append(path, "x")...)) / cmdCoordScale
+	out.Y = float64(e.Int(append(path, "y")...)) / cmdCoordScale
+}
+
+func setTargetUnit(out *Event, e *s2prot.Event, path ...string) {
+	out.HasTarget = true
+	out.X = float64(e.Int(append(path, "snapshotPoint", "x")...)) / cmdCoordScale
+	out.Y = float64(e.Int(append(path, "snapshotPoint", "y")...)) / cmdCoordScale
+	out.TargetTag = Tag(e.Int(append(path, "tag")...))
+}
+
+// mask converts a removeMask / control-group mask choice.
+func mask(s s2prot.Struct) Mask {
 	switch {
-	case e.Value("data", "TargetPoint") != nil:
-		out.HasTarget = true
-		out.X = float64(e.Int("data", "TargetPoint", "x")) / cmdCoordScale
-		out.Y = float64(e.Int("data", "TargetPoint", "y")) / cmdCoordScale
-	case e.Value("data", "TargetUnit") != nil:
-		out.HasTarget = true
-		out.X = float64(e.Int("data", "TargetUnit", "snapshotPoint", "x")) / cmdCoordScale
-		out.Y = float64(e.Int("data", "TargetUnit", "snapshotPoint", "y")) / cmdCoordScale
-		out.TargetTag = Tag(e.Int("data", "TargetUnit", "tag"))
+	case s["Mask"] != nil:
+		var bits []bool
+		switch b := s["Mask"].(type) {
+		case s2prot.BitArr:
+			for i := 0; i < b.Count; i++ {
+				bits = append(bits, b.Bit(i))
+			}
+		case *s2prot.BitArr:
+			for i := 0; i < b.Count; i++ {
+				bits = append(bits, b.Bit(i))
+			}
+		}
+		return Mask{Kind: MaskBits, Bits: bits}
+	case s["OneIndices"] != nil:
+		return Mask{Kind: MaskOneIndices, Indices: indices(s["OneIndices"])}
+	case s["ZeroIndices"] != nil:
+		return Mask{Kind: MaskZeroIndices, Indices: indices(s["ZeroIndices"])}
 	}
-	return out, true
+	if _, ok := s["ZeroIndices"]; ok { // an empty list decodes as a nil value
+		return Mask{Kind: MaskZeroIndices}
+	}
+	if _, ok := s["OneIndices"]; ok {
+		return Mask{Kind: MaskOneIndices}
+	}
+	return Mask{Kind: MaskNone}
+}
+
+func indices(v interface{}) []int {
+	arr, _ := v.([]interface{})
+	out := make([]int, 0, len(arr))
+	for _, x := range arr {
+		out = append(out, int(asInt(x)))
+	}
+	return out
 }
 
 func asInt(v interface{}) int64 {
