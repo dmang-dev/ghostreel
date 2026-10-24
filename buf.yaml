@@ -1,6 +1,11 @@
 version: v2
 modules:
   - path: proto
+  # Blizzard's s2client-proto, vendored unmodified for the engine exporter.
+  - path: third_party
+    lint:
+      ignore:
+        - third_party/s2clientprotocol
 lint:
   use:
     - STANDARD

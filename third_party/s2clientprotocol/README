@@ -1,0 +1,2 @@
+Vendored from https://github.com/Blizzard/s2client-proto at 4867bb9 (MIT, see LICENSE).
+Used only by the engine-tier exporter (internal/engine). Do not edit; re-copy to update.

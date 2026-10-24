@@ -1,0 +1,15 @@
+# Go bindings for Blizzard's s2client-proto (used by internal/engine).
+# Run with: buf generate --template buf.gen.s2client.yaml
+version: v2
+clean: true
+inputs:
+  - directory: third_party
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/OWNER/ghostreel/internal/engine/s2api
+plugins:
+  - local: protoc-gen-go
+    out: internal/engine/s2api
+    opt: paths=source_relative

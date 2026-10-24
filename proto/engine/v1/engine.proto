@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: Apache-2.0
+
+// Ground truth from the engine-tier exporter (cmd/ghostreel-engine): the
+// exact state of every unit every `step` loops, recorded by playing the
+// replay in a real SC2 client of the matching build. It feeds two things:
+// exact (SOURCE_ENGINE) keyframes for timelines, and the accuracy report
+// that measures the tracker and command tiers against it.
+syntax = "proto3";
+
+package engine.v1;
+
+option go_package = "github.com/OWNER/ghostreel/gen/engine/v1;enginev1";
+
+enum SchemaVersion {
+  SCHEMA_VERSION_UNSPECIFIED = 0;
+  SCHEMA_VERSION_1 = 1;
+}
+
+message Samples {
+  SchemaVersion schema_version = 1;
+  string replay_hash = 2; // hex SHA-256 of the replay file
+  uint32 base_build = 3;
+  string game_version = 4; // version reported by the client
+  uint32 step = 5;         // loops between frames
+  // Player whose orders are recorded (orders are only visible for the
+  // observed player; positions are recorded for everyone, fog disabled).
+  uint32 observed_player = 6;
+  uint32 loops = 7; // game length
+  repeated UnitTypeInfo unit_types = 8;
+  repeated Frame frames = 9;
+}
+
+// From the client's own game data for this build.
+message UnitTypeInfo {
+  uint32 id = 1;
+  string name = 2;
+  float movement_speed = 3; // cells per game second (Normal speed)
+}
+
+message Frame {
+  uint32 loop = 1;
+  repeated UnitSample units = 2;
+}
+
+message UnitSample {
+  // The client's tag. Its low 32 bits are the replay's packed tag
+  // (index << 18 | recycle); see docs/DECISIONS.md.
+  uint64 tag = 1;
+  uint32 unit_type = 2;
+  int32 owner = 3;
+  float x = 4;
+  float y = 5;
+  float z = 6;
+  float facing = 7;
+  float radius = 8;
+  bool flying = 9;
+  float build_progress = 10;
+  repeated Order orders = 11; // observed player's units only
+}
+
+message Order {
+  uint32 ability_id = 1; // s2client ability id (stable across builds)
+  bool has_point = 2;
+  float target_x = 3;
+  float target_y = 4;
+  uint64 target_tag = 5;
+}

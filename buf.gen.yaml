@@ -1,5 +1,7 @@
 version: v2
 clean: true
+inputs:
+  - directory: proto
 plugins:
   # Go: needs protoc-gen-go on PATH (go install google.golang.org/protobuf/cmd/protoc-gen-go).
   - local: protoc-gen-go

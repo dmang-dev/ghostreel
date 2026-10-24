@@ -27,3 +27,5 @@ out/
 # Local tool config
 .claude/
 viewer/package.json.md5
+testdata/replays/engine/
+*.engine.pb.gz
