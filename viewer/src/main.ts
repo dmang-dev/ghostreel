@@ -6,6 +6,7 @@
 import "./style.css";
 import * as api from "./api";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, decodeTimeline, formatClock, isAlive, ownerAt, typeAt } from "./model";
+import { UnitModels } from "./models";
 import { Scene } from "./scene";
 import { blankGrid, hillshade, minimapTerrain } from "./terrain";
 
@@ -15,6 +16,14 @@ const stage = $("stage");
 const scene = new Scene(stage);
 // The scene's canvases go under the panels.
 stage.prepend(scene.canvas, stage.querySelector("canvas.labels")!);
+
+// Game models for the 3D view, if the server can read the game's data. It
+// opens the data in the background at startup, so ask again for a while.
+const unitModels = new UnitModels("");
+scene.models = unitModels;
+(async () => {
+  for (let i = 0; i < 10 && !(await unitModels.init()); i++) await new Promise((r) => setTimeout(r, 1500));
+})();
 
 interface Loaded {
   summary: api.Summary;
@@ -719,4 +728,4 @@ function cycleFog(): void {
 }
 
 // Debug handle for the console (and tests): the scene and current replay.
-(window as unknown as { ghostreel: unknown }).ghostreel = { scene, get cur() { return cur; } };
+(window as unknown as { ghostreel: unknown }).ghostreel = { scene, seek, get cur() { return cur; }, get loop() { return loop; } };

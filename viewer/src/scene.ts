@@ -4,8 +4,10 @@
 //
 //   2D: top-down, orthographic camera, units as flat circles and footprints.
 //   3D: perspective camera over a heightfield built from the map's terrain
-//       heights, units as stand-in solids (cylinders, footprint boxes; air
-//       units float), until real models come from the asset extractor.
+//       heights. Units are the game's own models when the server can read
+//       the player's game data (see models.ts), and stand-in solids
+//       (cylinders, footprint boxes; air units float) otherwise or while a
+//       model loads.
 //
 // World units are map cells, x right, y up, z up (heights), so timeline
 // coordinates go straight into the scene. Units are instanced meshes: a
@@ -16,7 +18,8 @@
 // units there, like the in-game player view.
 
 import * as THREE from "three";
-import { Model, UnitClass, isAlive, positionAt, type UnitState } from "./model";
+import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, isAlive, positionAt, type UnitState } from "./model";
+import type { UnitInstance, UnitModels } from "./models";
 
 /** What the renderer drew for one unit this frame; shared with UI and picking. */
 export interface DrawnUnit {
@@ -31,6 +34,9 @@ export interface DrawnUnit {
   air: boolean;
   constructing: boolean;
   hidden: boolean; // in the fog for the chosen player
+  facing: number;
+  moving: boolean;
+  attacking: boolean;
 }
 
 export type ViewMode = "2d" | "3d";
@@ -44,6 +50,11 @@ const NEUTRAL = {
 const DEATH_WINDOW = 112; // loops a death marker stays visible (5 s on the clock)
 const AIR_HEIGHT = 4; // cells above the ground for flying units in 3D
 const FOG_DARK = 0.62; // how much unseen ground is darkened
+const EVICT_FRAMES = 600; // drop a unit's model after this many frames unused
+// Models give way to stand-ins when they'd be a few pixels tall, and past a
+// count where skinning every unit costs more than it shows.
+const MODEL_MIN_PPC = 3;
+const MAX_MODELS = 400;
 
 export class Scene {
   readonly canvas: HTMLCanvasElement;
@@ -84,9 +95,18 @@ export class Scene {
   /** A click (not a drag) at a point in the canvas, in CSS pixels. */
   onClick?: (px: number, py: number) => void;
 
+  /** Game models, when the server has game data. */
+  models?: UnitModels;
+  private readonly instances = new Map<number, { inst: UnitInstance; type: string; death: boolean }>();
+  private frame = 0;
+
   private drawn: DrawnUnit[] = [];
   private drawnCount = 0;
-  private readonly tmp: UnitState = { id: 0, type: 0, owner: 0, x: 0, y: 0, facing: 0, constructing: false };
+  private readonly tmp: UnitState = { id: 0, type: 0, owner: 0, x: 0, y: 0, facing: 0, constructing: false, moving: false, attacking: false };
+  private readonly dead: DrawnUnit = {
+    id: 0, x: 0, y: 0, r: 0, w: 0, h: 0, owner: 0, type: 0, air: false, constructing: false, hidden: false,
+    facing: 0, moving: false, attacking: false,
+  };
   private readonly m4 = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly v = new THREE.Vector3();
@@ -135,7 +155,9 @@ export class Scene {
     this.meshes3 = Meshes.solid(n, this.scene);
     this.drawn = Array.from({ length: n }, () => ({
       id: 0, x: 0, y: 0, r: 0, w: 0, h: 0, owner: 0, type: 0, air: false, constructing: false, hidden: false,
+      facing: 0, moving: false, attacking: false,
     }));
+    this.clearInstances();
 
     this.fogData = new Uint8Array(width * height * 4);
     this.fogTex?.dispose();
@@ -279,6 +301,7 @@ export class Scene {
       const dr = this.drawn[nDrawn++];
       dr.id = s.id; dr.x = s.x; dr.y = s.y; dr.owner = s.owner; dr.type = s.type;
       dr.air = t.air; dr.constructing = s.constructing; dr.hidden = false;
+      dr.facing = s.facing; dr.moving = !!s.moving; dr.attacking = !!s.attacking;
       if (t.air || !t.footprintW) {
         dr.r = Math.max(t.radius, 0.25);
         dr.w = dr.h = 0;
@@ -291,16 +314,29 @@ export class Scene {
     // Pass 2: fog of war from the chosen player's units.
     const visible = this.fogPlayer ? this.computeFog(model) : undefined;
 
-    // Pass 3: instances.
+    // Pass 3: models and instances.
     let nf = 0, ng = 0, na = 0, nd = 0;
     let selDrawn: DrawnUnit | undefined;
     const three = this.mode === "3d";
+    const useModels = three && !!this.models?.available && this.pixelsPerCellAt(this.view.cx, this.view.cy) >= MODEL_MIN_PPC;
+    let nModels = 0;
+    this.frame++;
+    const clock = loop / LOOPS_PER_CLOCK_SECOND;
     for (let i = 0; i < nDrawn; i++) {
       const dr = this.drawn[i];
       const t = model.types[dr.type];
       if (visible && dr.owner !== this.fogPlayer && dr.owner !== 0 && !visible(dr.x, dr.y)) {
         dr.hidden = true;
         continue;
+      }
+      if (dr.id === selected) selDrawn = dr;
+      if (useModels && nModels < MAX_MODELS && this.onScreen(dr)) {
+        const action = dr.constructing ? "build" : dr.moving ? "walk" : dr.attacking ? "attack" : "stand";
+        // A per-unit phase keeps identical units from moving in lockstep.
+        if (this.placeModel(t.name, false, dr, action, clock + (dr.id % 97) * 0.173, t.speed * 1.4)) {
+          nModels++;
+          continue;
+        }
       }
       this.c.copy(dr.owner === 0 ? this.neutralColor(t.name) : this.colorOf(dr.owner));
       if (dr.constructing) this.c.multiplyScalar(0.45);
@@ -319,7 +355,6 @@ export class Scene {
         this.place(mesh, k, dr.x, dr.y, ground + lift, d, d, three ? d : 1);
         mesh.setColorAt(k, this.c);
       }
-      if (dr.id === selected) selDrawn = dr;
     }
     // Death markers.
     for (const u of model.units) {
@@ -328,6 +363,12 @@ export class Scene {
       if (!t || t.class === UnitClass.HIDDEN || t.footprintW) continue;
       positionAt(model.tracks[u.id], 0, u.diedLoop, s);
       if (visible && u.owner !== this.fogPlayer && !visible(s.x, s.y)) continue;
+      if (useModels) {
+        const dr = this.dead;
+        dr.id = u.id; dr.x = s.x; dr.y = s.y; dr.owner = u.owner; dr.air = t.air; dr.facing = s.facing;
+        const since = (loop - u.diedLoop) / LOOPS_PER_CLOCK_SECOND;
+        if (this.onScreen(dr) && this.placeModel(t.name, true, dr, "death", since, 0)) continue;
+      }
       const fade = 1 - (loop - u.diedLoop) / DEATH_WINDOW;
       const d = 1 + 1.6 * (1 - fade);
       this.place(ms.deaths, nd, s.x, s.y, three ? this.heightAt(s.x, s.y) + 0.15 : 0, d, d, 1);
@@ -335,6 +376,7 @@ export class Scene {
       ms.deaths.setColorAt(nd++, this.c);
     }
     ms.commit(nf, ng, na, nd);
+    this.sweepInstances(useModels);
 
     const sel = three ? this.selection3 : this.selection2;
     if (selDrawn && !selDrawn.hidden) {
@@ -386,6 +428,70 @@ export class Scene {
       const xi = Math.floor(x), yi = Math.floor(y);
       return xi >= 0 && yi >= 0 && xi < w && yi < h && seen[yi * w + xi] === 1;
     };
+  }
+
+  /** Whether a unit is near the visible part of the map (3D). */
+  private onScreen(d: DrawnUnit): boolean {
+    const [sx, sy] = this.worldToScreen(d.x, d.y, d.air ? AIR_HEIGHT : 0);
+    if (this.v.z > 1) return false; // behind the camera
+    const { clientWidth: w, clientHeight: h } = this.container;
+    const m = 200;
+    return sx > -m && sy > -m && sx < w + m && sy < h + m;
+  }
+
+  /**
+   * Draws a unit with its game model if one is loaded, returning false to
+   * fall back to the stand-in. Death models are separate files in the game;
+   * while one loads (or when there is none) the unit's own "Death" clip, if
+   * any, is used instead.
+   */
+  private placeModel(type: string, death: boolean, d: DrawnUnit, action: string, time: number, speed: number): boolean {
+    const models = this.models!;
+    let tpl = death ? models.get(type, true) : models.get(type);
+    let isDeathModel = death;
+    if (death && !tpl) {
+      tpl = models.get(type);
+      isDeathModel = false;
+      if (tpl && !tpl.clips.some((c) => c.words.includes("death"))) return false;
+    }
+    if (!tpl) return false;
+    let e = this.instances.get(d.id);
+    if (!e || e.type !== type || e.death !== isDeathModel) {
+      if (e) this.removeInstance(d.id);
+      e = { inst: models.instance(tpl, this.colorOf(d.owner)), type, death: isDeathModel };
+      this.instances.set(d.id, e);
+      this.scene.add(e.inst.root);
+    }
+    const inst = e.inst;
+    inst.setTeam(d.owner === 0 ? NEUTRAL.other : this.colorOf(d.owner));
+    inst.lastSeen = this.frame;
+    const root = inst.root;
+    root.visible = true;
+    root.position.set(d.x, d.y, this.heightAt(d.x, d.y) + (d.air ? AIR_HEIGHT : 0));
+    // Structures keep the orientation they were modelled in.
+    root.rotation.z = d.w ? -Math.PI / 2 : d.facing;
+    inst.pose({ action: isDeathModel ? "death" : action, time, speed });
+    return true;
+  }
+
+  /** Hides models not drawn this frame and frees long-unused ones. */
+  private sweepInstances(active: boolean): void {
+    for (const [id, e] of this.instances) {
+      if (!active || e.inst.lastSeen !== this.frame) e.inst.root.visible = false;
+      if (this.frame - e.inst.lastSeen > EVICT_FRAMES) this.removeInstance(id);
+    }
+  }
+
+  private removeInstance(id: number): void {
+    const e = this.instances.get(id);
+    if (!e) return;
+    this.scene.remove(e.inst.root);
+    e.inst.dispose();
+    this.instances.delete(id);
+  }
+
+  private clearInstances(): void {
+    for (const id of [...this.instances.keys()]) this.removeInstance(id);
   }
 
   /** Units drawn in the last frame (hidden ones excluded). */

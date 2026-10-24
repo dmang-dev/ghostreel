@@ -16,6 +16,7 @@ import {
   TimelineSchema,
   SchemaVersion,
   UnitClass,
+  UnitState as UnitStateKind,
   Source,
 } from "./gen/timeline/v1/timeline_pb";
 
@@ -52,6 +53,10 @@ export interface UnitState {
   y: number;
   facing: number;
   constructing: boolean;
+  /** Travelling between keyframes at this loop. */
+  moving?: boolean;
+  /** The last keyframe says the unit is attacking. */
+  attacking?: boolean;
 }
 
 /** Float32 rounding, so results compare exactly with the Go side's float32 fields. */
@@ -62,8 +67,9 @@ export function positionAt(
   keys: readonly Keyframe[] | undefined,
   speed: number,
   loop: number,
-  out: { x: number; y: number; facing: number },
+  out: { x: number; y: number; facing: number; moving?: boolean; attacking?: boolean },
 ): void {
+  out.moving = out.attacking = false;
   if (!keys || keys.length === 0) {
     out.x = out.y = out.facing = 0;
     return;
@@ -82,6 +88,7 @@ export function positionAt(
     return;
   }
   const k0 = keys[i - 1];
+  out.attacking = k0.state === UnitStateKind.ATTACKING;
   if (i === keys.length || k0.loop === loop) {
     out.x = k0.x; out.y = k0.y; out.facing = k0.facing;
     return;
@@ -102,6 +109,8 @@ export function positionAt(
     return;
   }
   const f = (loop - depart) / (k1.loop - depart);
+  out.moving = true;
+  out.attacking = false;
   out.x = f32(k0.x + f32(dx * f));
   out.y = f32(k0.y + f32(dy * f));
   out.facing = f32(Math.atan2(dy, dx));
