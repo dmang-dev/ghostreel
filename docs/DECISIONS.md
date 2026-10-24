@@ -90,3 +90,33 @@ The plan marked several facts "(verify)". Each was checked against the corpus in
   - speed changes (Stimpack, creep, Medivac boost);
   - building positions after a lift-off and landing that no sample catches.
 - **The app builds the command tier by default.** It needs game events, so first loads are slower on long games (cached afterwards). The cache key records the tier and whether a map was available; picking or downloading a map rebuilds the timeline.
+
+## Phase 2, second round (2026-10-24): attack-moves, speed, accuracy
+
+Every change below was kept only if it lowered the error against the five engine recordings (`ghostreel accuracy`, `internal/accuracy` tests). Moving-unit error of the commanded player, mean (median), in cells:
+
+| Game | Tracker | Command, round 1 | Command, now |
+| --- | --- | --- | --- |
+| Persephone 13:26 | 19.47 (13.45) | 7.97 (3.53) | 4.32 (2.54) |
+| Ultralove 19:33 | 21.56 (16.40) | 7.86 (2.87) | 6.12 (2.57) |
+| Torches 15:06 | 22.99 (17.34) | 5.96 (2.64) | 2.91 (2.20) |
+| Ley Lines 15:43 | 24.16 (21.74) | 5.29 (2.38) | 3.37 (2.04) |
+| Ley Lines 8:56 | 8.71 (5.11) | 3.19 (1.98) | 2.62 (1.92) |
+
+In order of effect:
+
+- **Rally points only from rally abilities.** A targeted command on a selected building used to set its rally, so a MULE calldown on another base's minerals rerouted every new SCV there. Now only `Rally*` abilities and right-clicks set rallies, and Hatcheries keep separate unit and worker rallies. Worker gather/return error fell from 5.5 to 3.6 / 3.1 cells.
+- **No steps across cliff levels.** Neighbouring cells on different flat cliff levels don't connect unless one of them is a ramp. This stops paths from running down the walkable rims on both sides of a thin cliff. Marine attack-move error fell from 9.6 to 5.5.
+- **Big units need room.** Units with a radius over 0.5 path only through cells inside a fully walkable 2×2 block, so tanks no longer squeeze through one-cell gaps between buildings.
+- **Ability names per build.** `internal/gamedata/abilities_gen.go` maps build-specific ability links to move / patrol / hold / attack / stop / Stimpack / Medivac boost / rally. It is generated (`tools/genabilities`) from sc2reader's LotV tables (MIT, `third_party/sc2reader`), using sc2reader's build ranges. Checked on 4.10: every command classified as move became engine order 16 (Move; 65,010 cases), and every attack-move became order 23 (Attack; 4,105 cases).
+- **Attack-moves stop at enemies, carefully.** An attack-moving unit stops when an enemy is within weapon range + radius + 1 cell, and walks on after 16 quiet loops. Using every enemy's tracker-tier position made results *worse*: the AI's units sit where they were born until sampled, so units stopped at phantom enemies. Only enemies the replay observed within 40 loops (samples, births, deaths) and structures count now. This gives a small, consistent gain (five-game total 25.2 → 24.5). Window, slack and resume delay were swept, and the results vary by about 1%.
+- **Speed changes.**
+  - Stimpack gives +50% for 246 loops. It helps only marginally on these games (the bot rarely stims).
+  - Creep gives +30%, or ×2.67 for Queens, for Zerg ground units within 12 cells of a Hatchery/Lair/Hive or 10 of a creep tumor; legs use their time-weighted share on creep. **Creep is not measured:** in every recorded game the Zerg player is the built-in AI, which has no orders to follow.
+- **Track simplification.** Command and engine keyframes that `PositionAt` reproduces within 0.25 cells are dropped; observations and deaths stay. Engine timelines shrink about 4× (15 MB → 3.7 MB for a 19-minute game), the extreme bot game's command tier from 11.5 MB to 7 MB, and accuracy is unchanged to two decimals.
+- **Pathing speed.** Connected components (recomputed only after the grid changes), slice-based A*, and revalidated rather than discarded path caches. The command tier for a 78-minute bot game with 1.5 M game events dropped from 77 s to about 15 s, plus about 15 s of decoding. Pro games take under a second.
+
+Still open:
+- **Siege Tanks on Ultralove** remain the largest single error (25.9 cells on attack orders). The real tanks get stuck at a ramp, most likely behind sieged tanks, which units can't push past. The tier doesn't model units blocking each other.
+- **Fights themselves** (kiting, chasing).
+- **Medivac boost** is classified but not applied.

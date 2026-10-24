@@ -6,7 +6,7 @@ ghostreel is a working name. The project is not affiliated with or endorsed by B
 
 > **What you're seeing.** A replay stores player inputs, not unit positions, so a viewer has to reconstruct movement. Births, deaths, buildings and player stats are always exact. How positions are filled in depends on the *tier* (the badge at the top of the viewer says which one you're seeing):
 >
-> - **Command tier** (the default): units follow the players' recorded orders along the map's paths, workers mine, new units walk to their rally point, and the estimate snaps to the real position whenever the replay sampled one. Measured against the real game, the commanded players' moving units are off by a median of 2–3.5 cells (mean 3–8). Players with no recorded orders (the built-in AI) fall back to the tracker tier.
+> - **Command tier** (the default): units follow the players' recorded orders along the map's paths: moves, attack-moves that stop at enemies, Stimpack, creep. Workers mine, new units walk to their rally point, and the estimate snaps to the real position whenever the replay sampled one. Measured against the real game, the commanded players' moving units are off by a median of about 2–2.6 cells (mean 2.6–6). Players with no recorded orders (the built-in AI) fall back to the tracker tier.
 > - **Tracker tier:** positions are known only when the replay sampled them (every ~11 s, mostly in fights) and at death; in between, units hold their last known position. Median error on moving units is 5–22 cells.
 > - **Engine tier:** exact positions, recorded by playing the replay in the real game with `ghostreel-engine` (see below).
 >
@@ -115,6 +115,6 @@ The code is Apache-2.0. StarCraft II's art, data and maps belong to Blizzard and
 
 ## Roadmap
 
-- **Phase 2, accuracy (done):** the `ghostreel-engine` exporter for exact positions and ground truth, and the command tier. Next for the command tier: modelling attack-moves that stop at enemies, speed upgrades (Stimpack, creep), and ground truth for current game versions (needs a Windows or macOS client).
+- **Phase 2, accuracy (done):** the `ghostreel-engine` exporter for exact positions and ground truth, and the command tier. Next for the command tier: units blocking each other (sieged tanks on ramps), fights themselves (kiting, chasing), and ground truth for current game versions and for Zerg players (needs a Windows or macOS client, and recorded games where the Zerg side is a player rather than the AI).
 - **Phase 3, 3D:** a local asset extractor for unit models, terrain textures and animations, and a 3D view with fog of war.
 - **Phase 4:** a browser-only build (WebAssembly), installers and plugin hooks.
