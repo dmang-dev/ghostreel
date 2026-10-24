@@ -22,6 +22,8 @@ desktop/frontend/wailsjs/
 
 # Generated debug output
 *.pb
+# ...but not the synthetic golden fixture the viewer tests read
+!viewer/src/testdata/*.pb
 out/
 
 # Local tool config
