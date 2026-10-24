@@ -1,0 +1,18 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "ghostreel",
+  "outputfilename": "ghostreel-desktop",
+  "frontend:dir": "../viewer",
+  "frontend:install": "npm ci",
+  "frontend:build": "npm run build:desktop",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "wailsjsdir": "./frontend",
+  "author": {
+    "name": "ghostreel contributors"
+  },
+  "info": {
+    "productName": "ghostreel",
+    "comments": "Replay viewer. Not affiliated with Blizzard Entertainment."
+  }
+}
