@@ -167,3 +167,25 @@ Still open:
 - The Windows installer associates `.SC2Replay` through Wails' `fileAssociations`, with a generated document icon. **Not verified locally:** NSIS couldn't be installed on the development machine (the installer's permission prompt was declined), so the installer step itself first runs in CI. Everything before it (the app build, icon and installer script generation) was checked with `wails build -nsis`.
 - **Not done:** code signing (needs maintainers' certificates), opening replays from Finder on macOS (Wails delivers those as events after start-up; the app handles command-line files only), Linux packages (.deb, AppImage).
 
+## Phase 5 (2026-10-24): depth
+
+### Analysis
+
+- Reports gain **series** (values over time), drawn as charts with a cursor at the current moment; clicking a chart seeks. New plugins: **economy** (income, workers, army value, supply, resources lost, from the stats events every 10 s), **expansions** (town halls placed after the start: where, when started and finished), and **supply blocks** (spans with no free supply below 200, accurate to the 10 s stats interval). APM is not done: the timeline doesn't keep every command.
+
+### Terrain
+
+- **`t3TextureMasks` is decoded.** It holds 8 layers, each 4 texels per cell across and 8 up (on all 13 maps tried). A layer is 32×32-byte tiles in strips two tiles high: down the strip first, then across, strips from the bottom up. Two measurements found this. First, byte-difference autocorrelation showed 1 byte per texel and 32-byte rows. Second, matching tile edges showed that the next tile (+1) continues upward and +2 continues to the right. The 8 weights of a texel sum to 255. The Phase 3 guesses (64×64 blocks, BC4) were wrong.
+- The server composes the ground from those masks and the layer textures (`CTerrainTex`), tiled as `uvtiling` says, at up to 8 pixels per cell, in about 0.3–0.8 s per map. Composed images matched each map's own minimap by eye. The viewer offers the result as **Ground textures** in 2D and 3D, the default when it's available. It needs the game's data, so the browser build doesn't have it.
+- **Creep** is drawn around finished hatcheries (12 cells) and creep tumors (10), grown over 12 s and kept to walkable ground. It is an estimate: the game spreads creep cell by cell and lets it recede slowly.
+- **Cliff meshes** are not done: the game builds cliffs from tile-set cliff models placed by rules not decoded here, so the heightfield's walls remain.
+
+### Command tier, round 3: nothing kept
+
+Two changes were measured on the five engine recordings and **reverted**, because neither lowered the error:
+
+- **Mining for players without orders** (the built-in AI). The AI's workers stay on the tracker tier, which holds each worker where it was last seen. That is close to right for workers mining at their birth base: the median error for the AI's Probes on Persephone is 4.5 cells. Sending new workers to mine at their nearest base raised the AI player's moving-unit error in all five games (for example 17.7 → 18.5 cells). Adding the AI's saturation behaviour (new workers to the emptiest base, transfers when a base finishes) made it worse still (17.7 → 21.4; the Probe median 4.5 → 24.2): the AI's real transfers don't follow that rule closely enough.
+- **Siege Tanks on Ultralove** (mean 44.6 cells under the command tier vs 15.0 for the tracker tier). The engine shows ten tanks jammed between a mineral line, supply depots, a Bunker and a Barracks. Several held attack-move orders for minutes without moving. The pathing grid shows a clear route; what stops them is the other tanks, and the replay has no trace of that. Unit-on-unit blocking stays out of reach.
+
+Also found: in the Ley Lines games, the large SCV and Medivac errors belong to the **AI** (also Terran), which the command tier doesn't model. The commanded player's numbers stand as in round 2 (moving units, mean): 4.32 / 6.12 / 2.91 / 3.37 / 2.62.
+

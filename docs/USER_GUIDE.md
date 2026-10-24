@@ -65,12 +65,15 @@ Click a unit to inspect it; the panel says when its position was last actually o
 
 The minimap moves the camera when clicked. Bars under the scrubber show deaths; yellow bands are battles; ticks at the top are upgrades (short) and expansions (long).
 
-## Build orders and battles
+## Analysis: build orders, battles, economy
 
 Press **B** (or use the tabs on the events panel) to switch between:
 
 - **Build order:** each player's structures, units, morphs and research for the first ten minutes, with supply. Structures appear when placed, units and research when finished (replays don't record when they were queued). Repeats a moment apart share a line ("Zergling ×6").
 - **Battles:** clusters of deaths close together in time and space, with each side's losses. They are also shown as yellow bands under the scrubber and as rings on the minimap while they happen.
+- **Economy:** charts of income, workers, army value, supply and resources lost for each player, with a line at the current moment. Click a chart to jump there.
+- **Expansions:** when and where each player took a new base, and when it finished.
+- **Supply blocks:** when each player had no free supply. These are accurate to about 10 s, the interval at which the replay records stats.
 
 Click any row to jump there. These come from analysis plugins; see [CONTRIBUTING.md](../CONTRIBUTING.md) to write your own.
 
@@ -89,11 +92,11 @@ In the browser, none of that is possible: browsers can't read your Battle.net ca
 
 ## 3D
 
-Press **3**. With StarCraft II installed on the same computer, units are the game's own models with their animations, and the map shows its rocks, plants and wreckage and a textured ground. The models are converted from your install the first time they're needed and kept in ghostreel's cache folder; nothing is downloaded or shared. If the game is installed somewhere unusual, point to the folder that contains `.build.info`, using `--gamedata` or the `GHOSTREEL_GAMEDATA` environment variable. To convert everything up front and see what's missing, run `ghostreel assets`.
+Press **3**. With StarCraft II installed on the same computer, units are the game's own models with their animations, and the map shows its rocks, plants and wreckage, and the ground painted with the map's own textures. The terrain menu calls this **Ground textures**, and it works in 2D too. Zerg creep shows as a purple layer around hatcheries and creep tumors; it is an estimate of how far it spread. The models are converted from your install the first time they're needed and kept in ghostreel's cache folder; nothing is downloaded or shared. If the game is installed somewhere unusual, point to the folder that contains `.build.info`, using `--gamedata` or the `GHOSTREEL_GAMEDATA` environment variable. To convert everything up front and see what's missing, run `ghostreel assets`.
 
 Without the game (and in the browser build), units are plain shapes in team colors, which is also what you see while a model loads and when zoomed far out.
 
-Known gaps: the ground uses one texture instead of the map's painted blend, and cliffs are plain walls.
+Known gaps: cliffs are plain walls rather than the game's cliff models, and there is no water.
 
 ## Privacy
 

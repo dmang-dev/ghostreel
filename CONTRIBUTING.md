@@ -69,7 +69,8 @@ Design history and the reasons behind choices are in [docs/DECISIONS.md](docs/DE
 Analysis plugins read a finished timeline and report what they find. The viewer draws every report without knowing the plugin:
 
 - **markers** (a moment or span, optionally a place) go under the scrubber and on the minimap;
-- **tables** go in the events panel as a tab, and clicking a row seeks to it.
+- **tables** go in the events panel as a tab, and clicking a row seeks to it;
+- **series** (values over time) are drawn as charts, one line per player.
 
 A plugin implements `analysis.Plugin` and registers itself:
 

@@ -46,7 +46,7 @@ cd viewer && npm ci && npm run build:web
 
 ### Build orders and battles
 
-Press **B** to switch the events panel to the build order or the battles found in the game. Rows jump to their moment. Both come from analysis plugins (`internal/analysis`); [CONTRIBUTING.md](CONTRIBUTING.md) shows how to add one.
+Press **B** to switch the events panel to the build order, battles, economy charts, expansions or supply blocks. Rows jump to their moment. Both come from analysis plugins (`internal/analysis`); [CONTRIBUTING.md](CONTRIBUTING.md) shows how to add one.
 
 ### 3D view
 
@@ -146,4 +146,5 @@ The code is Apache-2.0. StarCraft II's art, data and maps belong to Blizzard and
 
 - **Phase 2, accuracy (done):** the `ghostreel-engine` exporter for exact positions and ground truth, and the command tier. Next for the command tier: units blocking each other (sieged tanks on ramps), fights themselves (kiting, chasing), and ground truth for current game versions and for Zerg players (needs a Windows or macOS client, and recorded games where the Zerg side is a player rather than the AI).
 - **Phase 3, 3D (done):** the 3D view with the game's own models and animations, doodads, ground texture and fog of war. Next: blending the terrain's texture layers (the mask format isn't decoded yet), cliff meshes, and checking a current Windows install.
+- **Phase 5 (done):** economy charts, expansions and supply blocks; the map's painted ground textures and creep; a measured third round on the command tier (nothing beat the current model; see DECISIONS).
 - **Phase 4, 1.0 (done):** the browser-only build, installers and the release workflow, analysis plugins (build orders, battles), and the [user guide](docs/USER_GUIDE.md) and [contributor guide](CONTRIBUTING.md). Next: code signing, opening replays from Finder on macOS, and more plugins.
