@@ -147,6 +147,7 @@ Phase 1 is the first release people can use; each later phase improves it withou
 | 2 · Accuracy | Engine-tier exporter on the s2client API (ground truth); command tier: selection tracking, A* pathing, worker mining, error report vs ground truth | Command-tier position error meets the target set from benchmarks |
 | 3 · 3D | CASC extractor; `.m3` → glTF with animations; terrain mesh + texture splatting; doodads, resources, fog of war; 2D/3D toggle | Every unit in the current ladder pool renders and animates |
 | 4 · 1.0 release | WASM browser build, installers, user docs, contributor guide; plugin hooks (build orders, battle detection) | — |
+| 5 · Depth, then ship | More analysis plugins (expansions, supply blocks, income/army/worker graphs); 3D terrain fidelity (texture-mask blending, creep); command-tier accuracy round 3 (unit blocking, fights, Medivac boost); publish 1.0 (real repository, CI, first release) | Every change to the command tier lowers measured error; the release workflow produces installable builds on all three OSes |
 
 No dates yet: sizing depends on team size and how much `.m3` work the community add-on saves.
 

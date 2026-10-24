@@ -23,11 +23,19 @@ export interface Table {
   rows: { loop: number; cells: string[] }[];
 }
 
+export interface Series {
+  title: string;
+  player?: number;
+  unit?: string;
+  points: { loop: number; value: number }[];
+}
+
 export interface Report {
   plugin: string;
   title: string;
   markers?: Marker[];
   tables?: Table[];
+  series?: Series[];
   error?: string;
 }
 
@@ -37,6 +45,10 @@ export class ReportsView {
   current = -1;
   private table = 0;
   private rowEls: { loop: number; el: HTMLElement }[] = [];
+  private chart?: { canvas: HTMLCanvasElement; series: Series[] };
+  private loop = 0;
+  /** Game length in loops, for chart scales. */
+  loops = 1;
 
   constructor(
     private readonly tabs: HTMLElement,
@@ -47,7 +59,9 @@ export class ReportsView {
   ) {}
 
   set(reports: Report[]): void {
-    this.reports = reports.filter((r) => r.error || r.tables?.some((t) => t.rows.length) || r.markers?.length);
+    this.reports = reports.filter(
+      (r) => r.error || r.tables?.some((t) => t.rows.length) || r.markers?.length || r.series?.some((s) => s.points.length),
+    );
     for (const r of reports) if (r.error) console.warn(`analysis plugin ${r.plugin}: ${r.error}`);
     if (this.current >= this.reports.length) this.current = -1;
     this.table = 0;
@@ -75,6 +89,7 @@ export class ReportsView {
     this.feed.hidden = !!report;
     this.body.hidden = !report;
     this.rowEls = [];
+    this.chart = undefined;
     if (!report) return;
     this.body.replaceChildren();
     if (report.error) {
@@ -82,6 +97,10 @@ export class ReportsView {
       p.className = "report-error";
       p.textContent = `This plugin failed: ${report.error}`;
       this.body.append(p);
+      return;
+    }
+    if (report.series?.length) {
+      this.renderChart(report.series);
       return;
     }
     const tables = report.tables ?? [];
@@ -140,6 +159,78 @@ export class ReportsView {
 
   /** Marks the rows already reached at loop. */
   update(loop: number): void {
+    this.loop = loop;
     for (const { loop: l, el } of this.rowEls) el.classList.toggle("past", l <= loop);
+    if (this.chart) this.drawChart();
+  }
+
+  /** Series with one title share a chart; buttons pick the title. */
+  private renderChart(series: Series[]): void {
+    const titles = [...new Set(series.map((s) => s.title))];
+    const pick = document.createElement("div");
+    pick.className = "report-pick";
+    titles.forEach((title, i) => {
+      const b = document.createElement("button");
+      b.textContent = title;
+      b.className = i === this.table ? "on" : "";
+      b.onclick = () => {
+        this.table = i;
+        this.render();
+      };
+      pick.append(b);
+    });
+    const canvas = document.createElement("canvas");
+    canvas.className = "report-chart";
+    canvas.onclick = (e) => {
+      const r = canvas.getBoundingClientRect();
+      this.seek(Math.round(((e.clientX - r.left) / r.width) * this.loops));
+    };
+    const legend = document.createElement("div");
+    legend.className = "report-legend";
+    this.body.append(pick, canvas, legend);
+    this.chart = { canvas, series: series.filter((s) => s.title === titles[this.table]) };
+    this.drawChart();
+  }
+
+  private drawChart(): void {
+    const { canvas, series } = this.chart!;
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    const w = canvas.clientWidth || 260;
+    const h = canvas.clientHeight || 140;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext("2d")!;
+    ctx.scale(dpr, dpr);
+    let max = 1;
+    for (const s of series) for (const p of s.points) max = Math.max(max, p.value);
+    const pad = 4;
+    const x = (loop: number) => (loop / this.loops) * w;
+    const y = (v: number) => h - pad - (v / max) * (h - 2 * pad);
+    ctx.strokeStyle = "#ffffff18";
+    ctx.lineWidth = 1;
+    for (const f of [0.25, 0.5, 0.75]) {
+      ctx.beginPath();
+      ctx.moveTo(0, y(max * f) + 0.5);
+      ctx.lineTo(w, y(max * f) + 0.5);
+      ctx.stroke();
+    }
+    const now: string[] = [];
+    for (const s of series) {
+      ctx.strokeStyle = this.color(s.player ?? 0);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      s.points.forEach((p, i) => (i ? ctx.lineTo(x(p.loop), y(p.value)) : ctx.moveTo(x(p.loop), y(p.value))));
+      ctx.stroke();
+      let v: number | undefined;
+      for (const p of s.points) if (p.loop <= this.loop) v = p.value;
+      if (v !== undefined) now.push(`<span style="color:${this.color(s.player ?? 0)}">${Math.round(v)}${s.unit ?? ""}</span>`);
+    }
+    ctx.strokeStyle = "#ffffffaa";
+    ctx.beginPath();
+    ctx.moveTo(Math.round(x(this.loop)) + 0.5, 0);
+    ctx.lineTo(Math.round(x(this.loop)) + 0.5, h);
+    ctx.stroke();
+    const legend = canvas.nextElementSibling as HTMLElement | null;
+    if (legend) legend.innerHTML = `max ${Math.round(max)}${series[0]?.unit ?? ""} · now ${now.join(" · ")}`;
   }
 }

@@ -209,4 +209,6 @@ button:disabled { opacity: 0.4; cursor: default; }
 .report-pick button { border-left-width: 3px; }
 .report-error { color: var(--warn); }
 .report-empty { color: var(--muted); }
+.report-chart { display: block; width: 100%; height: 140px; cursor: crosshair; }
+.report-legend { color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 

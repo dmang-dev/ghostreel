@@ -93,6 +93,7 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded, map?.heights);
   doodadsFor = "";
   void loadDoodads();
+  reports.loops = model.loops;
   reports.set([]);
   api.fetchAnalysis(summary.id).then(
     (r) => {

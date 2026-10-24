@@ -2,13 +2,15 @@
 
 // Package analysis is ghostreel's plugin hook: a Plugin reads a finished
 // timeline and reports what it found as markers (spans of the game, shown on
-// the scrubber and the map) and tables (shown in the viewer's analysis
-// panel, each row jumping to its loop). The viewer draws any report, so a
-// new plugin needs no frontend changes.
+// the scrubber and the map), tables (shown in the viewer's analysis panel,
+// each row jumping to its loop) and series (values over time, drawn as
+// charts). The viewer draws any report, so a new plugin needs no frontend
+// changes.
 //
 // Plugins register themselves with Register, usually from an init function,
 // and a binary includes a plugin by importing its package. The built-in ones
-// are build orders and battle detection.
+// are build orders, battles, expansions, supply blocks and the economy
+// charts.
 package analysis
 
 import (
@@ -33,6 +35,7 @@ type Report struct {
 	Title   string   `json:"title"`
 	Markers []Marker `json:"markers,omitempty"`
 	Tables  []Table  `json:"tables,omitempty"`
+	Series  []Series `json:"series,omitempty"`
 	// Error is set instead of findings when the plugin failed.
 	Error string `json:"error,omitempty"`
 }
@@ -56,6 +59,21 @@ type Table struct {
 	Player  uint32   `json:"player,omitempty"` // whose it is; 0 for everyone
 	Columns []string `json:"columns"`
 	Rows    []Row    `json:"rows"`
+}
+
+// Series is a value over the game, drawn as a line chart; series with the
+// same Title share a chart (one line per player).
+type Series struct {
+	Title  string  `json:"title"`
+	Player uint32  `json:"player,omitempty"`
+	Unit   string  `json:"unit,omitempty"` // shown after values, e.g. "/min"
+	Points []Point `json:"points"`
+}
+
+// Point is a value at a loop.
+type Point struct {
+	Loop  uint32  `json:"loop"`
+	Value float32 `json:"value"`
 }
 
 // Row is a table row; selecting it seeks to Loop.

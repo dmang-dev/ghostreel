@@ -148,7 +148,7 @@ func TestRunIsolatesFailures(t *testing.T) {
 	for _, p := range Plugins() {
 		ids = append(ids, p.ID())
 	}
-	if strings.Join(ids, ",") != "battles,build-order" {
+	if strings.Join(ids, ",") != "battles,build-order,economy,expansions,supply-blocks" {
 		t.Errorf("built-in plugins = %v", ids)
 	}
 }
@@ -188,5 +188,31 @@ func TestRealReplays(t *testing.T) {
 				t.Logf("    %s %s", clock(m.Loop), m.Label)
 			}
 		}
+	}
+}
+
+func TestSupplyBlocksAndEconomy(t *testing.T) {
+	tl := game()
+	stat := func(loop uint32, used, made float32, income uint32) {
+		event(tl, loop, &pb.Event_PlayerStats{PlayerStats: &pb.PlayerStats{Player: 1, SupplyUsed: used, SupplyMade: made, MineralRate: income, Workers: 12}})
+	}
+	stat(160, 14, 15, 500)
+	stat(320, 15, 15, 600) // blocked
+	stat(480, 15, 15, 650) // still blocked
+	stat(640, 16, 23, 700) // depot done
+	stat(800, 200, 200, 2000)
+	rep, err := SupplyBlocks{}.Analyze(tl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Markers) != 1 || rep.Markers[0].Loop != 320 || rep.Markers[0].End != 640 || rep.Markers[0].Player != 1 {
+		t.Errorf("supply blocks = %+v", rep.Markers)
+	}
+	eco, err := Economy{}.Analyze(tl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eco.Series) != 5 || eco.Series[0].Title != "Income" || len(eco.Series[0].Points) != 5 || eco.Series[0].Points[1].Value != 600 {
+		t.Errorf("economy = %+v", eco.Series)
 	}
 }
