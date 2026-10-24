@@ -43,3 +43,8 @@ desktop: viewer
 
 clean:
 	rm -rf $(BIN) out viewer/dist
+
+# Viewer unit tests (TypeScript model vs Go golden files).
+.PHONY: viewer-test
+viewer-test:
+	cd viewer && npm test
