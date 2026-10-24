@@ -1,0 +1,89 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ghostreel</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="bar">
+        <span class="logo">ghostreel</span>
+        <button id="open" title="Open a .SC2Replay file (or drop one anywhere)">Open replay…</button>
+        <input type="file" id="file" accept=".SC2Replay" hidden />
+        <select id="library" title="Replays in the server's library folders" hidden>
+          <option value="">Library…</option>
+        </select>
+        <span id="title" class="title"></span>
+        <span id="tier" class="badge" hidden
+          title="Tracker tier: births, deaths and buildings are exact. Unit positions are exact only when the replay sampled them (mostly in fights) and at death; in between, units hold their last known position.">
+          Tracker tier · positions approximate</span>
+        <span class="spacer"></span>
+        <label class="toggle"><input type="checkbox" id="labels" checked /> Labels</label>
+        <select id="terrain-mode" title="Terrain layer">
+          <option value="shade">Shaded terrain</option>
+          <option value="minimap">Map art (minimap)</option>
+        </select>
+        <button id="help-btn" title="Keyboard shortcuts">?</button>
+      </header>
+
+      <main id="stage">
+        <div id="players"></div>
+        <div id="mapbanner" class="banner" hidden>
+          <div>
+            <strong>Map not found</strong> — playing on a blank grid.
+            <button id="pickmap">Pick map file…</button>
+            <input type="file" id="mapfile" accept=".SC2Map,.s2ma" hidden />
+          </div>
+          <details><summary>Where ghostreel looked</summary><pre id="maperror"></pre></details>
+        </div>
+        <aside id="feed" class="panel" hidden>
+          <h3>Events</h3>
+          <ol id="feed-list"></ol>
+        </aside>
+        <div id="inspect" class="panel" hidden></div>
+        <canvas id="minimap" hidden></canvas>
+        <div id="fps" hidden></div>
+        <div id="empty" class="center">
+          <h1>ghostreel</h1>
+          <p>Open a <code>.SC2Replay</code> or drop one anywhere in this window.</p>
+          <ul id="empty-library"></ul>
+        </div>
+        <div id="loading" class="center" hidden><div class="spinner"></div><p id="loading-text">Loading…</p></div>
+        <div id="error" class="banner error" hidden></div>
+        <div id="drop" class="center" hidden><p>Drop to open</p></div>
+        <div id="help" class="panel" hidden>
+          <h3>Shortcuts</h3>
+          <table>
+            <tr><td>Space / P</td><td>Play / pause</td></tr>
+            <tr><td>← / →</td><td>Back / forward 5 s (Shift: 30 s)</td></tr>
+            <tr><td>+ / −</td><td>Faster / slower</td></tr>
+            <tr><td>Home / End</td><td>Start / end</td></tr>
+            <tr><td>Click</td><td>Inspect a unit; drag to pan, wheel to zoom</td></tr>
+            <tr><td>Esc</td><td>Clear selection</td></tr>
+            <tr><td>L / M / F</td><td>Labels / map art / FPS counter</td></tr>
+          </table>
+        </div>
+      </main>
+
+      <footer class="transport">
+        <button id="play" disabled title="Play / pause (Space)">▶</button>
+        <span id="clock" class="clock">0:00 / 0:00</span>
+        <div class="scrub">
+          <canvas id="marks"></canvas>
+          <input type="range" id="scrub" min="0" max="0" step="1" value="0" disabled />
+        </div>
+        <select id="speed" title="Playback speed (+ / −); 1× is real time at Faster">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+          <option value="8">8×</option>
+          <option value="16">16×</option>
+        </select>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
