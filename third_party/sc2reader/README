@@ -1,0 +1,2 @@
+Ability link tables derived from https://github.com/ggtracker/sc2reader (MIT, see LICENSE)
+at commit e10fc93. Generated into internal/gamedata/abilities_gen.go by tools/genabilities.
