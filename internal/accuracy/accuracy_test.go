@@ -81,7 +81,7 @@ func TestPathabilityAgainstEngine(t *testing.T) {
 }
 
 // TestCommandTierBeatsTracker guards the command tier's main result: for the
-// player whose orders are recorded, moving units are at least twice as
+// player whose orders are recorded, moving units are at least 2.5 times as
 // accurate as with the tracker tier alone.
 func TestCommandTierBeatsTracker(t *testing.T) {
 	for _, p := range groundTruth(t) {
@@ -101,8 +101,8 @@ func TestCommandTierBeatsTracker(t *testing.T) {
 		after := Compare(cmd, s).MovingByOwner[player]
 		t.Logf("%s: moving error %.2f -> %.2f cells (median %.2f -> %.2f)",
 			filepath.Base(p), before.Mean, after.Mean, before.Median, after.Median)
-		if after.Mean > before.Mean/2 {
-			t.Errorf("%s: command tier %.2f is not under half of tracker %.2f", filepath.Base(p), after.Mean, before.Mean)
+		if after.Mean > before.Mean*0.4 {
+			t.Errorf("%s: command tier %.2f is not under 40%% of tracker %.2f", filepath.Base(p), after.Mean, before.Mean)
 		}
 		if sr := CheckSelection(r.Events, s); sr.Precision < 0.9 {
 			t.Errorf("%s: selection precision %.2f", filepath.Base(p), sr.Precision)

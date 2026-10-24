@@ -21,6 +21,7 @@ func Grid(m *mapfile.Map) *pathing.Grid {
 			}
 		}
 	}
+	g.SetLevels(m.CliffLevels)
 	return g
 }
 

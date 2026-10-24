@@ -245,3 +245,29 @@ func TestMarshalRoundTrip(t *testing.T) {
 		t.Error("unknown schema version accepted")
 	}
 }
+
+func TestSimplifyKeepsShape(t *testing.T) {
+	k := func(loop uint32, x float32, src pb.Source) *pb.Keyframe {
+		return &pb.Keyframe{Loop: loop, X: x, Source: src}
+	}
+	cmd, trk := pb.Source_SOURCE_COMMAND, pb.Source_SOURCE_TRACKER
+	// Constant motion at 1 cell per 16 loops (speed 1), sampled every 16
+	// loops, then a hold, then an observation.
+	var ks []*pb.Keyframe
+	for i := uint32(0); i <= 10; i++ {
+		ks = append(ks, k(i*16, float32(i), cmd))
+	}
+	ks = append(ks, k(400, 10, cmd), k(500, 10, cmd), k(600, 12, trk))
+	speed := func(uint32) float32 { return 1 }
+	out := simplifyKeys(ks, speed, SimplifyTolerance)
+	if len(out) >= len(ks) || out[len(out)-1].Source != trk {
+		t.Fatalf("simplified %d -> %d keys: %v", len(ks), len(out), out)
+	}
+	for loop := uint32(0); loop <= 600; loop += 4 {
+		ax, _, _ := PositionAt(&pb.Track{Keyframes: ks}, 1, loop)
+		bx, _, _ := PositionAt(&pb.Track{Keyframes: out}, 1, loop)
+		if math.Abs(float64(ax-bx)) > SimplifyTolerance+1e-3 {
+			t.Fatalf("loop %d: simplified x=%v, original %v", loop, bx, ax)
+		}
+	}
+}

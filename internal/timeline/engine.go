@@ -51,5 +51,6 @@ func ApplyEngine(tl *pb.Timeline, s *enginev1.Samples) error {
 		t.Keyframes = ek
 	}
 	tl.Meta.Fidelity = pb.Source_SOURCE_ENGINE
+	Simplify(tl, SimplifyTolerance)
 	return nil
 }

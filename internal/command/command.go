@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	pb "github.com/OWNER/ghostreel/gen/timeline/v1"
+	"github.com/OWNER/ghostreel/internal/gamedata"
 	"github.com/OWNER/ghostreel/internal/pathing"
 	"github.com/OWNER/ghostreel/internal/replay"
 	"github.com/OWNER/ghostreel/internal/selection"
@@ -33,6 +34,14 @@ type Options struct {
 	// Formation is the largest offset (cells) a unit keeps from its group's
 	// center when a group is ordered to a point.
 	Formation float64
+	// For experiments: turn off attack-move engagement or Stimpack.
+	NoEngage, NoStim bool
+	// EnemyWindow: an enemy unit counts only if the replay observed it within
+	// this many loops (structures always count). 0 means 40.
+	EnemyWindow float64
+	// EngageSlack is added to weapon range for acquiring targets (default 1),
+	// ResumeAfter the quiet loops before an engaged unit walks on (default 16).
+	EngageSlack, ResumeAfter float64
 }
 
 func (o *Options) defaults() {
@@ -64,6 +73,9 @@ type agent struct {
 	goal      *pt
 	stopAt    float64 // distance from goal to stop at
 	commanded bool
+	// stimUntil is when a Stimpack wears off (0 = never stimmed)
+	stimUntil float64
+	attack    *attackJob
 }
 
 type mineJob struct {
@@ -86,10 +98,17 @@ type builder struct {
 	assigned map[uint32]int
 	// rally points of production structures and larvae, by tag
 	rally map[replay.Tag]rallyPoint
+	// worker rallies (townhalls, hatcheries) when set separately
+	workerRally map[replay.Tag]rallyPoint
 	// producer of each unit, to follow larva -> hatchery for rallies
 	creator map[replay.Tag]replay.Tag
 	// structure footprints currently blocking the grid
 	occupied map[uint32]occupancy
+	// players whose units get the creep speed bonus
+	zerg map[int]bool
+	// caches by time bucket: creep discs, other players' units
+	creep   map[int][]creepSource
+	enemies map[int][]enemy
 }
 
 type rallyPoint struct {
@@ -106,14 +125,20 @@ func Apply(tl *pb.Timeline, events []replay.Event, opts Options) {
 		byTag: map[uint32]*pb.Unit{}, bySlot: map[uint32]*pb.Unit{},
 		agents: map[uint32]*agent{}, sel: selection.New(),
 		tracks: map[uint32]*pb.Track{}, active: map[int]bool{}, assigned: map[uint32]int{},
-		rally: map[replay.Tag]rallyPoint{}, creator: map[replay.Tag]replay.Tag{},
+		rally: map[replay.Tag]rallyPoint{}, workerRally: map[replay.Tag]rallyPoint{}, creator: map[replay.Tag]replay.Tag{},
 		occupied: map[uint32]occupancy{},
+		zerg:     map[int]bool{}, creep: map[int][]creepSource{}, enemies: map[int][]enemy{},
 	}
 	for _, u := range tl.Units {
 		b.byTag[u.Tag] = u
 	}
 	for _, t := range tl.Tracks {
 		b.tracks[t.UnitId] = t
+	}
+	for _, p := range tl.Meta.Players {
+		if p.Race == "Zerg" {
+			b.zerg[int(p.Id)] = true
+		}
 	}
 	for i := range events {
 		if events[i].Kind == replay.KindCommand && events[i].Player > 0 {
@@ -135,6 +160,7 @@ func Apply(tl *pb.Timeline, events []replay.Event, opts Options) {
 		b.tracks[a.id].Keyframes = a.keys
 	}
 	tl.Meta.Fidelity = pb.Source_SOURCE_COMMAND
+	timeline.Simplify(tl, timeline.SimplifyTolerance)
 }
 
 func (b *builder) unitType(u *pb.Unit, loop int64) *pb.UnitType {
@@ -215,8 +241,8 @@ func (b *builder) apply(e *replay.Event) {
 	case replay.KindCommand:
 		if e.HasTarget {
 			b.setRally(e)
-			b.command(e, t)
 		}
+		b.command(e, t)
 	}
 }
 
@@ -282,6 +308,7 @@ func (b *builder) setKey(a *agent, t float64, p pt, state pb.UnitState, src pb.S
 // advance commits the plan up to t: keyframes at every leg boundary before t
 // and one at t. Mining jobs extend the plan as needed.
 func (b *builder) advance(a *agent, t float64) {
+	b.extendAttack(a, t)
 	b.extendMining(a, t)
 	for len(a.legs) > 0 {
 		l := a.legs[0]
@@ -318,7 +345,7 @@ func (b *builder) current(a *agent, t float64) pt {
 
 func (b *builder) stop(a *agent, t float64) {
 	b.advance(a, t)
-	a.legs, a.mining, a.goal = nil, nil, nil
+	a.legs, a.mining, a.goal, a.attack = nil, nil, nil, nil
 }
 
 // moveTo replaces (or, queued, extends) the plan with a path to goal,
@@ -329,14 +356,14 @@ func (b *builder) moveTo(a *agent, t float64, goal pt, stopAt float64, queued bo
 	}
 	var from pt
 	start := t
-	if queued && len(a.legs) > 0 && a.mining == nil {
+	if queued && len(a.legs) > 0 && a.mining == nil && a.attack == nil {
 		last := a.legs[len(a.legs)-1]
 		from, start = last.b, last.t1
 	} else {
 		from = b.current(a, t)
 		a.legs = nil
 	}
-	a.mining = nil
+	a.mining, a.attack = nil, nil
 	g := goal
 	a.goal, a.stopAt = &g, stopAt
 	b.appendPath(a, from, start, goal, stopAt)
@@ -347,26 +374,17 @@ func (b *builder) appendPath(a *agent, from pt, start float64, goal pt, stopAt f
 	if a.typ.Air || b.opts.Grid == nil {
 		path = []pt{goal}
 	} else {
-		if !b.opts.Grid.Reachable(from, goal) {
+		if !b.opts.Grid.ReachableFor(from, goal, big(a.typ)) {
 			// Walled in (or an unreachable target): the unit stays put.
 			a.goal = nil
 			return
 		}
-		path = b.opts.Grid.Path(from, goal)
+		path = b.opts.Grid.PathFor(from, goal, big(a.typ))
 	}
 	if stopAt > 0 {
 		path = shorten(from, path, stopAt)
 	}
-	cur, tt := from, start
-	for _, p := range path {
-		d := math.Hypot(p.X-cur.X, p.Y-cur.Y)
-		if d < 1e-6 {
-			continue
-		}
-		dt := d / a.speed
-		a.legs = append(a.legs, leg{t0: tt, t1: tt + dt, a: cur, b: p})
-		cur, tt = p, tt+dt
-	}
+	b.walk(a, from, start, path)
 }
 
 // shorten trims the end of a path so it stops dist short of its goal.
@@ -395,6 +413,12 @@ func (b *builder) sample(a *agent, t float64, p pt) {
 	b.setKey(a, t, p, pb.UnitState_UNIT_STATE_IDLE, pb.Source_SOURCE_TRACKER)
 	a.legs = nil
 	switch {
+	case a.attack != nil:
+		j := a.attack
+		j.pos, j.time = p, t
+		if !j.engaged {
+			j.path = b.route(a, p, j.goal)
+		}
 	case a.mining != nil:
 		a.mining.nextLegAt = t
 		a.mining.toField = true
@@ -420,7 +444,29 @@ func (b *builder) command(e *replay.Event, t float64) {
 	if len(group) == 0 {
 		return
 	}
+	kind := gamedata.Ability(int(b.tl.Meta.BaseBuild), e.AbilityLink, e.AbilityCmdIndex, e.TargetTag != 0)
+	switch kind {
+	case gamedata.AbilityStop, gamedata.AbilityHold:
+		for _, a := range group {
+			b.stop(a, t)
+		}
+		return
+	case gamedata.AbilityStim:
+		for _, a := range group {
+			b.stim(a, t)
+		}
+		return
+	}
+	if !e.HasTarget {
+		return
+	}
 	target := pt{X: e.X, Y: e.Y}
+	if kind == gamedata.AbilityAttackMove && e.TargetTag == 0 && !e.Queued {
+		for i, goal := range b.formation(group, t, target) {
+			b.startAttackMove(group[i], t, goal)
+		}
+		return
+	}
 	var tu *pb.Unit
 	if e.TargetTag != 0 {
 		tu = b.byTag[uint32(e.TargetTag)]
@@ -447,7 +493,15 @@ func (b *builder) command(e *replay.Event, t float64) {
 		}
 		return
 	}
-	// Point target: keep a loose formation around the group's center.
+	for i, goal := range b.formation(group, t, target) {
+		b.moveTo(group[i], t, goal, 0, e.Queued)
+	}
+}
+
+// formation gives each unit of a group ordered to a point its own goal: the
+// point plus the unit's offset from the group's center, capped so the group
+// stays loose rather than spread over the map.
+func (b *builder) formation(group []*agent, t float64, target pt) []pt {
 	cx, cy := 0.0, 0.0
 	pos := make([]pt, len(group))
 	for i, a := range group {
@@ -457,12 +511,36 @@ func (b *builder) command(e *replay.Event, t float64) {
 	}
 	cx /= float64(len(group))
 	cy /= float64(len(group))
-	for i, a := range group {
+	goals := make([]pt, len(group))
+	for i := range group {
 		off := pt{X: pos[i].X - cx, Y: pos[i].Y - cy}
 		if d := math.Hypot(off.X, off.Y); d > b.opts.Formation {
 			off.X, off.Y = off.X*b.opts.Formation/d, off.Y*b.opts.Formation/d
 		}
-		b.moveTo(a, t, pt{X: target.X + off.X, Y: target.Y + off.Y}, 0, e.Queued)
+		goals[i] = pt{X: target.X + off.X, Y: target.Y + off.Y}
+	}
+	return goals
+}
+
+// stim speeds a Marine or Marauder up for a while; its current plan is
+// re-timed from now.
+func (b *builder) stim(a *agent, t float64) {
+	if b.opts.NoStim || (a.typ.Name != "Marine" && a.typ.Name != "Marauder") {
+		return
+	}
+	p := b.current(a, t)
+	a.stimUntil = t + stimLoops
+	switch {
+	case a.attack != nil:
+		// Steps after now use the new speed; drop the precomputed tail.
+		a.legs = nil
+		a.attack.pos, a.attack.time = p, t
+		if !a.attack.engaged {
+			a.attack.path = b.route(a, p, a.attack.goal)
+		}
+	case a.goal != nil && len(a.legs) > 0:
+		a.legs = nil
+		b.appendPath(a, p, t, *a.goal, a.stopAt)
 	}
 }
 
@@ -577,7 +655,7 @@ func (b *builder) startMining(a *agent, t float64, field *pb.Unit, ft *pb.UnitTy
 		drop:  pt{X: th.X - ux*(baseR+float64(a.typ.Radius)), Y: th.Y - uy*(baseR+float64(a.typ.Radius))},
 	}
 	from := b.current(a, t)
-	a.legs, a.goal = nil, nil
+	a.legs, a.goal, a.attack = nil, nil, nil
 	a.mining = job
 	a.commanded = true
 	b.mineLeg(a, from, t)
@@ -636,8 +714,12 @@ func (b *builder) onBirth(a *agent, e *replay.Event, typ *pb.UnitType, t float64
 		b.mineNearest(a, t)
 		return
 	}
+	worker := typ.Class == pb.UnitClass_UNIT_CLASS_WORKER
 	for c, hops := e.Creator, 0; c != 0 && hops < 3; c, hops = b.creator[c], hops+1 {
 		r, ok := b.rally[c]
+		if wr, wok := b.workerRally[c]; worker && wok {
+			r, ok = wr, true
+		}
 		if !ok {
 			continue
 		}
@@ -658,8 +740,18 @@ func (b *builder) onBirth(a *agent, e *replay.Event, typ *pb.UnitType, t float64
 }
 
 // setRally records a rally point for the structures (and larvae) in a
-// player's selection when it gets a targeted command.
+// player's selection: from a rally ability, or from a right-click with
+// buildings selected (how players usually set rallies). Other targeted
+// commands (a MULE calldown, say) don't move the rally.
 func (b *builder) setRally(e *replay.Event) {
+	kind := gamedata.Ability(int(b.tl.Meta.BaseBuild), e.AbilityLink, e.AbilityCmdIndex, e.TargetTag != 0)
+	if kind != gamedata.AbilityRally && kind != gamedata.AbilityRallyWorker && e.AbilityLink != -1 {
+		return
+	}
+	rallies := b.rally
+	if kind == gamedata.AbilityRallyWorker {
+		rallies = b.workerRally
+	}
 	r := rallyPoint{p: pt{X: e.X, Y: e.Y}}
 	if e.TargetTag != 0 {
 		r.unit = b.byTag[uint32(e.TargetTag)]
@@ -671,7 +763,7 @@ func (b *builder) setRally(e *replay.Event) {
 		}
 		typ := b.unitType(u, e.Loop)
 		if !mobile(typ) || typ.Name == "Larva" || typ.Name == "Egg" {
-			b.rally[tag] = r
+			rallies[tag] = r
 		}
 	}
 }
