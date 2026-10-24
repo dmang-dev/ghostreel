@@ -127,6 +127,7 @@ func unmarshalXML(d []byte, v any) error {
 type terrainXML struct {
 	bias, scale, standard float64 // t3HeightMap quantization
 	textures              []string
+	tiling                [4]float64 // texture repeats across the map (x, y) and offsets
 }
 
 // parseTerrainXML reads what t3Terrain.xml says about the visual height map
@@ -135,6 +136,7 @@ type terrainXML struct {
 func parseTerrainXML(d []byte) (terrainXML, error) {
 	var x struct {
 		HeightMap struct {
+			UVTiling string `xml:"uvtiling,attr"`
 			VertData struct {
 				Bias     float64 `xml:"quantizeBias,attr"`
 				Scale    float64 `xml:"quantizeScale,attr"`
@@ -151,12 +153,74 @@ func parseTerrainXML(d []byte) (terrainXML, error) {
 	}
 	v := x.HeightMap.VertData
 	t := terrainXML{bias: v.Bias, scale: v.Scale, standard: v.Standard}
+	// Layer i is texture i; keep the slots even when empty.
+	names := make([]string, 8)
+	found := false
 	for _, tex := range x.HeightMap.Textures {
-		if tex.I < 8 && tex.Name != "" {
-			t.textures = append(t.textures, tex.Name)
+		if tex.I >= 0 && tex.I < 8 {
+			names[tex.I] = tex.Name
+			found = found || tex.Name != ""
+		}
+	}
+	if found {
+		t.textures = names
+	}
+	for i, f := range strings.Fields(x.HeightMap.UVTiling) {
+		if i < 4 {
+			t.tiling[i], _ = strconv.ParseFloat(f, 64)
 		}
 	}
 	return t, nil
+}
+
+// TextureMasks are the terrain's painted texture layers: weight 0-255 of
+// layer L's texture at texel (u, v) is Layers[L][v*W+u], v = 0 at the
+// bottom of the map. Texels aren't square: there are W/width per cell
+// across and H/height per cell up (4 and 8 on the maps seen so far).
+type TextureMasks struct {
+	W, H   int
+	Layers [][]uint8
+	// Tiling is how many times layer textures repeat across the map (x, y),
+	// then their offsets, from t3Terrain.xml's uvtiling.
+	Tiling [4]float64
+}
+
+// parseTextureMasks reads t3TextureMasks: "MASK", version 0x66, u32 at 12
+// and 16 (texel width x2 and height), 64-byte header, then 8 layers one
+// after another. A layer is 32x32-byte tiles in strips two tiles high: down
+// the strip first, then across, strips bottom to top.
+func parseTextureMasks(d []byte) (*TextureMasks, error) {
+	if err := checkMagic(d, "MASK"); err != nil {
+		return nil, err
+	}
+	const layers, hdr, tile = 8, 64, 32
+	if len(d) < hdr {
+		return nil, errors.New("truncated")
+	}
+	h := int(le.Uint32(d[16:]))
+	if h <= 0 || h%(2*tile) != 0 || (len(d)-hdr)%(layers*h) != 0 {
+		return nil, fmt.Errorf("unexpected size %d for height %d", len(d), h)
+	}
+	w := (len(d) - hdr) / layers / h
+	if w%tile != 0 {
+		return nil, fmt.Errorf("unexpected layer width %d", w)
+	}
+	m := &TextureMasks{W: w, H: h}
+	tilesAcross := w / tile
+	per := w * h
+	for l := 0; l < layers; l++ {
+		src := d[hdr+l*per : hdr+(l+1)*per]
+		out := make([]uint8, per)
+		for t := 0; t < per/(tile*tile); t++ {
+			strip, r := t/(2*tilesAcross), t%(2*tilesAcross)
+			tx, ty := r/2, strip*2+r%2
+			for y := 0; y < tile; y++ {
+				copy(out[(ty*tile+y)*w+tx*tile:][:tile], src[t*tile*tile+y*tile:][:tile])
+			}
+		}
+		m.Layers = append(m.Layers, out)
+	}
+	return m, nil
 }
 
 // parseVisualHeights reads t3HeightMap: "HMAP", u32 version, u32 w, u32 h

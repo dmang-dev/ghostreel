@@ -27,8 +27,9 @@ const reports = new ReportsView($("feed-tabs"), $("report"), $("feed-list"), (l)
 // opens the data in the background at startup, so ask again for a while.
 const unitModels = new UnitModels("");
 scene.models = unitModels;
-(async () => {
+const assetsReady = (async () => {
   for (let i = 0; i < 10 && !(await unitModels.init()); i++) await new Promise((r) => setTimeout(r, 1500));
+  return unitModels.available;
 })();
 
 interface Loaded {
@@ -41,6 +42,8 @@ interface Loaded {
   playable: api.MapRect;
   shaded: HTMLCanvasElement;
   art: HTMLCanvasElement | null;
+  /** The painted ground from the game's textures, once the server has made it. */
+  ground: HTMLCanvasElement | null;
 }
 
 let cur: Loaded | undefined;
@@ -49,7 +52,8 @@ let playing = false;
 let speed = 1;
 let selected: number | undefined;
 let scrubbing = false;
-let terrainMode: "shade" | "minimap" = "shade";
+type TerrainMode = "shade" | "minimap" | "ground";
+let terrainMode: TerrainMode = "shade";
 
 // ---------------------------------------------------------------- loading
 
@@ -88,9 +92,12 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   const playable = map?.playable ?? { Left: 0, Bottom: 0, Right: width, Top: height };
   const shaded = map ? hillshade(map) : blankGrid(width, height);
   const art = map && minimap ? minimapTerrain(map, minimap) : null;
-  cur = { summary, model, map, minimap, width, height, playable, shaded, art };
+  cur = { summary, model, map, minimap, width, height, playable, shaded, art, ground: null };
 
   scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded, map?.heights);
+  if (terrainMode === "ground") setTerrainMode("shade");
+  $<HTMLOptionElement>("terrain-mode-ground").hidden = true;
+  if (map) void assetsReady.then((ok) => ok && loadGround(summary.id));
   doodadsFor = "";
   void loadDoodads();
   reports.loops = model.loops;
@@ -435,7 +442,7 @@ function sizeMinimap(): void {
   minimapBase = document.createElement("canvas");
   minimapBase.width = c.width;
   minimapBase.height = c.height;
-  const src = terrainMode === "minimap" && cur.art ? cur.art : cur.shaded;
+  const src = terrainImage();
   const sx = src.width / cur.width;
   minimapBase.getContext("2d")!.drawImage(src, p.Left * sx, (cur.height - p.Top) * sx, pw * sx, ph * sx, 0, 0, c.width, c.height);
 }
@@ -519,10 +526,16 @@ $<HTMLSelectElement>("speed").onchange = (e) => setSpeed(Number((e.target as HTM
   scrub.addEventListener("input", () => seek(Number(scrub.value)));
 }
 $<HTMLInputElement>("labels").onchange = (e) => (scene.showLabels = (e.target as HTMLInputElement).checked);
-$<HTMLSelectElement>("terrain-mode").onchange = (e) => setTerrainMode((e.target as HTMLSelectElement).value as "shade" | "minimap");
+$<HTMLSelectElement>("terrain-mode").onchange = (e) => setTerrainMode((e.target as HTMLSelectElement).value as TerrainMode);
 $("help-btn").onclick = () => ($("help").hidden = !$("help").hidden);
 
-function setTerrainMode(mode: "shade" | "minimap"): void {
+function terrainImage(): HTMLCanvasElement {
+  if (terrainMode === "minimap" && cur?.art) return cur.art;
+  if (terrainMode === "ground" && cur?.ground) return cur.ground;
+  return cur!.shaded;
+}
+
+function setTerrainMode(mode: TerrainMode): void {
   terrainMode = mode;
   $<HTMLSelectElement>("terrain-mode").value = mode;
   if (!cur) return;
@@ -530,8 +543,25 @@ function setTerrainMode(mode: "shade" | "minimap"): void {
     showError("This map has no minimap image.");
     return;
   }
-  scene.setTerrain(mode === "minimap" ? cur.art! : cur.shaded);
+  // The painted ground already has texture; the tiled detail is for the others.
+  scene.setTerrain(terrainImage(), mode !== "ground");
   sizeMinimap();
+}
+
+/** The map's painted ground, composed by the server from the game's textures. */
+function loadGround(id: string): void {
+  const img = new Image();
+  img.onload = () => {
+    if (cur?.summary.id !== id) return;
+    const c = document.createElement("canvas");
+    c.width = img.width;
+    c.height = img.height;
+    c.getContext("2d")!.drawImage(img, 0, 0);
+    cur.ground = c;
+    $<HTMLOptionElement>("terrain-mode-ground").hidden = false;
+    if (terrainMode === "shade") setTerrainMode("ground");
+  };
+  img.src = `/api/r/${id}/ground`;
 }
 
 window.addEventListener("keydown", (e) => {
@@ -575,7 +605,7 @@ window.addEventListener("keydown", (e) => {
       break;
     case "m":
     case "M":
-      setTerrainMode(terrainMode === "shade" ? "minimap" : "shade");
+      setTerrainMode(terrainMode === "shade" ? "minimap" : terrainMode === "minimap" && cur?.ground ? "ground" : "shade");
       break;
     case "b":
     case "B":

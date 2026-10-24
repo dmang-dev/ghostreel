@@ -73,6 +73,7 @@ export class Scene {
   private fogMesh3?: THREE.Mesh;
   private terrainTex?: THREE.CanvasTexture;
   private groundDetail?: THREE.Texture;
+  private useDetail = true;
   private detailGain = 1;
   private fogTex?: THREE.DataTexture;
   private fogData?: Uint8Array;
@@ -174,7 +175,9 @@ export class Scene {
     this.applyMode();
   }
 
-  setTerrain(canvas: HTMLCanvasElement): void {
+  /** Sets the terrain image; detail tiles the 3D ground texture over it. */
+  setTerrain(canvas: HTMLCanvasElement, detail = true): void {
+    this.useDetail = detail;
     for (const m of [this.terrain2, this.terrain3, this.fogMesh2, this.fogMesh3]) {
       if (m) {
         this.scene.remove(m);
@@ -233,7 +236,7 @@ export class Scene {
   private applyGroundDetail(): void {
     const mat = this.terrain3?.material as THREE.MeshLambertMaterial | undefined;
     if (!mat) return;
-    const tex = this.groundDetail;
+    const tex = this.useDetail ? this.groundDetail : undefined;
     mat.onBeforeCompile = (shader) => {
       if (!tex) return;
       shader.uniforms.detailMap = { value: tex };

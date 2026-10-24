@@ -268,6 +268,9 @@ func (s *Service) DownloadMap(ctx context.Context, id string) (*Loaded, error) {
 	return s.replaceMap(ctx, l, "", &r)
 }
 
+// MapFile is the decoded map, or nil when there is none.
+func (l *Loaded) MapFile() *mapfile.Map { return l.mapFile }
+
 // CanDownload reports whether DownloadMap could find this replay's map.
 func (l *Loaded) CanDownload() bool {
 	return l.Map == nil && !l.noLookup && l.Info.MapHandle != nil && l.Info.MapHandle.DepotURL != ""

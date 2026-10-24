@@ -22,6 +22,7 @@
 //	GET  /api/assets/icon/{type}   PNG command-card icon (404 when none)
 //	GET  /api/assets/model/{id}    binary glTF of a model by id, ?v= variation (doodads)
 //	GET  /api/assets/terrain/{id}  PNG terrain texture layer (map JSON's terrainTextures)
+//	GET  /api/r/{id}/ground        JPEG of the map's painted ground, from the game's textures
 package server
 
 import (
@@ -36,11 +37,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/OWNER/ghostreel/internal/app"
 	"github.com/OWNER/ghostreel/internal/assets"
 	"github.com/OWNER/ghostreel/internal/casc"
+	"github.com/OWNER/ghostreel/internal/mapfile"
 	"github.com/OWNER/ghostreel/internal/replay"
 )
 
@@ -59,6 +62,9 @@ type Server struct {
 	Startup *app.Loaded
 
 	assets atomic.Pointer[assets.Library]
+
+	groundMu sync.Mutex
+	ground   map[*mapfile.Map][]byte // composed ground images, per decoded map
 }
 
 // SetAssets makes 3D models available once the game data has been opened
@@ -163,6 +169,7 @@ func (s *Server) Handler() http.Handler {
 	}))
 	mux.HandleFunc("GET /api/assets/icon/{type}", s.asset("image/png", (*assets.Library).IconPNG))
 	mux.HandleFunc("GET /api/assets/terrain/{type}", s.asset("image/png", (*assets.Library).TerrainPNG))
+	mux.HandleFunc("GET /api/r/{id}/ground", s.groundImage)
 	mux.HandleFunc("GET /api/assets/model/{type}", func(w http.ResponseWriter, r *http.Request) {
 		v, _ := strconv.Atoi(r.URL.Query().Get("v"))
 		s.asset("model/gltf-binary", func(l *assets.Library, id string) ([]byte, error) {
@@ -197,6 +204,40 @@ func (s *Server) asset(mime string, get func(*assets.Library, string) ([]byte, e
 		w.Header().Set("Cache-Control", "private, max-age=86400")
 		w.Write(b)
 	}
+}
+
+// groundImage composes a replay's map ground once per map.
+func (s *Server) groundImage(w http.ResponseWriter, r *http.Request) {
+	lib := s.assets.Load()
+	l := s.App.Get(r.PathValue("id"))
+	if lib == nil || l == nil || l.MapFile() == nil {
+		httpError(w, http.StatusNotFound, errors.New("no map or no game data"))
+		return
+	}
+	m := l.MapFile()
+	s.groundMu.Lock()
+	b := s.ground[m]
+	s.groundMu.Unlock()
+	if b == nil {
+		var err error
+		if b, err = lib.GroundJPEG(m); err != nil {
+			code := http.StatusInternalServerError
+			if errors.Is(err, assets.ErrNoModel) {
+				code = http.StatusNotFound
+			}
+			httpError(w, code, err)
+			return
+		}
+		s.groundMu.Lock()
+		if s.ground == nil {
+			s.ground = map[*mapfile.Map][]byte{}
+		}
+		s.ground[m] = b
+		s.groundMu.Unlock()
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.Write(b)
 }
 
 func (s *Server) library(w http.ResponseWriter, r *http.Request) {

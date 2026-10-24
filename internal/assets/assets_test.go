@@ -5,11 +5,14 @@ package assets
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/OWNER/ghostreel/internal/casc"
 	"github.com/OWNER/ghostreel/internal/gamedata"
+	"github.com/OWNER/ghostreel/internal/mapfile"
 )
 
 const cascDir = "../../testdata/casc"
@@ -118,5 +121,29 @@ func TestTerrainTextures(t *testing.T) {
 	}
 	if ok == 0 {
 		t.Error("no terrain texture converted")
+	}
+}
+
+func TestGround(t *testing.T) {
+	l := openLib(t)
+	paths, _ := filepath.Glob("../../testdata/maps/*.SC2Map")
+	if len(paths) == 0 {
+		t.Skip("no maps in testdata/maps")
+	}
+	for _, p := range paths {
+		m, err := mapfile.Open(p)
+		if err != nil || m.Masks == nil {
+			continue
+		}
+		start := time.Now()
+		b, err := l.GroundJPEG(m)
+		if err != nil {
+			t.Errorf("%s: %v", filepath.Base(p), err)
+			continue
+		}
+		t.Logf("%s: %d KiB in %v", filepath.Base(p), len(b)/1024, time.Since(start).Round(time.Millisecond))
+		if out := os.Getenv("GHOSTREEL_GROUND_OUT"); out != "" {
+			os.WriteFile(filepath.Join(out, filepath.Base(p)+".jpg"), b, 0o644)
+		}
 	}
 }

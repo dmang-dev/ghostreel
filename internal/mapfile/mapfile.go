@@ -33,6 +33,8 @@ type Map struct {
 	// TerrainTextures are the terrain's texture layers (CTerrainTex ids),
 	// base layer first, from t3Terrain.xml.
 	TerrainTextures []string
+	// Masks are the painted texture layers; nil when the map has none.
+	Masks *TextureMasks
 
 	// Heights holds terrain heights at cell corners: (Width+1)*(Height+1)
 	// values in game units.
@@ -176,6 +178,14 @@ func Decode(a ReadFile) (*Map, error) {
 			warn("t3Terrain.xml", err)
 		} else {
 			mp.TerrainTextures = t.textures
+			if d := get("t3TextureMasks"); d != nil && t.textures != nil {
+				if masks, err := parseTextureMasks(d); err != nil {
+					warn("t3TextureMasks", err)
+				} else {
+					masks.Tiling = t.tiling
+					mp.Masks = masks
+				}
+			}
 			if d := get("t3HeightMap"); d != nil && mp.Heights != nil {
 				if visual, err = parseVisualHeights(d, mp.Width+1, mp.Height+1, t); err != nil {
 					warn("t3HeightMap", err)
