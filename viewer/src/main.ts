@@ -14,6 +14,7 @@ import type { Marker } from "./reports";
 import { UnitModels } from "./models";
 import { ReportsView } from "./reports";
 import { Scene } from "./scene";
+import { maskTextures } from "./ground";
 import { blankGrid, hillshade, minimapTerrain } from "./terrain";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -573,6 +574,34 @@ function loadGround(id: string): void {
     if (terrainMode === "shade") setTerrainMode("ground");
   };
   img.src = `/api/r/${id}/ground`;
+  void loadGroundLayers(id);
+}
+
+/**
+ * The map's texture layers and masks, so the scene can paint the ground on
+ * the GPU at the textures' full resolution (the composed image above is a
+ * fallback, and the minimap).
+ */
+async function loadGroundLayers(id: string): Promise<void> {
+  const info = cur?.map?.terrainMasks;
+  const names = cur?.map?.terrainTextures ?? [];
+  if (!info || !names.length) return;
+  try {
+    const loader = new THREE.TextureLoader();
+    const [planes, ...textures] = await Promise.all([
+      api.fetchMasks(id),
+      ...names.slice(0, 8).map((n) =>
+        n ? loader.loadAsync(`/api/assets/terrain/${encodeURIComponent(n)}`).catch(() => undefined) : Promise.resolve(undefined),
+      ),
+    ]);
+    const layers = planes && planes.length === info.width * info.height * 8
+      ? { masks: maskTextures(planes, info.width, info.height), textures: textures as (THREE.Texture | undefined)[], tiling: info.tiling }
+      : undefined;
+    if (cur?.summary.id === id && layers) scene.setGroundLayers(layers);
+    else for (const t of textures) (t as THREE.Texture | undefined)?.dispose();
+  } catch (e) {
+    console.warn("ground layers:", e);
+  }
 }
 
 window.addEventListener("keydown", (e) => {

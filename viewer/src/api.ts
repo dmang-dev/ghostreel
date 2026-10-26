@@ -62,6 +62,8 @@ export interface MapData {
   tileset: string;
   /** Terrain texture layers (ids for /api/assets/terrain), base first. */
   terrainTextures?: string[];
+  /** The painted texture masks (served by fetchMasks): size in texels, and texture repeats across the map (x, y) then offsets in cells. */
+  terrainMasks?: { width: number; height: number; tiling: number[] };
   startLocations: { X: number; Y: number }[] | null;
   objects: MapObject[];
   heights?: number[];
@@ -148,6 +150,13 @@ export async function fetchMap(id: string): Promise<MapData | null> {
   const resp = await apiFetch(`/api/r/${id}/map`);
   if (resp.status === 404) return null;
   return (await check(resp)).json();
+}
+
+/** The map's texture-mask planes (see MapData.terrainMasks), or null. */
+export async function fetchMasks(id: string): Promise<Uint8Array | null> {
+  const resp = await apiFetch(`/api/r/${id}/masks`);
+  if (!resp.ok || !resp.body) return null;
+  return new Uint8Array(await new Response(resp.body.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
 }
 
 /**

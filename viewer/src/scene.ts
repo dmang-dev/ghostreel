@@ -18,6 +18,7 @@
 // units there, like the in-game player view.
 
 import * as THREE from "three";
+import { disposeLayers, fineHeights, splat, SUB, type GroundLayers } from "./ground";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, isAlive, positionAt, type UnitState } from "./model";
 import type { UnitInstance, UnitModels } from "./models";
 
@@ -82,9 +83,11 @@ export class Scene {
   private creepTex?: THREE.DataTexture;
   private creepData?: Uint8Array;
   private creepKey = "";
+  private hasCreep = false;
   private pathable?: Uint8Array;
   private terrainTex?: THREE.CanvasTexture;
   private groundDetail?: THREE.Texture;
+  private groundLayers?: GroundLayers;
   private useDetail = true;
   private detailGain = 1;
   private fogTex?: THREE.DataTexture;
@@ -93,7 +96,7 @@ export class Scene {
   private model?: Model;
   private worldW = 1;
   private worldH = 1;
-  private heights?: Float32Array; // (w+1)*(h+1) corner heights, row 0 at y=0
+  private heights?: Float32Array; // smoothed heightfield, SUB vertices per cell (see ground.ts), row 0 at y=0
   private playerColors = new Map<number, THREE.Color>();
 
   private meshes2?: Meshes;
@@ -169,7 +172,7 @@ export class Scene {
     this.model = model;
     this.worldW = width;
     this.worldH = height;
-    this.heights = heights && heights.length === (width + 1) * (height + 1) ? Float32Array.from(heights) : undefined;
+    this.heights = heights && heights.length === (width + 1) * (height + 1) ? fineHeights(heights, width, height) : undefined;
     this.playerColors.clear();
     for (const p of model.tl.meta?.players ?? []) this.playerColors.set(p.id, new THREE.Color(p.color));
 
@@ -184,6 +187,7 @@ export class Scene {
     this.clearInstances();
     this.setDoodads(undefined);
     this.setGroundDetail(undefined);
+    this.setGroundLayers(undefined);
 
     this.fogData = new Uint8Array(width * height * 4);
     this.fogTex?.dispose();
@@ -197,11 +201,16 @@ export class Scene {
     this.creepTex.magFilter = this.creepTex.minFilter = THREE.LinearFilter;
     this.creepTex.needsUpdate = true;
     this.creepKey = "";
+    this.hasCreep = false;
     this.setTerrain(terrain);
     this.applyMode();
   }
 
-  /** Sets the terrain image; detail tiles the 3D ground texture over it. */
+  /**
+   * Sets the terrain image. detail tiles the 3D ground texture over it;
+   * without it the image is the painted ground, which the texture layers
+   * (setGroundLayers) replace once they've loaded.
+   */
   setTerrain(canvas: HTMLCanvasElement, detail = true): void {
     this.useDetail = detail;
     for (const m of [this.terrain2, this.terrain3, this.fogMesh2, this.fogMesh3, this.creepMesh2, this.creepMesh3]) {
@@ -214,7 +223,7 @@ export class Scene {
     this.terrainTex?.dispose();
     this.terrainTex = new THREE.CanvasTexture(canvas);
     this.terrainTex.colorSpace = THREE.SRGBColorSpace;
-    this.terrainTex.anisotropy = 8;
+    this.terrainTex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
 
     // 2D: a flat plane.
     const flat = new THREE.PlaneGeometry(this.worldW, this.worldH);
@@ -225,7 +234,7 @@ export class Scene {
     // 3D: the same texture on a heightfield, lit.
     const field = this.heightfield();
     this.terrain3 = new THREE.Mesh(field, new THREE.MeshLambertMaterial({ map: this.terrainTex }));
-    this.applyGroundDetail();
+    this.applyGround();
 
     // Fog overlays: black, with the fog texture as per-cell opacity.
     const fogMat = () => new THREE.MeshBasicMaterial({
@@ -256,9 +265,8 @@ export class Scene {
 
   /**
    * Tiles a ground texture (the map's base terrain layer) over the 3D
-   * terrain, colored by the terrain image's shading. The game blends several
-   * layers by painted masks; those aren't decoded yet, so one layer stands
-   * in for all of them.
+   * terrain, colored by the terrain image's shading: texture for the
+   * Shaded and Minimap terrain, which aren't the painted ground.
    */
   setGroundDetail(tex: THREE.Texture | undefined): void {
     this.groundDetail?.dispose();
@@ -268,12 +276,43 @@ export class Scene {
       tex.colorSpace = THREE.SRGBColorSpace;
       this.detailGain = Math.min(3, 0.5 / Math.max(averageLuminance(tex.image as CanvasImageSource & { width: number; height: number }), 0.05));
     }
-    this.applyGroundDetail();
+    this.applyGround();
   }
 
-  private applyGroundDetail(): void {
+  /** The map's texture layers and masks, to paint the ground on the GPU. */
+  setGroundLayers(layers: GroundLayers | undefined): void {
+    if (this.groundLayers) disposeLayers(this.groundLayers);
+    this.groundLayers = layers;
+    const aniso = this.renderer.capabilities.getMaxAnisotropy();
+    for (const t of layers?.textures ?? []) {
+      if (!t) continue;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = aniso;
+      t.needsUpdate = true;
+    }
+    this.applyGround();
+  }
+
+  /** Sets up the terrain materials for the ground in use. */
+  private applyGround(): void {
+    const layers = this.useDetail ? undefined : this.groundLayers;
+    const flat = this.terrain2?.material as THREE.MeshBasicMaterial | undefined;
+    if (flat) {
+      flat.onBeforeCompile = (shader) => {
+        if (layers) splat(shader, layers, this.worldW, this.worldH, false);
+      };
+      flat.customProgramCacheKey = () => (layers ? "ground-layers" : "ground");
+      flat.needsUpdate = true;
+    }
     const mat = this.terrain3?.material as THREE.MeshLambertMaterial | undefined;
     if (!mat) return;
+    if (layers) {
+      mat.onBeforeCompile = (shader) => splat(shader, layers, this.worldW, this.worldH, true);
+      mat.customProgramCacheKey = () => "ground-layers";
+      mat.needsUpdate = true;
+      return;
+    }
     const tex = this.useDetail ? this.groundDetail : undefined;
     mat.onBeforeCompile = (shader) => {
       if (!tex) return;
@@ -297,33 +336,32 @@ export class Scene {
     mat.needsUpdate = true;
   }
 
-  /** A plane with one vertex per terrain corner, raised to the map's heights. */
+  /** A plane with SUB vertices per cell, raised to the smoothed heights. */
   private heightfield(): THREE.BufferGeometry {
-    const w = this.worldW;
-    const h = this.worldH;
-    const geo = new THREE.PlaneGeometry(w, h, w, h);
+    const fw = this.worldW * SUB;
+    const fh = this.worldH * SUB;
+    const geo = new THREE.PlaneGeometry(this.worldW, this.worldH, fw, fh);
     const pos = geo.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < pos.count; i++) {
-      const col = i % (w + 1);
-      const row = Math.floor(i / (w + 1)); // PlaneGeometry rows run top to bottom
-      const y = h - row;
-      pos.setXYZ(i, col, y, this.heights ? this.heights[y * (w + 1) + col] : 0);
+      const col = i % (fw + 1);
+      const row = fh - Math.floor(i / (fw + 1)); // PlaneGeometry rows run top to bottom
+      pos.setXYZ(i, col / SUB, row / SUB, this.heights ? this.heights[row * (fw + 1) + col] : 0);
     }
     pos.needsUpdate = true;
     geo.computeVertexNormals();
     return geo;
   }
 
-  /** Terrain height at a point (bilinear between corners), 0 without a map. */
+  /** Height of the drawn ground at a point (bilinear), 0 without a map. */
   heightAt(x: number, y: number): number {
     const hs = this.heights;
     if (!hs) return 0;
-    const w = this.worldW;
-    const cx = Math.min(Math.max(x, 0), w - 1e-3);
-    const cy = Math.min(Math.max(y, 0), this.worldH - 1e-3);
+    const fw = this.worldW * SUB;
+    const cx = Math.min(Math.max(x * SUB, 0), fw - 1e-3);
+    const cy = Math.min(Math.max(y * SUB, 0), this.worldH * SUB - 1e-3);
     const x0 = Math.floor(cx), y0 = Math.floor(cy);
     const fx = cx - x0, fy = cy - y0;
-    const at = (xx: number, yy: number) => hs[yy * (w + 1) + xx];
+    const at = (xx: number, yy: number) => hs[yy * (fw + 1) + xx];
     return (at(x0, y0) * (1 - fx) + at(x0 + 1, y0) * fx) * (1 - fy) + (at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx) * fy;
   }
 
@@ -337,13 +375,18 @@ export class Scene {
     const three = this.mode === "3d";
     if (this.terrain2) this.terrain2.visible = !three;
     if (this.terrain3) this.terrain3.visible = three;
-    if (this.creepMesh2) this.creepMesh2.visible = !three;
-    if (this.creepMesh3) this.creepMesh3.visible = three;
+    this.updateCreepVisibility();
     this.meshes2?.setVisible(!three);
     this.meshes3?.setVisible(three);
     if (this.doodads) this.doodads.visible = three;
     this.selection2.visible = this.selection3.visible = false;
     this.updateFogVisibility();
+  }
+
+  /** The creep overlays draw only while there is creep. */
+  private updateCreepVisibility(): void {
+    if (this.creepMesh2) this.creepMesh2.visible = this.hasCreep && this.mode === "2d";
+    if (this.creepMesh3) this.creepMesh3.visible = this.hasCreep && this.mode === "3d";
   }
 
   private updateFogVisibility(): void {
@@ -640,6 +683,8 @@ export class Scene {
       }
     }
     this.creepTex!.needsUpdate = true;
+    this.hasCreep = sources.length > 0;
+    this.updateCreepVisibility();
   }
 
   /** Units drawn in the last frame (hidden ones excluded). */
