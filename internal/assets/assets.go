@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/draw"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -361,7 +362,9 @@ func (l *Library) texture(path string) image.Image {
 }
 
 // TerrainPNG returns a terrain texture layer (a CTerrainTex id, as a map's
-// t3Terrain.xml names them) as PNG.
+// t3Terrain.xml names them) as an opaque PNG. The alpha channel holds
+// something other than coverage, and browsers that premultiply it would
+// darken the colors.
 func (l *Library) TerrainPNG(id string) ([]byte, error) {
 	if !safeName.MatchString(id) {
 		return nil, ErrNoModel
@@ -370,7 +373,20 @@ func (l *Library) TerrainPNG(id string) ([]byte, error) {
 	if !ok || path == "" {
 		return nil, ErrNoModel
 	}
-	return l.encodePNG(path)
+	img := l.texture(path)
+	if img == nil {
+		return nil, fmt.Errorf("%w (%s is not in the game data)", ErrNoModel, path)
+	}
+	rgba := image.NewNRGBA(img.Bounds()) // a copy: img may be shared
+	draw.Draw(rgba, rgba.Rect, img, img.Bounds().Min, draw.Src)
+	for i := 3; i < len(rgba.Pix); i += 4 {
+		rgba.Pix[i] = 255
+	}
+	var out bytes.Buffer
+	if err := png.Encode(&out, rgba); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }
 
 func (l *Library) encodePNG(path string) ([]byte, error) {

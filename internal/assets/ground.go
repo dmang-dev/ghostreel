@@ -65,10 +65,8 @@ func (l *Library) composeGround(m *mapfile.Map) (*image.NRGBA, error) {
 	out := image.NewNRGBA(image.Rect(0, 0, w, h))
 	// Texels per cell in the masks (4 across, 8 up on every map seen).
 	su, sv := float64(mk.W)/float64(m.Width), float64(mk.H)/float64(m.Height)
-	tx, ty, ox, oy := mk.Tiling[0], mk.Tiling[1], mk.Tiling[2], mk.Tiling[3]
-	if tx == 0 || ty == 0 {
-		tx, ty = float64(m.Width)*3/32, float64(m.Height)*3/32 // a repeat every ~10.7 cells
-	}
+	t := m.GroundTiling()
+	tx, ty, ox, oy := t[0], t[1], t[2], t[3]
 	weights := make([]float64, len(mk.Layers))
 	for py := 0; py < h; py++ {
 		y := float64(m.Height) - (float64(py)+0.5)/float64(ppc) // cells, up

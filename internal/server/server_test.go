@@ -4,7 +4,9 @@ package server
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -77,6 +79,14 @@ func TestOpenReplayAndFetch(t *testing.T) {
 	if code, _ := get(t, ts.URL+"/api/r/"+s.ID+"/map"); code != 404 {
 		t.Errorf("map without a map: %d", code)
 	}
+	// Replay data isn't cached by the browser: the map can change under the
+	// same id.
+	if r, err := http.Get(ts.URL + "/api/r/" + s.ID + "/timeline"); err == nil {
+		if cc := r.Header.Get("Cache-Control"); cc != "no-cache" {
+			t.Errorf("timeline Cache-Control %q", cc)
+		}
+		r.Body.Close()
+	}
 	code, body := get(t, ts.URL+"/api/r/"+s.ID+"/analysis")
 	if code != 200 || !strings.Contains(string(body), `"plugin":"build-order"`) || !strings.Contains(string(body), `"plugin":"battles"`) {
 		t.Errorf("analysis: %d %.200s", code, body)
@@ -92,9 +102,29 @@ func TestOpenReplayAndFetch(t *testing.T) {
 		t.Fatalf("set map: %d %+v", resp.StatusCode, s2)
 	}
 	code, mj := get(t, ts.URL+"/api/r/"+s.ID+"/map")
-	var m struct{ Width, Height int }
+	var m struct {
+		Width, Height int
+		TerrainMasks  *struct{ Width, Height int }
+	}
 	if code != 200 || json.Unmarshal(mj, &m) != nil || m.Width != 200 || m.Height != 176 {
 		t.Fatalf("map: %d %+v", code, m)
+	}
+	// The texture masks: two RGBA planes, gzipped.
+	code, gz := get(t, ts.URL+"/api/r/"+s.ID+"/masks")
+	if m.TerrainMasks == nil {
+		if code != 404 {
+			t.Errorf("masks without masks: %d", code)
+		}
+	} else {
+		zr, err := gzip.NewReader(bytes.NewReader(gz))
+		if code != 200 || err != nil {
+			t.Fatalf("masks: %d %v", code, err)
+		}
+		planes, err := io.ReadAll(zr)
+		if want := m.TerrainMasks.Width * m.TerrainMasks.Height * 8; err != nil || len(planes) != want {
+			t.Errorf("masks: %d bytes (%v), want %d", len(planes), err, want)
+		}
+		t.Logf("masks: %d KiB gzipped", len(gz)/1024)
 	}
 	if code, png := get(t, ts.URL+"/api/r/"+s.ID+"/minimap"); code != 200 || !bytes.HasPrefix(png, []byte("\x89PNG")) {
 		t.Errorf("minimap: %d", code)

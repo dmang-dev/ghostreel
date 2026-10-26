@@ -213,3 +213,46 @@ func TestResourcesMatchReplay(t *testing.T) {
 		t.Errorf("replay resources %d, matched in map %d, map resources %d", total, matched, len(fromMap))
 	}
 }
+
+func TestMaskPlanes(t *testing.T) {
+	m := &TextureMasks{W: 2, H: 1}
+	for l := 0; l < 8; l++ {
+		m.Layers = append(m.Layers, []uint8{uint8(10*l + 1), uint8(10*l + 2)})
+	}
+	p := m.Planes()
+	if len(p) != 2*2*4 {
+		t.Fatalf("planes are %d bytes, want 16", len(p))
+	}
+	// Texel 1 of the first plane is layers 0-3 there; texel 0 of the
+	// second is layers 4-7.
+	if got := p[4:8]; got[0] != 2 || got[1] != 12 || got[2] != 22 || got[3] != 32 {
+		t.Errorf("plane 0 texel 1 = %v", got)
+	}
+	if got := p[8:12]; got[0] != 41 || got[1] != 51 || got[2] != 61 || got[3] != 71 {
+		t.Errorf("plane 1 texel 0 = %v", got)
+	}
+	// Fewer layers leave the rest at 0.
+	m.Layers = m.Layers[:3]
+	if p := m.Planes(); p[3] != 0 || p[8] != 0 {
+		t.Errorf("missing layers not 0: %v", p)
+	}
+}
+
+func TestGroundTiling(t *testing.T) {
+	m := &Map{Width: 160, Height: 128}
+	if got := m.GroundTiling(); got != [4]float64{15, 12, 0, 0} {
+		t.Errorf("without masks: %v", got)
+	}
+	m.Masks = &TextureMasks{W: 640, H: 1024, Tiling: [4]float64{14.25, 15.75, 1, 2}}
+	if got := m.GroundTiling(); got != m.Masks.Tiling {
+		t.Errorf("from the map: %v", got)
+	}
+	e := m.Export(false).TerrainMasks
+	if e == nil || e.Width != 640 || e.Height != 1024 || e.Tiling != m.Masks.Tiling {
+		t.Errorf("export: %+v", e)
+	}
+	m.Masks.Tiling = [4]float64{}
+	if got := m.GroundTiling(); got != [4]float64{15, 12, 0, 0} {
+		t.Errorf("unset in the map: %v", got)
+	}
+}

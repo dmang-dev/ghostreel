@@ -23,9 +23,11 @@
 //	GET  /api/assets/model/{id}    binary glTF of a model by id, ?v= variation (doodads)
 //	GET  /api/assets/terrain/{id}  PNG terrain texture layer (map JSON's terrainTextures)
 //	GET  /api/r/{id}/ground        JPEG of the map's painted ground, from the game's textures
+//	GET  /api/r/{id}/masks         gzipped texture-mask planes (map JSON's terrainMasks)
 package server
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"io"
@@ -170,6 +172,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/assets/icon/{type}", s.asset("image/png", (*assets.Library).IconPNG))
 	mux.HandleFunc("GET /api/assets/terrain/{type}", s.asset("image/png", (*assets.Library).TerrainPNG))
 	mux.HandleFunc("GET /api/r/{id}/ground", s.groundImage)
+	mux.HandleFunc("GET /api/r/{id}/masks", s.masks)
 	mux.HandleFunc("GET /api/assets/model/{type}", func(w http.ResponseWriter, r *http.Request) {
 		v, _ := strconv.Atoi(r.URL.Query().Get("v"))
 		s.asset("model/gltf-binary", func(l *assets.Library, id string) ([]byte, error) {
@@ -236,8 +239,23 @@ func (s *Server) groundImage(w http.ResponseWriter, r *http.Request) {
 		s.groundMu.Unlock()
 	}
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.Header().Set("Cache-Control", "no-cache") // as blob: depends on the map in use
 	w.Write(b)
+}
+
+// masks serves the map's texture masks, for blending the ground textures
+// on the GPU. They're map data, so no game data is needed.
+func (s *Server) masks(w http.ResponseWriter, r *http.Request) {
+	l := s.App.Get(r.PathValue("id"))
+	if l == nil || l.MapFile() == nil || l.MapFile().Masks == nil {
+		httpError(w, http.StatusNotFound, errors.New("no texture masks for this replay"))
+		return
+	}
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Cache-Control", "no-cache") // as blob: depends on the map in use
+	z, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+	z.Write(l.MapFile().Masks.Planes())
+	z.Close()
 }
 
 func (s *Server) library(w http.ResponseWriter, r *http.Request) {
@@ -337,7 +355,9 @@ func (s *Server) blob(pick func(*app.Loaded) ([]byte, string)) http.HandlerFunc 
 			return
 		}
 		w.Header().Set("Content-Type", ctype)
-		w.Header().Set("Cache-Control", "private, max-age=3600")
+		// Not cached: these change when the replay's map is picked or
+		// downloaded, and when ghostreel is upgraded, under the same id.
+		w.Header().Set("Cache-Control", "no-cache")
 		w.Write(data)
 	}
 }

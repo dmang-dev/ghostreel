@@ -3,7 +3,9 @@
 package assets
 
 import (
+	"bytes"
 	"errors"
+	"image/png"
 	"os"
 	"path/filepath"
 	"sync"
@@ -117,7 +119,21 @@ func TestTerrainTextures(t *testing.T) {
 			continue
 		}
 		ok++
-		t.Logf("%s: %d bytes", id, len(b))
+		img, err := png.Decode(bytes.NewReader(b))
+		if err != nil {
+			t.Errorf("%s: %v", id, err)
+			continue
+		}
+		// Opaque, so browsers don't premultiply the colors away.
+		r := img.Bounds()
+		for y := r.Min.Y; y < r.Max.Y; y++ {
+			for x := r.Min.X; x < r.Max.X; x++ {
+				if _, _, _, a := img.At(x, y).RGBA(); a != 0xffff {
+					t.Fatalf("%s: alpha %d at %d,%d", id, a>>8, x, y)
+				}
+			}
+		}
+		t.Logf("%s: %dx%d, %d bytes", id, r.Dx(), r.Dy(), len(b))
 	}
 	if ok == 0 {
 		t.Error("no terrain texture converted")

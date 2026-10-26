@@ -185,6 +185,38 @@ type TextureMasks struct {
 	Tiling [4]float64
 }
 
+// Planes packs the layers for a GPU: two RGBA images of W x H texels,
+// layers 0-3 in the first and 4-7 in the second, rows from the bottom of
+// the map.
+func (m *TextureMasks) Planes() []byte {
+	per := m.W * m.H
+	out := make([]byte, 2*per*4)
+	for l, layer := range m.Layers {
+		if l >= 8 {
+			break
+		}
+		plane := out[(l/4)*per*4:]
+		for i, v := range layer {
+			plane[i*4+l%4] = v
+		}
+	}
+	return out
+}
+
+// GroundTiling is how the texture layers tile: repeats across the map
+// (x, y), then offsets in cells. Maps that don't say repeat about every
+// 10.7 cells.
+func (m *Map) GroundTiling() [4]float64 {
+	var t [4]float64
+	if m.Masks != nil {
+		t = m.Masks.Tiling
+	}
+	if t[0] == 0 || t[1] == 0 {
+		t[0], t[1] = float64(m.Width)*3/32, float64(m.Height)*3/32
+	}
+	return t
+}
+
 // parseTextureMasks reads t3TextureMasks: "MASK", version 0x66, u32 at 12
 // and 16 (texel width x2 and height), 64-byte header, then 8 layers one
 // after another. A layer is 32x32-byte tiles in strips two tiles high: down
