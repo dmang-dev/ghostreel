@@ -35,6 +35,8 @@ type Map struct {
 	TerrainTextures []string
 	// Masks are the painted texture layers; nil when the map has none.
 	Masks *TextureMasks
+	// Cliffs are where the game draws cliff models; nil when unknown.
+	Cliffs *Cliffs
 
 	// Heights holds terrain heights at cell corners: (Width+1)*(Height+1)
 	// values in game units.
@@ -187,8 +189,13 @@ func Decode(a ReadFile) (*Map, error) {
 				}
 			}
 			if d := get("t3HeightMap"); d != nil && mp.Heights != nil {
-				if visual, err = parseVisualHeights(d, mp.Width+1, mp.Height+1, t); err != nil {
+				var levels []uint8
+				if visual, levels, err = parseVisualHeights(d, mp.Width+1, mp.Height+1, t); err != nil {
 					warn("t3HeightMap", err)
+				} else if c, err := newCliffs(mp.Width, mp.Height, t, levels); err != nil {
+					warn("cliffs", err)
+				} else {
+					mp.Cliffs = c
 				}
 			}
 		}

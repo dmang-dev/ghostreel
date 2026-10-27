@@ -28,6 +28,7 @@ type Model struct {
 	Name      string // the artist's source file name
 	Bones     []Bone
 	Vertices  []Vertex
+	HasColor  bool // the vertices carry colors (Vertex.Color)
 	Meshes    []Mesh
 	Materials []Material
 	Sequences []Sequence
@@ -56,6 +57,9 @@ type Vertex struct {
 	UV      [2]float32
 	Joints  [4]uint16 // bone indices
 	Weights [4]float32
+	// Color is the vertex color, RGBA 0-255, when the model has one
+	// (Model.HasColor); cliff pieces fade into the terrain by its alpha.
+	Color [4]uint8
 }
 
 // Mesh is one drawn batch: a run of triangles with one material.
@@ -401,11 +405,11 @@ func (m *Model) MergeAnimations(a *Model) {
 // parts we read (-1 when absent) for a model's vertex_flags.
 type vertexLayout struct {
 	size, weights, lookups, influences int
-	normal, normalF, uv, uvF           int
+	normal, normalF, uv, uvF, color    int
 }
 
 func layoutFor(flags uint32) vertexLayout {
-	l := vertexLayout{weights: -1, lookups: -1, normal: -1, normalF: -1, uv: -1, uvF: -1}
+	l := vertexLayout{weights: -1, lookups: -1, normal: -1, normalF: -1, uv: -1, uvF: -1, color: -1}
 	add := func(n int) int { o := l.size; l.size += n; return o }
 	if flags&0x1 != 0 {
 		add(12) // position
@@ -428,7 +432,10 @@ func layoutFor(flags uint32) vertexLayout {
 	}
 	for _, bit := range []uint32{0x100, 0x200, 0x400, 0x800, 0x1000} {
 		if flags&bit != 0 {
-			add(4) // vertex color and unknowns
+			o := add(4) // vertex color (0x200) and unknowns
+			if bit == 0x200 {
+				l.color = o
+			}
 		}
 	}
 	for i, bit := range []uint32{0x2000, 0x4000, 0x8000, 0x10000} {
@@ -488,6 +495,7 @@ func (f *file) meshes(m *Model, field func(string) int) error {
 	}
 	nv := int(vr.count) / l.size
 	raw := make([]Vertex, nv)
+	m.HasColor = l.color >= 0
 	luts := make([][4]uint8, nv)
 	for i := range raw {
 		o := int(vs.offset) + i*l.size
@@ -508,6 +516,11 @@ func (f *file) meshes(m *Model, field func(string) int) error {
 			for k := 0; k < 3; k++ {
 				v.Normal[k] = f.f32(o + l.normalF + 4*k)
 			}
+		}
+		if l.color >= 0 {
+			// Stored BGRA.
+			c := f.b[o+l.color : o+l.color+4]
+			v.Color = [4]uint8{c[2], c[1], c[0], c[3]}
 		}
 		switch {
 		case l.uv >= 0:

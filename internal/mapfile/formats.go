@@ -128,6 +128,15 @@ type terrainXML struct {
 	bias, scale, standard float64 // t3HeightMap quantization
 	textures              []string
 	tiling                [4]float64 // texture repeats across the map (x, y) and offsets
+	cliffSets             []string   // CCliff ids, by index
+	cliffCells            []cliffCellXML
+}
+
+type cliffCellXML struct {
+	I    int `xml:"i,attr"`
+	F    int `xml:"f,attr"`
+	Cid  int `xml:"cid,attr"`
+	Cvar int `xml:"cvar,attr"`
 }
 
 // parseTerrainXML reads what t3Terrain.xml says about the visual height map
@@ -146,6 +155,11 @@ func parseTerrainXML(d []byte) (terrainXML, error) {
 				I    int    `xml:"i,attr"`
 				Name string `xml:"name,attr"`
 			} `xml:"textureList>texture"`
+			CliffSets []struct {
+				I    int    `xml:"i,attr"`
+				Name string `xml:"name,attr"`
+			} `xml:"cliffSetList>cliffSet"`
+			CliffCells []cliffCellXML `xml:"cliffCellList>cc"`
 		} `xml:"heightMap"`
 	}
 	if err := unmarshalXML(d, &x); err != nil {
@@ -165,6 +179,15 @@ func parseTerrainXML(d []byte) (terrainXML, error) {
 	if found {
 		t.textures = names
 	}
+	for _, c := range x.HeightMap.CliffSets {
+		if c.I >= 0 && c.I < 256 {
+			for len(t.cliffSets) <= c.I {
+				t.cliffSets = append(t.cliffSets, "")
+			}
+			t.cliffSets[c.I] = c.Name
+		}
+	}
+	t.cliffCells = x.HeightMap.CliffCells
 	for i, f := range strings.Fields(x.HeightMap.UVTiling) {
 		if i < 4 {
 			t.tiling[i], _ = strconv.ParseFloat(f, 64)
@@ -258,27 +281,30 @@ func parseTextureMasks(d []byte) (*TextureMasks, error) {
 // parseVisualHeights reads t3HeightMap: "HMAP", u32 version, u32 w, u32 h
 // (vertices), header up to len - w*h*6, then 6 bytes per vertex: u16 (not
 // understood), u16 quantized height, u16 cliff level. Height = q * scale +
-// standardHeight - bias, with the parameters from t3Terrain.xml.
-func parseVisualHeights(d []byte, w, h int, t terrainXML) ([]float32, error) {
+// standardHeight - bias, with the parameters from t3Terrain.xml. Returns
+// the heights and the cliff levels, row 0 at the bottom.
+func parseVisualHeights(d []byte, w, h int, t terrainXML) ([]float32, []uint8, error) {
 	if err := checkMagic(d, "HMAP"); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if t.scale == 0 {
-		return nil, fmt.Errorf("no quantization in t3Terrain.xml")
+		return nil, nil, fmt.Errorf("no quantization in t3Terrain.xml")
 	}
 	fw, fh := int(le.Uint32(d[8:])), int(le.Uint32(d[12:]))
 	if fw != w || fh != h {
-		return nil, fmt.Errorf("grid %dx%d, want %dx%d vertices", fw, fh, w, h)
+		return nil, nil, fmt.Errorf("grid %dx%d, want %dx%d vertices", fw, fh, w, h)
 	}
 	hdr := len(d) - w*h*6
 	if hdr < 16 {
-		return nil, fmt.Errorf("size %d too small for %dx%d", len(d), w, h)
+		return nil, nil, fmt.Errorf("size %d too small for %dx%d", len(d), w, h)
 	}
 	out := make([]float32, w*h)
+	levels := make([]uint8, w*h)
 	for i := range out {
 		out[i] = float32(float64(le.Uint16(d[hdr+i*6+2:]))*t.scale + t.standard - t.bias)
+		levels[i] = uint8(min(le.Uint16(d[hdr+i*6+4:]), 255))
 	}
-	return out, nil
+	return out, levels, nil
 }
 
 // parseCliffLevels reads t3SyncCliffLevel: "CLIF", u32 version, u32 w, u32 h

@@ -130,6 +130,13 @@ func TestOpenReplayAndFetch(t *testing.T) {
 	if code, png := get(t, ts.URL+"/api/r/"+s.ID+"/minimap"); code != 200 || !bytes.HasPrefix(png, []byte("\x89PNG")) {
 		t.Errorf("minimap: %d", code)
 	}
+	// Cliff pieces come from the game data, which this server hasn't got.
+	if code, _ := get(t, ts.URL+"/api/r/"+s.ID+"/cliffs"); code != 404 {
+		t.Errorf("cliffs without game data: %d", code)
+	}
+	if code, _ := get(t, ts.URL+"/api/assets/cliff/CliffNatural0Ex1/aabb"); code != 404 {
+		t.Errorf("cliff piece without game data: %d", code)
+	}
 
 	// A wrong map is rejected.
 	other, err := os.ReadFile(filepath.Join(testdata, "maps", "DefeatMarines.SC2Map"))

@@ -33,6 +33,9 @@
 //	GET  /api/assets/terrain/{id}  PNG terrain texture layer (map JSON's terrainTextures)
 //	GET  /api/r/{id}/ground        JPEG of the map's painted ground, from the game's textures
 //	GET  /api/r/{id}/masks         gzipped texture-mask planes (map JSON's terrainMasks)
+//	GET  /api/r/{id}/cliffs        JSON of the map's cliff pieces (assets.CliffLayout)
+//	GET  /api/assets/cliff/{mesh}/{piece}  binary glTF of a cliff piece, ?v= variation
+//	GET  /api/assets/cliffmaterial/{set}   binary glTF of a cliff set's material model
 package server
 
 import (
@@ -310,6 +313,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/assets/terrain/{type}", s.asset("image/png", (*assets.Library).TerrainPNG))
 	mux.HandleFunc("GET /api/r/{id}/ground", s.groundImage)
 	mux.HandleFunc("GET /api/r/{id}/masks", s.masks)
+	mux.HandleFunc("GET /api/r/{id}/cliffs", s.cliffs)
+	mux.HandleFunc("GET /api/assets/cliff/{mesh}/{piece}", func(w http.ResponseWriter, r *http.Request) {
+		v, _ := strconv.Atoi(r.URL.Query().Get("v"))
+		mesh := r.PathValue("mesh")
+		s.asset("model/gltf-binary", func(l *assets.Library, piece string) ([]byte, error) {
+			return l.CliffGLB(mesh, piece, v)
+		}, "piece")(w, r)
+	})
+	mux.HandleFunc("GET /api/assets/cliffmaterial/{type}", s.asset("model/gltf-binary", (*assets.Library).CliffMaterialGLB))
 	mux.HandleFunc("GET /api/assets/model/{type}", func(w http.ResponseWriter, r *http.Request) {
 		v, _ := strconv.Atoi(r.URL.Query().Get("v"))
 		s.asset("model/gltf-binary", func(l *assets.Library, id string) ([]byte, error) {
@@ -322,16 +334,21 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-// asset serves one converted asset. Models are immutable for a game build,
-// so the viewer may cache them.
-func (s *Server) asset(mime string, get func(*assets.Library, string) ([]byte, error)) http.HandlerFunc {
+// asset serves one converted asset, named by the path value param ("type"
+// when not given). Models are immutable for a game build, so the viewer may
+// cache them.
+func (s *Server) asset(mime string, get func(*assets.Library, string) ([]byte, error), param ...string) http.HandlerFunc {
+	name := "type"
+	if len(param) > 0 {
+		name = param[0]
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		l := s.assets.Load()
 		if l == nil {
 			httpError(w, http.StatusNotFound, errors.New("no game data: 3D models are unavailable"))
 			return
 		}
-		b, err := get(l, r.PathValue("type"))
+		b, err := get(l, r.PathValue(name))
 		if err != nil {
 			code := http.StatusInternalServerError
 			if errors.Is(err, assets.ErrNoModel) || errors.Is(err, os.ErrNotExist) || errors.Is(err, casc.ErrNotLocal) {

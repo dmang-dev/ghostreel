@@ -46,6 +46,7 @@ type Library struct {
 	models   *catalog
 	buttons  *catalog
 	terrain  *catalog          // CTerrainTex: terrain texture layers
+	cliffs   *catalog          // CCliff and CCliffMesh: cliff sets and their pieces
 	actorOf  map[string]string // unit type → actor id
 
 	mu      sync.Mutex
@@ -71,7 +72,7 @@ func Open(installDir, cacheDir string) (*Library, error) {
 	}
 	l := &Library{
 		st: st, cacheDir: cacheDir, files: map[string]string{},
-		actors: newCatalog(), models: newCatalog(), buttons: newCatalog(), terrain: newCatalog(),
+		actors: newCatalog(), models: newCatalog(), buttons: newCatalog(), terrain: newCatalog(), cliffs: newCatalog(),
 		actorOf: map[string]string{}, pending: map[string]*result{},
 	}
 	l.build = strings.Fields(st.Config["build-name"] + " unknown")[0]
@@ -105,6 +106,8 @@ func Open(installDir, cacheDir string) (*Library, error) {
 			{"modeldata.xml", l.models, func(c string) bool { return c == "CModel" }},
 			{"buttondata.xml", l.buttons, func(c string) bool { return c == "CButton" }},
 			{"terraintexdata.xml", l.terrain, func(c string) bool { return c == "CTerrainTex" }},
+			{"cliffdata.xml", l.cliffs, func(c string) bool { return c == "CCliff" }},
+			{"cliffmeshdata.xml", l.cliffs, func(c string) bool { return c == "CCliffMesh" }},
 		} {
 			b, err := st.ReadFile(dir + f.file)
 			if err != nil {
@@ -275,7 +278,8 @@ func (l *Library) cached(key string, resolve func() (string, []string, error)) (
 		if err != nil {
 			return nil, err
 		}
-		b, err := l.convert(name, anims)
+		// Cliff pieces fade into the terrain by their vertex alpha.
+		b, err := l.convertWith(name, anims, strings.HasPrefix(key, "cliff."))
 		if errors.Is(err, m3.ErrNoGeometry) {
 			return nil, fmt.Errorf("%w (%s has no geometry)", ErrNoModel, name)
 		}
@@ -316,6 +320,12 @@ var skipSequence = regexp.MustCompile(`(?i)dance|victory|cheer|portrait|talk|fid
 // convert reads a model and the animation files it requires and converts
 // them to glTF.
 func (l *Library) convert(name string, anims []string) ([]byte, error) {
+	return l.convertWith(name, anims, false)
+}
+
+// convertWith converts a model; vertexAlpha keeps its vertex alpha (cliff
+// pieces).
+func (l *Library) convertWith(name string, anims []string, vertexAlpha bool) ([]byte, error) {
 	b, err := l.st.ReadFile(name)
 	if err != nil {
 		return nil, err
@@ -340,8 +350,9 @@ func (l *Library) convert(name string, anims []string) ([]byte, error) {
 		m.MergeAnimations(a)
 	}
 	return m.GLB(m3.GLBOptions{
-		Texture:   l.texture,
-		Sequences: func(s string) bool { return !skipSequence.MatchString(s) },
+		Texture:     l.texture,
+		Sequences:   func(s string) bool { return !skipSequence.MatchString(s) },
+		VertexAlpha: vertexAlpha,
 	})
 }
 

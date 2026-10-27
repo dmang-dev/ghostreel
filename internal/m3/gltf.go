@@ -24,6 +24,10 @@ type GLBOptions struct {
 	Texture func(path string) image.Image
 	// Sequences, when non-nil, selects the animations to keep by name.
 	Sequences func(name string) bool
+	// VertexAlpha exports the vertices' color alpha as COLOR_0 (white, with
+	// that alpha) when they have colors: cliff pieces fade into the
+	// terrain by it. Other models' vertex colors mean other things.
+	VertexAlpha bool
 }
 
 // The model's root node turns the game's z-up space into glTF's y-up; a
@@ -39,6 +43,7 @@ type glbWriter struct {
 const (
 	glFloat         = 5126
 	glUnsignedShort = 5123
+	glUnsignedByte  = 5121
 	glUnsignedInt   = 5125
 	glArrayBuffer   = 34962
 	glElementBuffer = 34963
@@ -154,6 +159,13 @@ func (m *Model) GLB(opt GLBOptions) ([]byte, error) {
 		"TEXCOORD_0": w.floats(uv, "VEC2", glArrayBuffer, false),
 		"WEIGHTS_0":  w.floats(wts, "VEC4", glArrayBuffer, false),
 		"JOINTS_0":   w.accessor(w.view(jnt, glArrayBuffer), glUnsignedShort, nv, "VEC4", nil),
+	}
+	if opt.VertexAlpha && m.HasColor {
+		col := make([]byte, 0, 4*nv)
+		for _, v := range m.Vertices {
+			col = append(col, 255, 255, 255, v.Color[3])
+		}
+		attrs["COLOR_0"] = w.accessor(w.view(col, glArrayBuffer), glUnsignedByte, nv, "VEC4", map[string]any{"normalized": true})
 	}
 
 	// Materials and textures.
