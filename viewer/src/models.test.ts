@@ -2,7 +2,7 @@
 
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { pickClip } from "./models";
+import { buildPose, pickClip, type ClipInfo } from "./models";
 
 const clips = (...names: string[]) =>
   names.map((name) => ({
@@ -34,5 +34,33 @@ describe("pickClip", () => {
 
   it("finds nothing for a rigid model", () => {
     expect(pickClip([], "stand")).toBeUndefined();
+  });
+});
+
+describe("buildPose", () => {
+  const clip = (name: string, duration: number, looping: boolean) =>
+    ({ clip: { name, duration } as THREE.AnimationClip, words: name.toLowerCase().split(/_|\s+/), looping, moveSpeed: 0 }) as ClipInfo;
+  const staged = [
+    clip("Build_A_Start", 3, false), clip("Build_A_Stand", 2, true),
+    clip("Build_B_Start", 3, false), clip("Build_B_Stand", 2, true),
+    clip("Build_C_Start", 3, false), clip("Build_C_Stand", 2, true),
+    clip("Build_D_Start", 2, false), clip("Stand", 1, true),
+  ].map((c) => ({ ...c, words: c.clip.name.toLowerCase().split("_") }));
+
+  it("steps through the stages over the build time", () => {
+    // 40 s build: 10 s per stage.
+    expect(buildPose(staged, 0.01, 40)).toMatchObject({ info: { clip: { name: "Build_A_Start" } } });
+    expect(buildPose(staged, 0.2, 40)).toMatchObject({ info: { clip: { name: "Build_A_Stand" } }, time: 5 });
+    expect(buildPose(staged, 0.51, 40)?.info.clip.name).toBe("Build_C_Start");
+    // The last stage holds its start clip's end.
+    const d = buildPose(staged, 0.99, 40)!;
+    expect(d.info.clip.name).toBe("Build_D_Start");
+    expect(d.time).toBeCloseTo(2, 2);
+  });
+
+  it("plays a birth clip over the build, or gives up", () => {
+    const birth = [clip("Birth", 4, false), clip("Stand", 1, true)].map((c) => ({ ...c, words: [c.clip.name.toLowerCase()] }));
+    expect(buildPose(birth, 0.5, 40)).toMatchObject({ info: { clip: { name: "Birth" } }, time: 2 });
+    expect(buildPose([clip("Stand", 1, true)], 0.5, 40)).toBeUndefined();
   });
 });

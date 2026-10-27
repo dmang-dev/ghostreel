@@ -25,6 +25,8 @@ export const LOOPS_PER_CLOCK_SECOND = 22.4;
 export const LOOPS_PER_GAME_SECOND = 16;
 /** Speed used for units of unknown speed (cells per game second). */
 export const DEFAULT_SPEED = 2.5;
+/** Build time assumed for a type no building of which finished (~45 s on the clock). */
+const DEFAULT_BUILD_LOOPS = 1000;
 
 export { UnitClass };
 export type { Timeline, Unit, UnitType, PlayerStats };
@@ -168,6 +170,8 @@ export class Model {
   readonly feed: FeedItem[] = [];
   /** Drawn mining for workers of players without orders (mining.ts). */
   readonly mining: Mining;
+  /** Typical construction time per type in loops, from buildings that finished. */
+  private readonly buildLoops = new Map<number, number>();
 
   /** opts.mining: false leaves workers where the timeline puts them (tests against Go). */
   constructor(tl: Timeline, opts: { mining?: boolean } = {}) {
@@ -179,6 +183,14 @@ export class Model {
     for (const t of tl.tracks) this.tracks[t.unitId] = t.keyframes;
     this.mining = new Mining(this.units, this.types, this.tracks, ownerAt, (t) => this.types[t]?.class === UnitClass.WORKER);
     if (opts.mining === false) this.mining.players.clear();
+    const durations = new Map<number, number[]>();
+    for (const u of this.units) {
+      if (!u.constructed || u.doneLoop === undefined) continue;
+      let d = durations.get(u.type);
+      if (!d) durations.set(u.type, (d = []));
+      d.push(u.doneLoop - u.bornLoop);
+    }
+    for (const [t, d] of durations) this.buildLoops.set(t, d.sort((a, b) => a - b)[d.length >> 1]);
     for (const e of tl.events) {
       const k = e.kind;
       switch (k.case) {
@@ -264,6 +276,21 @@ export class Model {
     const speed = this.types[t]?.speed ?? 0;
     positionAt(this.tracks[u.id], speed, loop, out);
     this.mining.apply(u, t, out.owner, this.tracks[u.id], loop, speed || DEFAULT_SPEED, out);
+  }
+
+  /**
+   * How far a building under construction has come at loop, 0-1: from its
+   * own finish when it has one, else its type's usual build time (for one
+   * cancelled or still unfinished at the end).
+   */
+  buildProgress(u: Unit, loop: number): number {
+    return Math.min(1, Math.max(0, (loop - u.bornLoop) / this.buildTotal(u)));
+  }
+
+  /** A building's whole construction time in loops (see buildProgress). */
+  buildTotal(u: Unit): number {
+    const total = u.doneLoop !== undefined ? u.doneLoop - u.bornLoop : this.buildLoops.get(u.type) ?? DEFAULT_BUILD_LOOPS;
+    return Math.max(total, 1);
   }
 
   /**

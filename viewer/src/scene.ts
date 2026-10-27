@@ -485,8 +485,10 @@ export class Scene {
       if (dr.id === selected) selDrawn = dr;
       if (useModels && nModels < MAX_MODELS && this.onScreen(dr)) {
         const action = dr.constructing ? "build" : dr.moving ? "walk" : dr.attacking ? "attack" : "stand";
+        const u = model.units[dr.id];
+        const build = dr.constructing ? { progress: model.buildProgress(u, loop), buildTime: model.buildTotal(u) / LOOPS_PER_CLOCK_SECOND } : undefined;
         // A per-unit phase keeps identical units from moving in lockstep.
-        if (this.placeModel(t.name, false, dr, action, clock + (dr.id % 97) * 0.173, t.speed * 1.4)) {
+        if (this.placeModel(t.name, false, dr, action, clock + (dr.id % 97) * 0.173, t.speed * 1.4, build)) {
           nModels++;
           continue;
         }
@@ -497,7 +499,8 @@ export class Scene {
       if (dr.w) {
         // Structures: a footprint (2D) or a box whose height grows with its size (3D).
         const tall = three ? (dr.owner === 0 ? (t.name.includes("Mineral") ? 1.2 : 1.6) : 1 + dr.w * 0.45) : 1;
-        const sz = dr.constructing && three ? tall * 0.5 : tall;
+        // A stand-in under construction grows with it.
+        const sz = dr.constructing && three ? tall * (0.25 + 0.75 * model.buildProgress(model.units[dr.id], loop)) : tall;
         this.place(ms.footprints, nf, dr.x, dr.y, ground + (three ? sz / 2 : 0), dr.w - 0.15, dr.h - 0.15, sz);
         ms.footprints.setColorAt(nf++, this.c);
       } else {
@@ -598,7 +601,10 @@ export class Scene {
    * while one loads (or when there is none) the unit's own "Death" clip, if
    * any, is used instead.
    */
-  private placeModel(type: string, death: boolean, d: DrawnUnit, action: string, time: number, speed: number): boolean {
+  private placeModel(
+    type: string, death: boolean, d: DrawnUnit, action: string, time: number, speed: number,
+    build?: { progress: number; buildTime: number },
+  ): boolean {
     const models = this.models!;
     let tpl = death ? models.get(type, true) : models.get(type);
     let isDeathModel = death;
@@ -623,7 +629,7 @@ export class Scene {
     root.position.set(d.x, d.y, this.heightAt(d.x, d.y) + (d.air ? AIR_HEIGHT : 0));
     // Structures keep the orientation they were modelled in.
     root.rotation.z = d.w ? -Math.PI / 2 : d.facing;
-    inst.pose({ action: isDeathModel ? "death" : action, time, speed });
+    inst.pose({ action: isDeathModel ? "death" : action, time, speed, ...build });
     return true;
   }
 
