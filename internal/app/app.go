@@ -31,7 +31,7 @@ import (
 
 // CacheVersion is part of every cached timeline's file name. Bump it whenever
 // the builders' output changes so stale timelines are rebuilt.
-const CacheVersion = "tl4"
+const CacheVersion = "tl5"
 
 // Tiers a Service can build.
 const (

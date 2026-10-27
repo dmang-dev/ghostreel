@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	pb "github.com/dmang-dev/ghostreel/gen/timeline/v1"
+	"github.com/dmang-dev/ghostreel/internal/pathing"
 	"github.com/dmang-dev/ghostreel/internal/timeline"
 )
 
@@ -176,5 +177,14 @@ func (b *builder) onCreep(x, y, t float64) bool {
 	return false
 }
 
-// big reports whether a unit needs two cells of room to pass (see pathing).
-func big(t *pb.UnitType) bool { return t.Radius > 0.5 }
+// sizeOf is the clearance class a unit paths with (see pathing): Siege
+// Tanks and bigger keep a cell of room, so they miss gaps Marauders fit through.
+func sizeOf(t *pb.UnitType) pathing.Size {
+	if t.Radius > 0.8 {
+		return pathing.Huge
+	}
+	if t.Radius > 0.5 {
+		return pathing.Big
+	}
+	return pathing.Small
+}

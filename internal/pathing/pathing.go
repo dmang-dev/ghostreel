@@ -5,15 +5,48 @@
 // shortened to the waypoints where the path turns. It is used by the command
 // tier to move units around cliffs and buildings instead of through them.
 //
-// Big units (radius over half a cell) need room: for them a cell is passable
-// only if some 2×2 block of walkable cells contains it, so they don't squeeze
-// through one-cell gaps between buildings.
+// Big units need room: for them a cell is passable only if some 2×2 block of
+// walkable cells contains it, so they don't squeeze through one-cell gaps
+// between buildings. Huge units (Siege Tanks, Thors) search a different
+// graph: the corners between cells, keeping a clearance of about one cell
+// from anything blocked, so they also miss diagonal gaps narrower than their
+// width, such as a ramp's top beside a building.
 package pathing
 
 import (
 	"container/heap"
 	"math"
 )
+
+// Size is a unit's clearance class: how wide a gap it needs.
+type Size int
+
+const (
+	Small Size = iota // fits through one-cell gaps
+	Big               // needs a 2×2 block
+	Huge              // walks cell corners with about one cell of clearance
+)
+
+// hugeRadius is the clearance a Huge unit keeps on straight segments
+// (a Siege Tank's radius).
+const hugeRadius = 0.875
+
+// nodeOf is the search node holding point p: the cell it lies in, or for Huge
+// units the nearest cell corner (corner (x, y) is the point (x, y)).
+func nodeOf(p Point, size Size) (int, int) {
+	if size == Huge {
+		return int(math.Round(p.X)), int(math.Round(p.Y))
+	}
+	return int(math.Floor(p.X)), int(math.Floor(p.Y))
+}
+
+// nodePoint is the point a search node stands for.
+func nodePoint(x, y int, size Size) Point {
+	if size == Huge {
+		return Point{float64(x), float64(y)}
+	}
+	return Point{float64(x) + 0.5, float64(y) + 0.5}
+}
 
 // Point is a position in cells.
 type Point struct{ X, Y float64 }
@@ -31,8 +64,8 @@ type Grid struct {
 	// version changes whenever walkability does; connected components (for
 	// cheap reachability) are recomputed lazily per unit size.
 	version     uint64
-	comp        [2][]int32
-	compVersion [2]uint64
+	comp        [3][]int32
+	compVersion [3]uint64
 
 	// A* scratch buffers, reused between searches (stamp marks valid entries).
 	gs    []float64
@@ -44,7 +77,7 @@ type Grid struct {
 
 type pathKey struct {
 	sx, sy, gx, gy int
-	big            bool
+	size           Size
 }
 
 // New returns a grid of the given size with every cell walkable.
@@ -67,9 +100,9 @@ type cachedPath struct {
 }
 
 // stillPassable reports whether every cell of a cached path is still open.
-func (g *Grid) stillPassable(cells []Point, big bool) bool {
+func (g *Grid) stillPassable(cells []Point, size Size) bool {
 	for _, c := range cells {
-		if !g.passable(int(c.X), int(c.Y), big) {
+		if x, y := nodeOf(c, size); !g.passable(x, y, size) {
 			return false
 		}
 	}
@@ -102,13 +135,18 @@ func (g *Grid) Walkable(x, y int) bool {
 	return x >= 0 && y >= 0 && x < g.W && y < g.H && g.walk[y*g.W+x]
 }
 
-// passable is Walkable for a unit of the given size class.
-func (g *Grid) passable(x, y int, big bool) bool {
+// passable reports whether a unit of the given size can stand on node (x, y).
+func (g *Grid) passable(x, y int, size Size) bool {
+	switch size {
+	case Small:
+		return g.Walkable(x, y)
+	case Huge:
+		// The four cells around the corner, walkable and on one level.
+		return g.Walkable(x-1, y-1) && g.Walkable(x, y-1) && g.Walkable(x-1, y) && g.Walkable(x, y) &&
+			g.canStep(x-1, y-1, x, y-1) && g.canStep(x-1, y, x, y) && g.canStep(x-1, y-1, x-1, y) && g.canStep(x, y-1, x, y)
+	}
 	if !g.Walkable(x, y) {
 		return false
-	}
-	if !big {
-		return true
 	}
 	for oy := -1; oy <= 0; oy++ {
 		for ox := -1; ox <= 0; ox++ {
@@ -120,26 +158,45 @@ func (g *Grid) passable(x, y int, big bool) bool {
 	return false
 }
 
+// step reports whether a unit may move from node (cx, cy) to its neighbor
+// (cx+dx, cy+dy), both passable. Diagonal steps may not cut past blocked
+// corners; a Huge unit's diagonal step passes through a cell's center and
+// needs all of the 3×3 cells around it (the two nodes' blocks cover the rest).
+func (g *Grid) step(cx, cy, dx, dy int, size Size, pass func(x, y int) bool) bool {
+	if !g.canStep(cx, cy, cx+dx, cy+dy) {
+		return false
+	}
+	if dx == 0 || dy == 0 {
+		return true
+	}
+	if size == Huge {
+		// The cell the step crosses, and its two corners the nodes don't cover.
+		mx, my := cx+min(dx, 0), cy+min(dy, 0)
+		return g.Walkable(mx+dx, my-dy) && g.Walkable(mx-dx, my+dy)
+	}
+	return pass(cx+dx, cy) && pass(cx, cy+dy)
+}
+
 // Path returns waypoints from a to b for a small unit; see PathFor.
-func (g *Grid) Path(a, b Point) []Point { return g.PathFor(a, b, false) }
+func (g *Grid) Path(a, b Point) []Point { return g.PathFor(a, b, Small) }
 
 // Reachable reports whether a small unit can get from a to b.
-func (g *Grid) Reachable(a, b Point) bool { return g.ReachableFor(a, b, false) }
+func (g *Grid) Reachable(a, b Point) bool { return g.ReachableFor(a, b, Small) }
 
 // PathFor returns waypoints from a to b, excluding a and ending at b (or at
 // the nearest passable cell to b). It returns just [b] when the straight line
-// is clear or no path exists. big selects the 2×2 clearance rule.
-func (g *Grid) PathFor(a, b Point, big bool) []Point {
-	if g.lineClear(a, b, big) {
+// is clear or no path exists. size selects the clearance rule.
+func (g *Grid) PathFor(a, b Point, size Size) []Point {
+	if g.lineClear(a, b, size) {
 		return []Point{b}
 	}
-	cells, gx, gy, ok := g.cells(a, b, big)
+	cells, gx, gy, ok := g.cells(a, b, size)
 	if !ok || cells == nil {
 		return []Point{b}
 	}
 	end := b
-	if !g.passable(int(b.X), int(b.Y), big) {
-		end = Point{float64(gx) + 0.5, float64(gy) + 0.5}
+	if bx, by := nodeOf(b, size); !g.passable(bx, by, size) {
+		end = nodePoint(gx, gy, size)
 	}
 	// String-pull: from the current point, jump to the farthest visible waypoint.
 	out := []Point{}
@@ -147,7 +204,7 @@ func (g *Grid) PathFor(a, b Point, big bool) []Point {
 	pts := append(append([]Point(nil), cells...), end)
 	for i := 0; i < len(pts); {
 		j := len(pts) - 1
-		for j > i && !g.lineClear(cur, pts[j], big) {
+		for j > i && !g.lineClear(cur, pts[j], size) {
 			j--
 		}
 		out = append(out, pts[j])
@@ -159,33 +216,33 @@ func (g *Grid) PathFor(a, b Point, big bool) []Point {
 
 // ReachableFor reports whether a path exists between two points: both lie
 // (after snapping to the nearest passable cell) in the same connected region.
-func (g *Grid) ReachableFor(a, b Point, big bool) bool {
-	if g.lineClear(a, b, big) {
+func (g *Grid) ReachableFor(a, b Point, size Size) bool {
+	if g.lineClear(a, b, size) {
 		return true
 	}
-	sx, sy, ok1 := g.nearestPassable(int(a.X), int(a.Y), big)
-	gx, gy, ok2 := g.nearestPassable(int(b.X), int(b.Y), big)
+	ax, ay := nodeOf(a, size)
+	bx, by := nodeOf(b, size)
+	sx, sy, ok1 := g.nearestPassable(ax, ay, size)
+	gx, gy, ok2 := g.nearestPassable(bx, by, size)
 	if !ok1 || !ok2 {
 		return false
 	}
-	comp := g.components(big)
+	comp := g.components(size)
 	c := comp[sy*g.W+sx]
 	return c >= 0 && c == comp[gy*g.W+gx]
 }
 
 // neighbors calls fn for each cell reachable in one step from (cx, cy),
 // with the step's cost. Diagonal steps may not cut past blocked corners.
-func (g *Grid) neighbors(cx, cy int, big bool, fn func(nx, ny int, cost float64)) {
+func (g *Grid) neighbors(cx, cy int, size Size, fn func(nx, ny int, cost float64)) {
+	pass := func(x, y int) bool { return g.passable(x, y, size) }
 	for dy := -1; dy <= 1; dy++ {
 		for dx := -1; dx <= 1; dx++ {
 			if dx == 0 && dy == 0 {
 				continue
 			}
 			nx, ny := cx+dx, cy+dy
-			if !g.passable(nx, ny, big) || !g.canStep(cx, cy, nx, ny) {
-				continue
-			}
-			if dx != 0 && dy != 0 && (!g.passable(cx+dx, cy, big) || !g.passable(cx, cy+dy, big)) {
+			if !g.passable(nx, ny, size) || !g.step(cx, cy, dx, dy, size, pass) {
 				continue
 			}
 			cost := 1.0
@@ -199,11 +256,8 @@ func (g *Grid) neighbors(cx, cy int, big bool, fn func(nx, ny int, cost float64)
 
 // components labels connected regions of passable cells (-1 = blocked),
 // recomputing only when the grid changed since the last call.
-func (g *Grid) components(big bool) []int32 {
-	k := 0
-	if big {
-		k = 1
-	}
+func (g *Grid) components(size Size) []int32 {
+	k := int(size)
 	if g.comp[k] != nil && g.compVersion[k] == g.version {
 		return g.comp[k]
 	}
@@ -211,12 +265,13 @@ func (g *Grid) components(big bool) []int32 {
 	if len(comp) != g.W*g.H {
 		comp = make([]int32, g.W*g.H)
 	}
-	// Passability per cell, computed once for this labeling.
+	// Passability per node, computed once for this labeling.
 	pass := make([]bool, g.W*g.H)
 	for i := range comp {
 		comp[i] = -1
-		pass[i] = g.passable(i%g.W, i/g.W, big)
+		pass[i] = g.passable(i%g.W, i/g.W, size)
 	}
+	passAt := func(x, y int) bool { return x >= 0 && y >= 0 && x < g.W && y < g.H && pass[y*g.W+x] }
 	var label int32
 	queue := make([]int, 0, 1024)
 	for start := range comp {
@@ -236,11 +291,7 @@ func (g *Grid) components(big bool) []int32 {
 						continue
 					}
 					n := ny*g.W + nx
-					if comp[n] != -1 || !pass[n] || !g.canStep(cx, cy, nx, ny) {
-						continue
-					}
-					// Same corner rule as the search.
-					if dx != 0 && dy != 0 && (!pass[cy*g.W+nx] || !pass[ny*g.W+cx]) {
+					if comp[n] != -1 || !pass[n] || !g.step(cx, cy, dx, dy, size, passAt) {
 						continue
 					}
 					comp[n] = label
@@ -255,18 +306,20 @@ func (g *Grid) components(big bool) []int32 {
 }
 
 // cells runs (or reuses) A* between the passable cells nearest a and b.
-func (g *Grid) cells(a, b Point, big bool) ([]Point, int, int, bool) {
-	sx, sy, ok1 := g.nearestPassable(int(a.X), int(a.Y), big)
-	gx, gy, ok2 := g.nearestPassable(int(b.X), int(b.Y), big)
+func (g *Grid) cells(a, b Point, size Size) ([]Point, int, int, bool) {
+	ax, ay := nodeOf(a, size)
+	bx, by := nodeOf(b, size)
+	sx, sy, ok1 := g.nearestPassable(ax, ay, size)
+	gx, gy, ok2 := g.nearestPassable(bx, by, size)
 	if !ok1 || !ok2 {
 		return nil, 0, 0, false
 	}
-	key := pathKey{sx, sy, gx, gy, big}
-	if c, ok := g.cache[key]; ok && c.cells != nil && (c.version == g.version || g.stillPassable(c.cells, big)) {
+	key := pathKey{sx, sy, gx, gy, size}
+	if c, ok := g.cache[key]; ok && c.cells != nil && (c.version == g.version || g.stillPassable(c.cells, size)) {
 		g.cache[key] = cachedPath{c.cells, g.version}
 		return c.cells, gx, gy, true
 	}
-	cells := g.astar(sx, sy, gx, gy, big)
+	cells := g.astar(sx, sy, gx, gy, size)
 	if len(g.cache) > 8192 {
 		g.cache = map[pathKey]cachedPath{}
 	}
@@ -274,8 +327,51 @@ func (g *Grid) cells(a, b Point, big bool) ([]Point, int, int, bool) {
 	return cells, gx, gy, true
 }
 
-// lineClear walks the cells a segment crosses (supercover DDA).
-func (g *Grid) lineClear(a, b Point, big bool) bool {
+// lineClear reports whether a unit can walk the segment from a to b: every
+// cell it crosses is passable (see cellsClear), and for Huge units the
+// segment also keeps hugeRadius clear of blocked cells.
+func (g *Grid) lineClear(a, b Point, size Size) bool {
+	if size != Huge {
+		return g.cellsClear(a, b, size)
+	}
+	if !g.cellsClear(a, b, Small) {
+		return false
+	}
+	d := math.Hypot(b.X-a.X, b.Y-a.Y)
+	n := int(d/0.25) + 1
+	for i := 1; i <= n; i++ {
+		f := float64(i) / float64(n)
+		// Near the start the unit may already touch something (it stands
+		// beside a building); only what lies ahead must be clear.
+		if f*d < hugeRadius {
+			continue
+		}
+		if !g.clear(Point{a.X + (b.X-a.X)*f, a.Y + (b.Y-a.Y)*f}, hugeRadius) {
+			return false
+		}
+	}
+	return true
+}
+
+// clear reports whether a disc of radius r at p overlaps no blocked cell.
+func (g *Grid) clear(p Point, r float64) bool {
+	for y := int(math.Floor(p.Y - r)); y <= int(math.Floor(p.Y+r)); y++ {
+		for x := int(math.Floor(p.X - r)); x <= int(math.Floor(p.X+r)); x++ {
+			if g.Walkable(x, y) {
+				continue
+			}
+			dx := math.Max(math.Max(float64(x)-p.X, p.X-float64(x+1)), 0)
+			dy := math.Max(math.Max(float64(y)-p.Y, p.Y-float64(y+1)), 0)
+			if dx*dx+dy*dy < r*r {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// cellsClear walks the cells a segment crosses (supercover DDA).
+func (g *Grid) cellsClear(a, b Point, size Size) bool {
 	x, y := int(math.Floor(a.X)), int(math.Floor(a.Y))
 	ex, ey := int(math.Floor(b.X)), int(math.Floor(b.Y))
 	dx, dy := b.X-a.X, b.Y-a.Y
@@ -308,7 +404,7 @@ func (g *Grid) lineClear(a, b Point, big bool) bool {
 	// only cells after it must be passable.
 	for n := 0; n < 4*(g.W+g.H); n++ {
 		if x == ex && y == ey {
-			return g.passable(x, y, big) || n == 0
+			return g.passable(x, y, size) || n == 0
 		}
 		px, py := x, y
 		if tMaxX < tMaxY {
@@ -318,7 +414,7 @@ func (g *Grid) lineClear(a, b Point, big bool) bool {
 			tMaxY += tDeltaY
 			y += stepY
 		}
-		if !g.passable(x, y, big) || !g.canStep(px, py, x, y) {
+		if !g.passable(x, y, size) || !g.canStep(px, py, x, y) {
 			return false
 		}
 	}
@@ -345,14 +441,14 @@ func (g *Grid) canStep(ax, ay, bx, by int) bool {
 }
 
 // nearestPassable searches outward in rings for a passable cell.
-func (g *Grid) nearestPassable(x, y int, big bool) (int, int, bool) {
-	if g.passable(x, y, big) {
+func (g *Grid) nearestPassable(x, y int, size Size) (int, int, bool) {
+	if g.passable(x, y, size) {
 		return x, y, true
 	}
 	for r := 1; r < 12; r++ {
 		for dy := -r; dy <= r; dy++ {
 			for dx := -r; dx <= r; dx++ {
-				if max(abs(dx), abs(dy)) == r && g.passable(x+dx, y+dy, big) {
+				if max(abs(dx), abs(dy)) == r && g.passable(x+dx, y+dy, size) {
 					return x + dx, y + dy, true
 				}
 			}
@@ -389,10 +485,10 @@ func (o *openSet) Pop() interface{} {
 // astar returns cell centers from start (exclusive) to goal (inclusive), or
 // nil when unreachable. Callers check reachability first (components), so a
 // search normally ends at the goal rather than exhausting the map.
-func (g *Grid) astar(sx, sy, gx, gy int, big bool) []Point {
+func (g *Grid) astar(sx, sy, gx, gy int, size Size) []Point {
 	start, goal := sy*g.W+sx, gy*g.W+gx
 	if start == goal {
-		return []Point{{float64(gx) + 0.5, float64(gy) + 0.5}}
+		return []Point{nodePoint(gx, gy, size)}
 	}
 	if n := g.W * g.H; len(g.gs) != n {
 		g.gs, g.from = make([]float64, n), make([]int32, n)
@@ -412,7 +508,7 @@ func (g *Grid) astar(sx, sy, gx, gy int, big bool) []Point {
 		if cur.i == goal {
 			var cells []Point
 			for i := goal; i != start; i = int(g.from[i]) {
-				cells = append(cells, Point{float64(i%g.W) + 0.5, float64(i/g.W) + 0.5})
+				cells = append(cells, nodePoint(i%g.W, i/g.W, size))
 			}
 			for l, r := 0, len(cells)-1; l < r; l, r = l+1, r-1 {
 				cells[l], cells[r] = cells[r], cells[l]
@@ -423,7 +519,7 @@ func (g *Grid) astar(sx, sy, gx, gy int, big bool) []Point {
 			continue
 		}
 		g.done[cur.i] = st
-		g.neighbors(cur.i%g.W, cur.i/g.W, big, func(nx, ny int, cost float64) {
+		g.neighbors(cur.i%g.W, cur.i/g.W, size, func(nx, ny int, cost float64) {
 			ni := ny*g.W + nx
 			ng := cur.g + cost
 			if g.seen[ni] == st && ng >= g.gs[ni] {

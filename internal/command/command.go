@@ -374,12 +374,12 @@ func (b *builder) appendPath(a *agent, from pt, start float64, goal pt, stopAt f
 	if a.typ.Air || b.opts.Grid == nil {
 		path = []pt{goal}
 	} else {
-		if !b.opts.Grid.ReachableFor(from, goal, big(a.typ)) {
+		if !b.opts.Grid.ReachableFor(from, goal, sizeOf(a.typ)) {
 			// Walled in (or an unreachable target): the unit stays put.
 			a.goal = nil
 			return
 		}
-		path = b.opts.Grid.PathFor(from, goal, big(a.typ))
+		path = b.opts.Grid.PathFor(from, goal, sizeOf(a.typ))
 	}
 	if stopAt > 0 {
 		path = shorten(from, path, stopAt)

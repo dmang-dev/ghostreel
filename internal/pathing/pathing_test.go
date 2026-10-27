@@ -35,7 +35,7 @@ func TestAroundWall(t *testing.T) {
 	cur := a
 	top := 0.0
 	for _, q := range p {
-		if !g.lineClear(cur, q, false) {
+		if !g.lineClear(cur, q, Small) {
 			t.Fatalf("leg %v -> %v crosses the wall", cur, q)
 		}
 		top = math.Max(top, q.Y)
@@ -109,11 +109,11 @@ func TestBigUnitsNeedRoom(t *testing.T) {
 		}
 	}
 	a, b := Point{2.5, 5.5}, Point{8.5, 5.5}
-	small := g.PathFor(a, b, false)
+	small := g.PathFor(a, b, Small)
 	if len(small) != 1 {
 		t.Errorf("small unit should go straight through the gap: %v", small)
 	}
-	big := g.PathFor(a, b, true)
+	big := g.PathFor(a, b, Big)
 	top := 0.0
 	for _, q := range big {
 		top = math.Max(top, q.Y)
@@ -122,7 +122,50 @@ func TestBigUnitsNeedRoom(t *testing.T) {
 		t.Errorf("big unit squeezed through the 1-cell gap: %v", big)
 	}
 	g.Set(5, 8, false) // now the wide gap is only 1 cell too
-	if g.ReachableFor(a, b, true) {
+	if g.ReachableFor(a, b, Big) {
 		t.Error("big unit should be walled in")
+	}
+}
+
+func TestHugeUnitsNeedMoreRoom(t *testing.T) {
+	// A diagonal wall (x+y = 12) with a hole one cell wide at (6, 6).
+	g := New(14, 14)
+	for x := 0; x <= 12; x++ {
+		if x != 6 {
+			g.Set(x, 12-x, false)
+		}
+	}
+	a, b := Point{3, 3}, Point{10, 10}
+	if !g.ReachableFor(a, b, Big) {
+		t.Error("a big unit fits through the diagonal hole (1.4 cells)")
+	}
+	if g.ReachableFor(a, b, Huge) {
+		t.Error("a huge unit should not fit through the diagonal hole")
+	}
+	g.Set(7, 5, true) // widen the hole to two cells (2.8 cells across)
+	if !g.ReachableFor(a, b, Huge) {
+		t.Fatal("a huge unit fits through the wider hole")
+	}
+	// The path runs through the hole and keeps clear of the wall.
+	path := g.PathFor(a, b, Huge)
+	cur := a
+	for _, q := range path {
+		if !g.lineClear(cur, q, Huge) {
+			t.Errorf("segment %v-%v is not clear", cur, q)
+		}
+		cur = q
+	}
+	if cur != b {
+		t.Errorf("path ends at %v, want %v", cur, b)
+	}
+	// An axis-aligned two-cell gap is wide enough for a huge unit.
+	g = New(10, 10)
+	for y := 0; y < 10; y++ {
+		if y != 4 && y != 5 {
+			g.Set(5, y, false)
+		}
+	}
+	if !g.ReachableFor(Point{2, 5}, Point{8, 5}, Huge) {
+		t.Error("a huge unit fits through a straight two-cell gap")
 	}
 }
