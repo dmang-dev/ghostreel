@@ -121,6 +121,31 @@ func TestRalliedWorkerMines(t *testing.T) {
 	}
 }
 
+func TestWorkersLeaveMinedOutField(t *testing.T) {
+	ev := []replay.Event{
+		{Loop: 0, Kind: replay.KindUnitBorn, Tag: tag(1, 1), UnitType: "CommandCenter", Player: 1, X: 20, Y: 20},
+		{Loop: 0, Kind: replay.KindUnitBorn, Tag: tag(2, 1), UnitType: "MineralField", Player: 0, X: 28, Y: 20},
+		{Loop: 0, Kind: replay.KindUnitBorn, Tag: tag(4, 1), UnitType: "MineralField", Player: 0, X: 26, Y: 25},
+		{Loop: 0, Kind: replay.KindUnitBorn, Tag: tag(3, 1), UnitType: "SCV", Player: 1, X: 24, Y: 20},
+		selectTags(10, tag(3, 1)),
+		{Loop: 10, Kind: replay.KindCommand, Player: 1, AbilityLink: -1, HasTarget: true, X: 28, Y: 20.5, TargetTag: tag(2, 1)},
+		{Loop: 500, Kind: replay.KindUnitDied, Tag: tag(2, 1), X: 28, Y: 20},
+	}
+	_, ix := build(t, ev, nil)
+	// After the east field runs out, the SCV shuttles to the one beside it.
+	closest := math.Inf(1)
+	for loop := uint32(700); loop < 1600; loop += 4 {
+		x, y := posOf(ix, "SCV", loop)
+		if math.Hypot(float64(x)-27.1, float64(y)-20.5) < 1 {
+			t.Fatalf("SCV still at the mined-out field at %d: (%v,%v)", loop, x, y)
+		}
+		closest = math.Min(closest, math.Hypot(float64(x)-26.5, float64(y)-25.5))
+	}
+	if closest > 2 {
+		t.Errorf("SCV never reached the other field (closest %.2f)", closest)
+	}
+}
+
 func TestWalledInUnitStays(t *testing.T) {
 	g := pathing.New(64, 64)
 	for y := 0; y < 64; y++ {

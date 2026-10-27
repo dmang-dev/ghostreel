@@ -79,7 +79,8 @@ type agent struct {
 }
 
 type mineJob struct {
-	field, drop pt // where the worker stands to mine and to drop off
+	fieldID     uint32 // the resource being mined
+	field, drop pt     // where the worker stands to mine and to drop off
 	nextLegAt   float64
 	toField     bool
 }
@@ -196,6 +197,9 @@ func (b *builder) apply(e *replay.Event) {
 	case replay.KindUnitDied:
 		if u := b.byTag[uint32(e.Tag)]; u != nil {
 			b.updateFootprint(u, nil, false, e.Loop)
+			if strings.Contains(b.unitType(u, e.Loop).Name, "MineralField") {
+				b.fieldMinedOut(u, t)
+			}
 		}
 		if a := b.agents[b.unitID(e.Tag)]; a != nil && !a.dead {
 			b.advance(a, t)
@@ -651,8 +655,9 @@ func (b *builder) startMining(a *agent, t float64, field *pb.Unit, ft *pb.UnitTy
 	fieldR := float64(ft.Radius) + float64(a.typ.Radius)
 	const baseR = 2.75
 	job := &mineJob{
-		field: pt{X: fp.X + ux*fieldR, Y: fp.Y + uy*fieldR},
-		drop:  pt{X: th.X - ux*(baseR+float64(a.typ.Radius)), Y: th.Y - uy*(baseR+float64(a.typ.Radius))},
+		fieldID: field.Id,
+		field:   pt{X: fp.X + ux*fieldR, Y: fp.Y + uy*fieldR},
+		drop:    pt{X: th.X - ux*(baseR+float64(a.typ.Radius)), Y: th.Y - uy*(baseR+float64(a.typ.Radius))},
 	}
 	from := b.current(a, t)
 	a.legs, a.goal, a.attack = nil, nil, nil
@@ -766,6 +771,54 @@ func (b *builder) setRally(e *replay.Event) {
 			rallies[tag] = r
 		}
 	}
+}
+
+// fieldMinedOut moves the workers mining a depleted mineral field to the
+// fields left nearby, as the game does, spreading them over the least used.
+func (b *builder) fieldMinedOut(field *pb.Unit, t float64) {
+	var miners []*agent
+	for _, a := range b.agents {
+		if !a.dead && a.mining != nil && a.mining.fieldID == field.Id {
+			miners = append(miners, a)
+		}
+	}
+	sort.Slice(miners, func(i, j int) bool { return miners[i].id < miners[j].id })
+	k := b.tracks[field.Id].Keyframes[0]
+	fp := pt{X: float64(k.X), Y: float64(k.Y)}
+	for _, a := range miners {
+		var pick *pb.Unit
+		pickScore := math.Inf(1)
+		users := b.miners()
+		for _, u := range b.tl.Units {
+			if u.Owner != 0 || u.Id == field.Id || !timeline.Alive(u, uint32(t)) || !strings.Contains(b.unitType(u, int64(t)).Name, "MineralField") {
+				continue
+			}
+			kk := b.tracks[u.Id].Keyframes[0]
+			d := math.Hypot(float64(kk.X)-fp.X, float64(kk.Y)-fp.Y)
+			if d > 8 {
+				continue
+			}
+			if score := float64(users[u.Id])*100 + d; score < pickScore {
+				pick, pickScore = u, score
+			}
+		}
+		if pick == nil {
+			b.stop(a, t) // the base is mined out
+			continue
+		}
+		b.startMining(a, t, pick, b.unitType(pick, int64(t)))
+	}
+}
+
+// miners counts the workers mining each field.
+func (b *builder) miners() map[uint32]int {
+	n := map[uint32]int{}
+	for _, a := range b.agents {
+		if !a.dead && a.mining != nil {
+			n[a.mining.fieldID]++
+		}
+	}
+	return n
 }
 
 // mineNearest sends a worker to the mineral field closest to where it is.
