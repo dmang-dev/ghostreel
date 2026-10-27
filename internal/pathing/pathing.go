@@ -220,16 +220,52 @@ func (g *Grid) ReachableFor(a, b Point, size Size) bool {
 	if g.lineClear(a, b, size) {
 		return true
 	}
-	ax, ay := nodeOf(a, size)
-	bx, by := nodeOf(b, size)
-	sx, sy, ok1 := g.nearestPassable(ax, ay, size)
-	gx, gy, ok2 := g.nearestPassable(bx, by, size)
-	if !ok1 || !ok2 {
+	sx, sy, gx, gy, ok := g.endpoints(a, b, size)
+	if !ok {
 		return false
 	}
 	comp := g.components(size)
 	c := comp[sy*g.W+sx]
 	return c >= 0 && c == comp[gy*g.W+gx]
+}
+
+// endpoints snaps a path's start and goal to passable nodes. A unit standing
+// on a blocked node (just born beside its building, say) may have passable
+// nodes on both sides of a wall or cliff at the same distance; it takes one
+// on the goal's side when there is one.
+func (g *Grid) endpoints(a, b Point, size Size) (sx, sy, gx, gy int, ok bool) {
+	bx, by := nodeOf(b, size)
+	gx, gy, ok = g.nearestPassable(bx, by, size)
+	if !ok {
+		return
+	}
+	ax, ay := nodeOf(a, size)
+	if g.passable(ax, ay, size) {
+		return ax, ay, gx, gy, true
+	}
+	comp := g.components(size)
+	want := comp[gy*g.W+gx]
+	for r := 1; r < 12; r++ {
+		found := false
+		for dy := -r; dy <= r; dy++ {
+			for dx := -r; dx <= r; dx++ {
+				x, y := ax+dx, ay+dy
+				if max(abs(dx), abs(dy)) != r || !g.passable(x, y, size) {
+					continue
+				}
+				if comp[y*g.W+x] == want {
+					return x, y, gx, gy, true
+				}
+				if !found {
+					sx, sy, found = x, y, true
+				}
+			}
+		}
+		if found {
+			return sx, sy, gx, gy, true
+		}
+	}
+	return 0, 0, 0, 0, false
 }
 
 // neighbors calls fn for each cell reachable in one step from (cx, cy),
@@ -307,11 +343,8 @@ func (g *Grid) components(size Size) []int32 {
 
 // cells runs (or reuses) A* between the passable cells nearest a and b.
 func (g *Grid) cells(a, b Point, size Size) ([]Point, int, int, bool) {
-	ax, ay := nodeOf(a, size)
-	bx, by := nodeOf(b, size)
-	sx, sy, ok1 := g.nearestPassable(ax, ay, size)
-	gx, gy, ok2 := g.nearestPassable(bx, by, size)
-	if !ok1 || !ok2 {
+	sx, sy, gx, gy, ok := g.endpoints(a, b, size)
+	if !ok {
 		return nil, 0, 0, false
 	}
 	key := pathKey{sx, sy, gx, gy, size}
