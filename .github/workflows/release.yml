@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Builds every release artifact when a version tag (v1.2.3) is pushed and
-# collects them in a draft GitHub release for a maintainer to review and
-# publish. Nothing from the game is bundled: models, textures and maps are
-# read from each user's own install at run time.
+# publishes them as a GitHub release, with latest.json, the signed manifest
+# the desktop app updates from (internal/update, cmd/releasetool). A tag
+# with a suffix (v1.3.0-rc1) makes a pre-release, which the app doesn't
+# offer. Run by hand (workflow_dispatch), it only builds the artifacts.
+# Nothing from the game is bundled: models, textures and maps are read from
+# each user's own install at run time.
 name: release
 
 on:
@@ -131,7 +134,8 @@ jobs:
         working-directory: desktop
         run: |
           extra=""; [ "$RUNNER_OS" = Windows ] && extra="-nsis"
-          wails build -clean -platform ${{ matrix.platform }} $extra
+          # The app's version, which the updater compares with the latest release.
+          wails build -clean -platform ${{ matrix.platform }} $extra -ldflags "-X main.version=${GITHUB_REF_NAME}"
       - name: Package
         run: |
           base="ghostreel-desktop_${GITHUB_REF_NAME}"
@@ -156,14 +160,32 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
       - name: Checksums
         run: cd artifacts && find . -maxdepth 1 -type f -printf '%f\n' | sort | xargs sha256sum > SHA256SUMS
+      # The signed manifest the desktop app updates from. Without the key the
+      # release still goes out, but installed apps won't see it.
+      - name: Update manifest
+        env:
+          GHOSTREEL_UPDATE_KEY: ${{ secrets.GHOSTREEL_UPDATE_KEY }}
+        run: |
+          if [ -z "$GHOSTREEL_UPDATE_KEY" ]; then
+            echo "::warning::GHOSTREEL_UPDATE_KEY isn't set: no latest.json, so the desktop app won't offer this release"
+            exit 0
+          fi
+          go run ./cmd/releasetool manifest -tag "$GITHUB_REF_NAME" -dir artifacts \
+            -url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}" \
+            -notes "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
       - uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           files: artifacts/*
