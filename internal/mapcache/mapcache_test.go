@@ -113,6 +113,39 @@ func TestDownloadRejectsWrongHash(t *testing.T) {
 	}
 }
 
+func TestFindBeside(t *testing.T) {
+	tmp := t.TempDir()
+	replayPath := filepath.Join(tmp, "replays", "game.SC2Replay")
+	write(t, replayPath, []byte("x"))
+	inMaps := filepath.Join(tmp, "replays", "Maps", "PylonAIE_v4.SC2Map")
+	write(t, inMaps, []byte("x"))
+	elsewhere := filepath.Join(tmp, "folder", "PylonAIE_v4.SC2Map")
+	write(t, elsewhere, []byte("x"))
+	r := &Resolver{MapDirs: []string{filepath.Join(tmp, "folder")}}
+	ctx := context.Background()
+
+	// A maps folder beside the replay (any case) wins over the map folders.
+	p, how, err := r.Resolve(ctx, &replay.Info{Path: replayPath, MapFileName: "pylonaie_v4.sc2map"}, "")
+	if err != nil || how != HowBeside || p != inMaps {
+		t.Errorf("maps folder: %v %v %s", err, how, p)
+	}
+	// Right next to the replay comes first.
+	beside := filepath.Join(tmp, "replays", "PylonAIE_v4.SC2Map")
+	write(t, beside, []byte("x"))
+	if p, how, err := r.Resolve(ctx, &replay.Info{Path: replayPath, MapFileName: "PylonAIE_v4.SC2Map"}, ""); err != nil || how != HowBeside || p != beside {
+		t.Errorf("next to replay: %v %v %s", err, how, p)
+	}
+	// Without a replay path (an upload), only the map folders are searched.
+	if p, how, err := r.Resolve(ctx, &replay.Info{MapFileName: "PylonAIE_v4.SC2Map"}, ""); err != nil || how != HowMapFolder || p != elsewhere {
+		t.Errorf("no path: %v %v %s", err, how, p)
+	}
+	// Not found anywhere: the error names the folders beside the replay.
+	_, _, err = r.Resolve(ctx, &replay.Info{Path: replayPath, MapFileName: "Other.SC2Map"}, "")
+	if !errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), filepath.Join(tmp, "replays", "maps")) {
+		t.Errorf("missing: %v", err)
+	}
+}
+
 func TestFindByName(t *testing.T) {
 	tmp := t.TempDir()
 	want := filepath.Join(tmp, "Ladder2019", "AbyssalReefAIE.SC2Map")

@@ -22,7 +22,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dmang-dev/ghostreel/internal/replay"
@@ -40,6 +42,7 @@ const (
 	HowOwnCache   How = "own-cache"  // ghostreel's download cache
 	HowDownloaded How = "downloaded" // fetched from the depot just now
 	HowMapFolder  How = "map-folder" // found by file name in a map folder
+	HowBeside     How = "beside"     // found by file name next to the replay
 )
 
 // Resolver holds the places to look. The zero value finds nothing; use
@@ -49,6 +52,9 @@ type Resolver struct {
 	BnetCacheDirs []string
 	// MapDirs are searched recursively for maps referenced by file name.
 	MapDirs []string
+	// extra are more map folders, changed while in use (SetExtraMapDirs).
+	mu    sync.RWMutex
+	extra []string
 	// DownloadDir caches depot downloads as <hash>.s2ma. Empty disables both
 	// the cache and downloading.
 	DownloadDir string
@@ -97,6 +103,28 @@ func Default() *Resolver {
 	return r
 }
 
+// SetExtraMapDirs sets map folders searched after MapDirs (the desktop
+// app's settings); safe while lookups run.
+func (r *Resolver) SetExtraMapDirs(dirs []string) {
+	r.mu.Lock()
+	r.extra = slices.Clone(dirs)
+	r.mu.Unlock()
+}
+
+// WithNetwork returns a copy of r that may download maps.
+func (r *Resolver) WithNetwork() *Resolver {
+	return &Resolver{
+		BnetCacheDirs: r.BnetCacheDirs, MapDirs: r.mapDirs(), DownloadDir: r.DownloadDir,
+		AllowNetwork: true, Client: r.Client, Log: r.Log,
+	}
+}
+
+func (r *Resolver) mapDirs() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return append(slices.Clone(r.MapDirs), r.extra...)
+}
+
 func (r *Resolver) logf(format string, args ...any) {
 	if r.Log != nil {
 		r.Log(format, args...)
@@ -141,11 +169,19 @@ func (r *Resolver) Resolve(ctx context.Context, info *replay.Info, manual string
 		}
 	}
 	if info.MapFileName != "" {
+		if p := findBeside(info.Path, info.MapFileName); p != "" {
+			r.logf("map: found %s next to the replay", info.MapFileName)
+			return p, HowBeside, nil
+		}
+		if info.Path != "" {
+			dir := filepath.Dir(info.Path)
+			tried = append(tried, fmt.Sprintf("%s in %s and %s", info.MapFileName, dir, filepath.Join(dir, "maps")))
+		}
 		if p := r.findByName(info.MapFileName); p != "" {
 			r.logf("map: found %s in %s", info.MapFileName, filepath.Dir(p))
 			return p, HowMapFolder, nil
 		}
-		tried = append(tried, fmt.Sprintf("%s in map folders %v", info.MapFileName, r.MapDirs))
+		tried = append(tried, fmt.Sprintf("%s in map folders %v", info.MapFileName, r.mapDirs()))
 	}
 	if len(tried) == 0 {
 		tried = append(tried, "the replay names no map file")
@@ -153,11 +189,42 @@ func (r *Resolver) Resolve(ctx context.Context, info *replay.Info, manual string
 	return "", "", fmt.Errorf("%w for %q; tried:\n  %s", ErrNotFound, info.MapTitle, strings.Join(tried, "\n  "))
 }
 
+// findBeside looks for a map file next to a replay, then in a "maps" folder
+// beside it (any case), the way bot harnesses keep the maps they play on.
+// Only those two folders are read, not their subfolders.
+func findBeside(replayPath, name string) string {
+	if replayPath == "" {
+		return ""
+	}
+	want := strings.ToLower(filepath.Base(strings.ReplaceAll(name, `\`, "/")))
+	dir := filepath.Dir(replayPath)
+	dirs := []string{dir}
+	if entries, err := os.ReadDir(dir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() && strings.EqualFold(e.Name(), "maps") {
+				dirs = append(dirs, filepath.Join(dir, e.Name()))
+			}
+		}
+	}
+	for _, d := range dirs {
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() && strings.ToLower(e.Name()) == want {
+				return filepath.Join(d, e.Name())
+			}
+		}
+	}
+	return ""
+}
+
 // findByName searches the map folders for a file, case-insensitively, and
 // also accepts the name without its directory part.
 func (r *Resolver) findByName(name string) string {
 	want := strings.ToLower(filepath.Base(strings.ReplaceAll(name, `\`, "/")))
-	for _, dir := range r.MapDirs {
+	for _, dir := range r.mapDirs() {
 		found := ""
 		filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {

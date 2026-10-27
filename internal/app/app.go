@@ -122,18 +122,31 @@ func (s *Service) LoadFile(ctx context.Context, path string) (*Loaded, error) {
 	if _, err := os.Stat(eng); err != nil {
 		eng = ""
 	}
-	return s.load(ctx, filepath.Base(path), data, eng)
+	return s.load(ctx, filepath.Base(path), data, eng, path)
 }
 
 // LoadBytes loads a replay from its contents (an upload or a dropped file).
 func (s *Service) LoadBytes(ctx context.Context, name string, data []byte) (*Loaded, error) {
-	return s.load(ctx, name, data, "")
+	return s.load(ctx, name, data, "", "")
 }
 
-func (s *Service) load(ctx context.Context, name string, data []byte, enginePath string) (*Loaded, error) {
+// load decodes and caches a replay; path is where it was read from ("" for
+// uploads), so maps kept beside it can be found.
+func (s *Service) load(ctx context.Context, name string, data []byte, enginePath, path string) (*Loaded, error) {
 	sum := sha256.Sum256(data)
 	id := hex.EncodeToString(sum[:])
 	if l := s.Get(id); l != nil {
+		// Look for a missing map again: it may be beside the replay (opened
+		// by path this time) or in a map folder added since.
+		if l.Map == nil && !l.noLookup && s.Resolver != nil {
+			cp := *l
+			if path != "" {
+				cp.Info.Path = path
+			}
+			if nl, err := s.replaceMap(ctx, &cp, "", s.Resolver); err == nil {
+				return nl, nil
+			}
+		}
 		return l, nil
 	}
 	r, err := replay.DecodeWith(bytes.NewReader(data), replay.Options{InfoOnly: true})
@@ -142,6 +155,7 @@ func (s *Service) load(ctx context.Context, name string, data []byte, enginePath
 	}
 	l := &Loaded{ID: id, Name: name, Info: r.Info, data: data, enginePath: enginePath}
 	l.Info.Hash = id
+	l.Info.Path = path
 	s.attachMap(ctx, l, "", s.Resolver)
 	if err := s.buildTimeline(l); err != nil {
 		return nil, err
@@ -263,9 +277,23 @@ func (s *Service) DownloadMap(ctx context.Context, id string) (*Loaded, error) {
 	if s.Resolver == nil {
 		return nil, errors.New("map lookup disabled")
 	}
-	r := *s.Resolver
-	r.AllowNetwork = true
-	return s.replaceMap(ctx, l, "", &r)
+	return s.replaceMap(ctx, l, "", s.Resolver.WithNetwork())
+}
+
+// FindMap looks for a replay's missing map again, in the places as they are
+// now (map folders added in the settings, say).
+func (s *Service) FindMap(ctx context.Context, id string) (*Loaded, error) {
+	l := s.Get(id)
+	if l == nil {
+		return nil, fmt.Errorf("replay %s is not loaded", id)
+	}
+	if l.Map != nil {
+		return l, nil
+	}
+	if s.Resolver == nil || l.noLookup {
+		return nil, errors.New("map lookup disabled")
+	}
+	return s.replaceMap(ctx, l, "", s.Resolver)
 }
 
 // MapFile is the decoded map, or nil when there is none.
