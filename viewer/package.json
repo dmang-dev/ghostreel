@@ -10,7 +10,7 @@
     "test": "vitest run",
     "preview": "vite preview",
     "build:desktop": "tsc --noEmit && vite build --outDir ../desktop/frontend/dist --emptyOutDir && node scripts/gitkeep.mjs ../desktop/frontend/dist",
-    "build:web": "node scripts/build-wasm.mjs && tsc --noEmit && vite build --mode web",
+    "build:web": "node scripts/build-wasm.mjs --compress && tsc --noEmit && vite build --mode web",
     "dev:web": "node scripts/build-wasm.mjs && vite --mode web"
   },
   "dependencies": {
