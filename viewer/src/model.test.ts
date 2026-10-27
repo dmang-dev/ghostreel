@@ -18,7 +18,8 @@ const golden: {
 }[] = JSON.parse(readFileSync(new URL("fixture.states.json", dir), "utf8"));
 
 describe("model matches the Go implementation", () => {
-  const model = new Model(tl);
+  // Drawn mining (mining.ts) is viewer-only, so it's off for the comparison.
+  const model = new Model(tl, { mining: false });
   for (const g of golden) {
     it(`loop ${g.loop}`, () => {
       const got = model.stateAt(g.loop);

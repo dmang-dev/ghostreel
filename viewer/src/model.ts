@@ -19,6 +19,7 @@ import {
   UnitState as UnitStateKind,
   Source,
 } from "./gen/timeline/v1/timeline_pb";
+import { Mining } from "./mining";
 
 export const LOOPS_PER_CLOCK_SECOND = 22.4;
 export const LOOPS_PER_GAME_SECOND = 16;
@@ -165,14 +166,19 @@ export class Model {
   /** Loops at which non-quiet units died, sorted (for battle markers). */
   readonly deathLoops: number[] = [];
   readonly feed: FeedItem[] = [];
+  /** Drawn mining for workers of players without orders (mining.ts). */
+  readonly mining: Mining;
 
-  constructor(tl: Timeline) {
+  /** opts.mining: false leaves workers where the timeline puts them (tests against Go). */
+  constructor(tl: Timeline, opts: { mining?: boolean } = {}) {
     this.tl = tl;
     this.units = tl.units;
     this.types = tl.unitTypes;
     this.loops = tl.meta?.loops ?? 0;
     this.tracks = new Array(tl.units.length);
     for (const t of tl.tracks) this.tracks[t.unitId] = t.keyframes;
+    this.mining = new Mining(this.units, this.types, this.tracks, ownerAt, (t) => this.types[t]?.class === UnitClass.WORKER);
+    if (opts.mining === false) this.mining.players.clear();
     for (const e of tl.events) {
       const k = e.kind;
       switch (k.case) {
@@ -255,7 +261,9 @@ export class Model {
     out.type = t;
     out.owner = ownerAt(u, loop);
     out.constructing = u.constructed && (u.doneLoop === undefined || u.doneLoop > loop);
-    positionAt(this.tracks[u.id], this.types[t]?.speed ?? 0, loop, out);
+    const speed = this.types[t]?.speed ?? 0;
+    positionAt(this.tracks[u.id], speed, loop, out);
+    this.mining.apply(u, t, out.owner, this.tracks[u.id], loop, speed || DEFAULT_SPEED, out);
   }
 
   /**
