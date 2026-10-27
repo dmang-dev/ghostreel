@@ -26,78 +26,97 @@ type SelectionReport struct {
 
 // CheckSelection replays the selection tracker over a replay's events and
 // compares, for each targeted command of the observed player, the tracked
-// selection with the units the engine reports carrying an order to that
+// selection with the units the engine reports newly carrying an order to that
 // target in the next frame. Commands followed by another command before that
 // frame are skipped (the order may already have been replaced).
+//
+// Bots order one unit per command, often several to the same spot in one
+// loop or a few loops apart, so a unit's order in the next frame may come
+// from any command since the previous frame. A command is judged together
+// with every command of the player in that span whose target matches it
+// (the same unit, or a point within half a cell): the union of their tracked
+// selections against the ordered units. Units that already carried the order
+// in the previous frame, and weren't selected, are left out.
 func CheckSelection(events []replay.Event, s *enginev1.Samples) SelectionReport {
 	var rep SelectionReport
 	player := int(s.ObservedPlayer)
 	frames := s.Frames
-	frameAfter := func(loop int64) *enginev1.Frame {
-		i := sort.Search(len(frames), func(i int) bool { return int64(frames[i].Loop) > loop })
-		if i == len(frames) {
-			return nil
-		}
-		return frames[i]
+	// frameAfter is the index of the first frame after loop.
+	frameAfter := func(loop int64) int {
+		return sort.Search(len(frames), func(i int) bool { return int64(frames[i].Loop) > loop })
 	}
-	// Loops of this player's commands, to skip commands quickly overridden.
-	var cmdLoops []int64
-	for i := range events {
-		if events[i].Kind == replay.KindCommand && events[i].Player == player {
-			if n := len(cmdLoops); n == 0 || cmdLoops[n-1] != events[i].Loop {
-				cmdLoops = append(cmdLoops, events[i].Loop)
-			}
-		}
-	}
-	nextCmdLoop := func(after int64) int64 {
-		i := sort.Search(len(cmdLoops), func(i int) bool { return cmdLoops[i] > after })
-		if i == len(cmdLoops) {
-			return math.MaxInt64
-		}
-		return cmdLoops[i]
-	}
-	// Bots often give the same order to several units in one loop, one unit
-	// per command. Commands with the same target in the same loop are judged
-	// together: the union of their selections against the ordered units.
-	type key struct {
-		tag  replay.Tag
-		x, y int64
-	}
-	type pending struct {
+	type cmd struct {
 		e   *replay.Event
-		got map[uint32]bool
+		sel []replay.Tag
 	}
-	var batch []*pending
-	batchKeys := map[key]*pending{}
-	var precSum, recSum float64
-	flush := func() {
-		for _, p := range batch {
-			judge(p.e, p.got, frameAfter, nextCmdLoop, player, &rep, &precSum, &recSum)
-		}
-		batch, batchKeys = nil, map[key]*pending{}
-	}
+	var cmds []cmd
 	tr := selection.New()
 	for i := range events {
 		e := &events[i]
-		if len(batch) > 0 && e.Loop != batch[0].e.Loop {
-			flush()
-		}
 		tr.Apply(e)
-		if e.Kind != replay.KindCommand || e.Player != player || !e.HasTarget || e.Queued {
-			continue
-		}
-		k := key{e.TargetTag, int64(math.Round(e.X * 2)), int64(math.Round(e.Y * 2))}
-		p := batchKeys[k]
-		if p == nil {
-			p = &pending{e: e, got: map[uint32]bool{}}
-			batchKeys[k] = p
-			batch = append(batch, p)
-		}
-		for _, t := range tr.Selected(player) {
-			p.got[uint32(t)] = true
+		if e.Kind == replay.KindCommand && e.Player == player {
+			c := cmd{e: e}
+			if e.HasTarget && !e.Queued {
+				c.sel = tr.Selected(player)
+			}
+			cmds = append(cmds, c)
 		}
 	}
-	flush()
+	sameTarget := func(a, b *replay.Event) bool {
+		if a.TargetTag != 0 || b.TargetTag != 0 {
+			return a.TargetTag == b.TargetTag
+		}
+		return math.Hypot(a.X-b.X, a.Y-b.Y) < 0.5
+	}
+	var precSum, recSum float64
+	for ci, c := range cmds {
+		e := c.e
+		if !e.HasTarget || e.Queued {
+			continue
+		}
+		fi := frameAfter(e.Loop)
+		if fi == len(frames) {
+			continue
+		}
+		next := ci + 1
+		for next < len(cmds) && cmds[next].e.Loop == e.Loop {
+			next++
+		}
+		if next < len(cmds) && cmds[next].e.Loop < int64(frames[fi].Loop) {
+			continue
+		}
+		// Only the first command of a matching group in a loop is judged.
+		first := true
+		for k := ci - 1; k >= 0 && cmds[k].e.Loop == e.Loop; k-- {
+			if cmds[k].sel != nil && sameTarget(cmds[k].e, e) {
+				first = false
+				break
+			}
+		}
+		if !first {
+			continue
+		}
+		var from int64 = -1
+		if fi > 0 {
+			from = int64(frames[fi-1].Loop)
+		}
+		got := map[uint32]bool{}
+		for k := ci; k >= 0 && cmds[k].e.Loop > from; k-- {
+			if cmds[k].sel != nil && sameTarget(cmds[k].e, e) {
+				for _, t := range cmds[k].sel {
+					got[uint32(t)] = true
+				}
+			}
+		}
+		for k := ci + 1; k < len(cmds) && cmds[k].e.Loop == e.Loop; k++ {
+			if cmds[k].sel != nil && sameTarget(cmds[k].e, e) {
+				for _, t := range cmds[k].sel {
+					got[uint32(t)] = true
+				}
+			}
+		}
+		judge(e, got, frames, fi, player, &rep, &precSum, &recSum)
+	}
 	if rep.Commands > 0 {
 		rep.Precision = precSum / float64(rep.Commands)
 		rep.Recall = recSum / float64(rep.Commands)
@@ -108,23 +127,25 @@ func CheckSelection(events []replay.Event, s *enginev1.Samples) SelectionReport 
 	return rep
 }
 
-// judge scores one (batched) command against the next engine frame.
-func judge(e *replay.Event, got map[uint32]bool, frameAfter func(int64) *enginev1.Frame,
-	nextCmdLoop func(int64) int64, player int, rep *SelectionReport, precSum, recSum *float64) {
-	f := frameAfter(e.Loop)
-	if f == nil || nextCmdLoop(e.Loop) < int64(f.Loop) {
-		return
+// judge scores one (grouped) command against frame fi.
+func judge(e *replay.Event, got map[uint32]bool, frames []*enginev1.Frame, fi, player int,
+	rep *SelectionReport, precSum, recSum *float64) {
+	had := map[uint32]bool{}
+	if fi > 0 {
+		for _, u := range frames[fi-1].Units {
+			if int(u.Owner) == player && hasOrder(e, u) {
+				had[EngineTag(u.Tag)] = true
+			}
+		}
 	}
 	want := map[uint32]bool{}
-	for _, u := range f.Units {
-		if int(u.Owner) != player {
+	for _, u := range frames[fi].Units {
+		if int(u.Owner) != player || !hasOrder(e, u) {
 			continue
 		}
-		for _, o := range u.Orders {
-			if matchesOrder(e, o) {
-				want[EngineTag(u.Tag)] = true
-				break
-			}
+		t := EngineTag(u.Tag)
+		if got[t] || !had[t] {
+			want[t] = true
 		}
 	}
 	if len(want) == 0 {
@@ -148,6 +169,15 @@ func judge(e *replay.Event, got map[uint32]bool, frameAfter func(int64) *enginev
 	if inter == len(want) && inter == len(got) {
 		rep.Exact++
 	}
+}
+
+func hasOrder(e *replay.Event, u *enginev1.UnitSample) bool {
+	for _, o := range u.Orders {
+		if matchesOrder(e, o) {
+			return true
+		}
+	}
+	return false
 }
 
 func matchesOrder(e *replay.Event, o *enginev1.Order) bool {
