@@ -169,3 +169,17 @@ func TestHugeUnitsNeedMoreRoom(t *testing.T) {
 		t.Error("a huge unit fits through a straight two-cell gap")
 	}
 }
+
+func TestStartOnWallTakesGoalSide(t *testing.T) {
+	g := New(10, 10)
+	for y := 0; y < 10; y++ {
+		g.Set(5, y, false)
+	}
+	// Standing on the wall itself, the unit belongs to the goal's side.
+	if !g.ReachableFor(Point{5.5, 5.5}, Point{8.5, 5.5}, Small) {
+		t.Error("right side should be reachable from the wall")
+	}
+	if !g.ReachableFor(Point{5.5, 5.5}, Point{1.5, 5.5}, Small) {
+		t.Error("left side should be reachable from the wall")
+	}
+}
