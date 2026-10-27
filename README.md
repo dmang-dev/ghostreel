@@ -72,7 +72,7 @@ Press **B** to switch the events panel to the build order, battles, hotspots, ec
 
 Press **3** (or the 3D button) to switch views. **V** cycles fog of war through each player's vision. In 3D, drag to pan, right-drag (or Shift-drag) to rotate and tilt, and scroll to zoom.
 
-With a StarCraft II installation on the same machine, the 3D view uses the game's own unit models, animations, doodads and ground textures. They are converted from your install on first use and cached locally. The server looks in the default install folder; point it elsewhere with `--gamedata <folder with .build.info>` or `GHOSTREEL_GAMEDATA`. Without an install, units are drawn as plain shapes.
+With a StarCraft II installation on the same machine (the desktop app's **Settings** can point to it if it's somewhere unusual), the 3D view uses the game's own unit models, animations, doodads and ground textures. They are converted from your install on first use and cached locally. The server looks in the default install folder; point it elsewhere with `--gamedata <folder with .build.info>` or `GHOSTREEL_GAMEDATA`. Without an install, units are drawn as plain shapes.
 
 ```bash
 go run ./cmd/ghostreel assets            # convert every ladder unit's model now and report gaps
@@ -105,7 +105,7 @@ ghostreel looks for a replay's map in this order:
 1. A map file you pick (**Pick map file…** in the viewer, `--map` on the command line).
 2. The Battle.net cache, where the game keeps every map you've played.
 3. ghostreel's own cache of maps it downloaded.
-4. For local and bot games, which record only a file name: your SC2 `Maps` folder and any folders in `--maps` / `GHOSTREEL_MAPS`.
+4. For local and bot games, which record only a file name: next to the replay or in a `maps` folder beside it, your SC2 `Maps` folder, and any folders in `--maps` / `GHOSTREEL_MAPS` (or the desktop app's **Settings**).
 
 If none of these has it, the replay still plays on a blank grid. For ladder and custom maps, **Download from Blizzard** fetches the map from Blizzard's public map server; the command-line equivalent is `--network`. The file is checked against the hash recorded in the replay. Nothing is downloaded unless you ask.
 

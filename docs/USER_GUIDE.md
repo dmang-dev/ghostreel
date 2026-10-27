@@ -85,7 +85,9 @@ The desktop app and `ghostreel serve` look for a replay's map in this order:
 1. A map file you pick (**Pick map file…**, or `--map` on the command line).
 2. The Battle.net cache, where the game keeps every map you've played: `C:\ProgramData\Blizzard Entertainment\Battle.net\Cache` on Windows, `/Users/Shared/Blizzard/Battle.net/Cache` on macOS.
 3. Maps ghostreel downloaded before.
-4. For local and bot games: your SC2 `Maps` folder, and folders in `--maps` / `GHOSTREEL_MAPS`.
+4. For local and bot games, which record only the map's file name: next to the replay, then in a `maps` folder beside it, then your SC2 `Maps` folder and the folders in `--maps` / `GHOSTREEL_MAPS` (in the desktop app, also the **Map folders** in **Settings**).
+
+Finding a map next to the replay needs to know where the replay is: the desktop app knows for **Open replay…**, files dropped on the window, the library and "Open with". A replay uploaded to `ghostreel serve` or the browser build has no folder, so only the other places are searched.
 
 If none has it, the replay plays on a blank grid. For ladder and custom maps, **Download from Blizzard** fetches the map from Blizzard's map server and checks it against the hash in the replay. Nothing is downloaded unless you click it.
 
@@ -130,4 +132,11 @@ Delete that folder to clear it.
 - **"Decoded with the protocol of build …"**: the replay is from a game version newer than ghostreel knows. It is decoded with the nearest older version, which usually works. Update ghostreel when a new version is out.
 - **Units stand still:** the replay is on the tracker tier (no map, or AI players). Add the map.
 - **The map doesn't match:** a map of the right name but a different size was found. Pick the right file.
-- **3D shows shapes only:** no game installation was found. Check the server's log line "3D models from …", or set `--gamedata`.
+- **3D shows shapes only:** no game installation was found. In the desktop app, open **Settings** and choose the StarCraft II folder (the one with `.build.info`, such as `D:\Games\StarCraft II`); the models load without a restart. With `ghostreel serve`, check the log line "3D models from …", or set `--gamedata`.
+
+## Settings (desktop app)
+
+**Settings** in the toolbar holds two things, saved in `settings.json` in your user config folder (`%AppData%\ghostreel` on Windows):
+
+- **StarCraft II folder:** where the game is installed, if ghostreel doesn't find it in the usual place. Leave it empty to find it automatically. Its `Maps` folder is searched for local maps too.
+- **Map folders:** more folders to search for the maps of local and bot games, one per line.
