@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -187,5 +188,84 @@ func TestLibrary(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != 200 && resp.StatusCode != 422 { // 422 for the pre-2.0.8 test replay
 		t.Errorf("library open %q: %d", list[0].Name, resp.StatusCode)
+	}
+}
+
+func TestOpenPathFindsMapBeside(t *testing.T) {
+	src := filepath.Join(testdata, "replays", "GhostProtocol_2026-03-11_18-03-30_Defeat.SC2Replay")
+	data, err := os.ReadFile(src)
+	mapData, err2 := os.ReadFile(filepath.Join(testdata, "maps", "AbyssalReefAIE.SC2Map"))
+	if err != nil || err2 != nil {
+		t.Skip("test replay or map not present")
+	}
+	dir := t.TempDir()
+	replayPath := filepath.Join(dir, "game.SC2Replay")
+	os.WriteFile(replayPath, data, 0o644)
+	os.Mkdir(filepath.Join(dir, "maps"), 0o755)
+	os.WriteFile(filepath.Join(dir, "maps", "AbyssalReefAIE.SC2Map"), mapData, 0o644)
+	body, _ := json.Marshal(map[string]string{"path": replayPath})
+
+	// serve doesn't open paths.
+	ts, _ := newTestServer(t)
+	if resp, _ := post(t, ts.URL+"/api/open-path", "", body); resp.StatusCode != 404 {
+		t.Errorf("open-path without OpenPaths: %d", resp.StatusCode)
+	}
+
+	svc := &app.Service{CacheDir: t.TempDir(), Resolver: &mapcache.Resolver{}}
+	desk := httptest.NewServer((&Server{App: svc, OpenPaths: true}).Handler())
+	defer desk.Close()
+	resp, s := post(t, desk.URL+"/api/open-path", "", body)
+	if resp.StatusCode != 200 || !s.HasMap || s.MapHow != "beside" {
+		t.Fatalf("open-path: %d %+v", resp.StatusCode, s)
+	}
+	bad, _ := json.Marshal(map[string]string{"path": "relative.SC2Replay"})
+	if resp, _ := post(t, desk.URL+"/api/open-path", "", bad); resp.StatusCode != 400 {
+		t.Errorf("relative path: %d", resp.StatusCode)
+	}
+	if code, _ := get(t, desk.URL+"/api/pick"); code != 405 {
+		t.Errorf("GET pick: %d", code)
+	}
+}
+
+type memSettings struct{ s Settings }
+
+func (m *memSettings) Settings() Settings     { return m.s }
+func (m *memSettings) GameDataStatus() string { return "status" }
+func (m *memSettings) Apply(s Settings) error {
+	if s.GameData == "bad" {
+		return errors.New("not an install")
+	}
+	m.s = s
+	return nil
+}
+
+func TestSettings(t *testing.T) {
+	ts, _ := newTestServer(t)
+	if code, _ := get(t, ts.URL+"/api/settings"); code != 404 {
+		t.Errorf("settings without a store: %d", code)
+	}
+	svc := &app.Service{CacheDir: t.TempDir()}
+	desk := httptest.NewServer((&Server{App: svc, Settings: &memSettings{}}).Handler())
+	defer desk.Close()
+	put := func(body string) (int, map[string]any) {
+		req, _ := http.NewRequest(http.MethodPut, desk.URL+"/api/settings", strings.NewReader(body))
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var out map[string]any
+		json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	if code, out := put(`{"gameData":"I:/SC2","mapFolders":["P:/maps"]}`); code != 200 || out["gameData"] != "I:/SC2" || out["gameDataStatus"] != "status" {
+		t.Errorf("put: %d %v", code, out)
+	}
+	if code, out := put(`{"gameData":"bad"}`); code != 400 || out["error"] != "not an install" {
+		t.Errorf("bad put: %d %v", code, out)
+	}
+	code, body := get(t, desk.URL+"/api/settings")
+	if code != 200 || !strings.Contains(string(body), `"mapFolders":["P:/maps"]`) {
+		t.Errorf("get: %d %s", code, body)
 	}
 }

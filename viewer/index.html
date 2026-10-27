@@ -30,6 +30,7 @@
         </select>
         <button id="director" title="Director: the camera follows the action and pans to hotspots (D)">Director</button>
         <button id="export-btn" title="Export the game or a highlight reel as an MP4 video">Export video</button>
+        <button id="settings-btn" title="Game data and map folders" hidden>Settings</button>
         <button id="help-btn" title="Keyboard shortcuts">?</button>
       </header>
 
@@ -83,6 +84,24 @@
           <div class="row">
             <button id="export-start">Export</button>
             <button id="export-cancel">Close</button>
+          </div>
+        </div>
+        <div id="settings" class="panel" hidden>
+          <h3>Settings</h3>
+          <label for="set-gamedata">StarCraft II folder, for the game's models and ground</label>
+          <div class="row">
+            <input type="text" id="set-gamedata" placeholder="Found automatically" spellcheck="false" />
+            <button id="set-gamedata-browse" hidden>Browse…</button>
+          </div>
+          <p id="set-gamedata-status" class="note"></p>
+          <label for="set-mapfolders">Map folders for local and bot games, one per line</label>
+          <textarea id="set-mapfolders" rows="3" spellcheck="false"></textarea>
+          <div class="row"><button id="set-mapfolders-add" hidden>Add folder…</button></div>
+          <p class="note">Maps are also found next to a replay and in a "maps" folder beside it.</p>
+          <p id="settings-note" class="note"></p>
+          <div class="row">
+            <button id="settings-save">Save</button>
+            <button id="settings-close">Close</button>
           </div>
         </div>
         <div id="help" class="panel" hidden>

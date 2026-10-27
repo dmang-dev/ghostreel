@@ -22,9 +22,9 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/dmang-dev/ghostreel/internal/app"
-	"github.com/dmang-dev/ghostreel/internal/assets"
 	"github.com/dmang-dev/ghostreel/internal/server"
 )
 
@@ -40,16 +40,22 @@ func main() {
 	}
 	svc := app.New() // timelines cached under the user cache dir; depot downloads only on request
 	svc.Log = func(format string, a ...any) { log.Printf(format, a...) }
-	srv := &server.Server{App: svc, Library: replayFolders()}
-	if dir := assets.FindInstall(); dir != "" {
-		go func() { // reading the game data takes a moment; the 2D view needs none of it
-			if l, err := assets.Open(dir, svc.CacheDir); err != nil {
-				log.Printf("3D models unavailable: %v", err)
-			} else {
-				srv.SetAssets(l)
-			}
-		}()
+	// The viewer opens replays by path here (native dialog, file drops),
+	// so maps kept beside them are found.
+	var appCtx context.Context
+	srv := &server.Server{App: svc, Library: replayFolders(), OpenPaths: true}
+	srv.PickReplay = func() (string, error) {
+		return wailsruntime.OpenFileDialog(appCtx, wailsruntime.OpenDialogOptions{
+			Title:   "Open replay",
+			Filters: []wailsruntime.FileFilter{{DisplayName: "SC2 replays (*.SC2Replay)", Pattern: "*.SC2Replay"}},
+		})
 	}
+	srv.PickFolder = func() (string, error) {
+		return wailsruntime.OpenDirectoryDialog(appCtx, wailsruntime.OpenDialogOptions{Title: "Choose a folder"})
+	}
+	// The settings page: the game data folder (read in the background) and
+	// extra map folders.
+	srv.Settings = newSettingsStore(srv, svc)
 
 	// "Open with ghostreel": a replay passed on the command line opens at start.
 	if len(os.Args) > 1 && strings.EqualFold(filepath.Ext(os.Args[1]), ".SC2Replay") {
@@ -71,9 +77,10 @@ func main() {
 			Assets:  dist,
 			Handler: srv.Handler(), // /api/* (everything not in the viewer build)
 		},
-		// Let the page handle dropped files like a browser does (the viewer
-		// uploads them to the API).
-		DragAndDrop: &options.DragAndDrop{DisableWebViewDrop: false},
+		OnStartup: func(ctx context.Context) { appCtx = ctx },
+		// Dropped files reach the viewer with their paths (window.runtime.
+		// OnFileDrop); the page still gets the drop too, for map files.
+		DragAndDrop: &options.DragAndDrop{EnableFileDrop: true},
 	})
 	if err != nil {
 		log.Fatal(err)

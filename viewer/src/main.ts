@@ -31,7 +31,7 @@ const reports = new ReportsView($("feed-tabs"), $("report"), $("feed-list"), (l)
 // opens the data in the background at startup, so ask again for a while.
 const unitModels = new UnitModels("");
 scene.models = unitModels;
-const assetsReady = (async () => {
+let assetsReady = (async () => {
   for (let i = 0; i < 10 && !(await unitModels.init()); i++) await new Promise((r) => setTimeout(r, 1500));
   return unitModels.available;
 })();
@@ -517,6 +517,114 @@ scene.onClick = (px, py) => {
 };
 
 $("open").onclick = () => $<HTMLInputElement>("file").click();
+
+// The desktop app opens replays by path (its own open dialog, and drops with
+// their paths) rather than uploading them, so maps kept beside them are found.
+let dropsByPath = false;
+declare global {
+  interface Window {
+    // Wails' runtime, in the desktop app.
+    runtime?: { OnFileDrop?: (cb: (x: number, y: number, paths: string[]) => void, useDropTarget?: boolean) => void };
+  }
+}
+/** The desktop app's settings: the game data folder and map folders. */
+function setupSettings(canBrowse: boolean): void {
+  const panel = $("settings");
+  const gameData = $<HTMLInputElement>("set-gamedata");
+  const folders = $<HTMLTextAreaElement>("set-mapfolders");
+  const status = $("set-gamedata-status");
+  const note = $("settings-note");
+  const showStatus = (s: api.Settings) => (status.textContent = s.gameDataStatus ?? "");
+  $("settings-btn").hidden = false;
+  $("set-gamedata-browse").hidden = $("set-mapfolders-add").hidden = !canBrowse;
+  $("settings-btn").onclick = async () => {
+    panel.hidden = !panel.hidden;
+    if (panel.hidden) return;
+    note.textContent = "";
+    try {
+      const s = await api.getSettings();
+      gameData.value = s.gameData;
+      folders.value = s.mapFolders.join("\n");
+      showStatus(s);
+    } catch (e) {
+      note.textContent = (e as Error).message;
+    }
+  };
+  $("settings-close").onclick = () => (panel.hidden = true);
+  $("set-gamedata-browse").onclick = () => {
+    api.pickFolder().then((p) => p && (gameData.value = p), () => {});
+  };
+  $("set-mapfolders-add").onclick = () => {
+    api.pickFolder().then((p) => {
+      if (p) folders.value = [...folders.value.split("\n").filter((l) => l.trim()), p].join("\n");
+    }, () => {});
+  };
+  $("settings-save").onclick = async () => {
+    note.className = "note";
+    note.textContent = "Saving…";
+    try {
+      const before = await api.getSettings();
+      const saved = await api.saveSettings({ gameData: gameData.value.trim(), mapFolders: folders.value.split("\n").map((l) => l.trim()).filter(Boolean) });
+      gameData.value = saved.gameData;
+      folders.value = saved.mapFolders.join("\n");
+      showStatus(saved);
+      note.textContent = "Saved.";
+      if (saved.gameData !== before.gameData) void waitForGameData();
+    } catch (e) {
+      note.className = "note error";
+      note.textContent = (e as Error).message;
+      return;
+    }
+    // A replay on screen without its map: look again in the new folders.
+    if (cur && !cur.summary.hasMap) {
+      const s = await api.findMap(cur.summary.id).catch(() => null);
+      if (s?.hasMap) void replaceMap(async () => s, "Loading the map…");
+    }
+  };
+
+  // The game data loads in the background: follow it, then show the
+  // replay on screen again with the game's models and ground.
+  async function waitForGameData(): Promise<void> {
+    for (let i = 0; i < 240; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const s = await api.getSettings().catch(() => null);
+      if (!s) return;
+      showStatus(s);
+      if (!s.gameDataStatus?.startsWith("Reading")) break;
+    }
+    const ok = await unitModels.init();
+    assetsReady = Promise.resolve(ok);
+    if (ok && cur) {
+      const c = cur;
+      doodadsFor = "";
+      void replaceMap(async () => c.summary, "Loading the game's models…");
+    }
+  }
+}
+
+const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
+api.config().then((c) => {
+  if (c.pick) {
+    $("open").onclick = () => {
+      api.pickReplay().then(
+        (p) => {
+          if (p) void load(() => api.openReplayPath(p), fileName(p));
+        },
+        (e) => showError(`Could not show the open dialog: ${(e as Error).message}`),
+      );
+    };
+  }
+  if (c.settings) setupSettings(!!c.pickFolder);
+  if (c.openPaths && window.runtime?.OnFileDrop) {
+    dropsByPath = true;
+    window.runtime.OnFileDrop((_x, _y, paths) => {
+      const p = paths.find((x) => /\.sc2replay$/i.test(x));
+      if (p) load(() => api.openReplayPath(p), fileName(p));
+    }, false);
+  }
+}).catch(() => {
+  // No config endpoint: the file picker still works.
+});
 $<HTMLInputElement>("file").onchange = (e) => {
   const f = (e.target as HTMLInputElement).files?.[0];
   if (f) load(() => api.openReplayFile(f), f.name);
@@ -697,8 +805,9 @@ window.addEventListener("keydown", (e) => {
     const f = e.dataTransfer?.files[0];
     if (!f) return;
     const name = f.name.toLowerCase();
-    if (name.endsWith(".sc2replay")) load(() => api.openReplayFile(f), f.name);
-    else if ((name.endsWith(".sc2map") || name.endsWith(".s2ma")) && cur) pickMap(f);
+    if (name.endsWith(".sc2replay")) {
+      if (!dropsByPath) load(() => api.openReplayFile(f), f.name); // else the path arrives via OnFileDrop
+    } else if ((name.endsWith(".sc2map") || name.endsWith(".s2ma")) && cur) pickMap(f);
     else showError(`${f.name} is not a replay (.SC2Replay) or map (.SC2Map / .s2ma).`);
   });
 }

@@ -88,6 +88,69 @@ async function check(resp: Response): Promise<Response> {
   throw new Error(msg);
 }
 
+export interface Config {
+  network: boolean;
+  /** The desktop app: replays can be opened by path (openReplayPath). */
+  openPaths?: boolean;
+  /** A native open dialog is available (pickReplay). */
+  pick?: boolean;
+  /** A native folder dialog is available (pickFolder). */
+  pickFolder?: boolean;
+  /** The settings page is available (the desktop app). */
+  settings?: boolean;
+}
+
+export interface Settings {
+  /** The StarCraft II folder; "" finds the install. */
+  gameData: string;
+  mapFolders: string[];
+  /** Which game data is in use, or why there is none (read-only). */
+  gameDataStatus?: string;
+}
+
+export async function getSettings(): Promise<Settings> {
+  return (await check(await apiFetch("/api/settings"))).json();
+}
+
+/** Saves the settings; rejects with a message for the user when they don't check out. */
+export async function saveSettings(s: Settings): Promise<Settings> {
+  const resp = await apiFetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ gameData: s.gameData, mapFolders: s.mapFolders }),
+  });
+  return (await check(resp)).json();
+}
+
+/** Shows the desktop app's folder dialog; resolves to the path, "" if cancelled. */
+export async function pickFolder(): Promise<string> {
+  return (await (await check(await apiFetch("/api/pick-folder", { method: "POST" }))).json()).path ?? "";
+}
+
+/** Looks for a replay's missing map again (after the map folders change). */
+export async function findMap(id: string): Promise<Summary> {
+  return (await check(await apiFetch(`/api/r/${id}/find-map`, { method: "POST" }))).json();
+}
+
+export async function config(): Promise<Config> {
+  return (await check(await apiFetch("/api/config"))).json();
+}
+
+/** Shows the desktop app's open dialog; resolves to the path, "" if cancelled. */
+export async function pickReplay(): Promise<string> {
+  return (await (await check(await apiFetch("/api/pick", { method: "POST" }))).json()).path ?? "";
+}
+
+/** Opens a replay by its path on disk (desktop app), so maps beside it are found. */
+export async function openReplayPath(path: string): Promise<Summary> {
+  const resp = await apiFetch("/api/open-path", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  });
+  return (await check(resp)).json();
+}
+
 export async function openReplayFile(file: File): Promise<Summary> {
   const resp = await apiFetch("/api/open", {
     method: "POST",

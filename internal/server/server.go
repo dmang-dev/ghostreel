@@ -4,10 +4,15 @@
 // handler backs `ghostreel serve` and the desktop app's asset server, so the
 // viewer talks to one API everywhere.
 //
-//	GET  /api/config               {network}
+//	GET  /api/config               {network, openPaths, pick, pickFolder, settings}
 //	GET  /api/library              replays in the configured folders
 //	POST /api/library/open         {"name": "..."} → Summary
 //	POST /api/open                 body = replay bytes, X-Filename header → Summary
+//	POST /api/open-path            {"path": "..."} → Summary (desktop only: OpenPaths)
+//	POST /api/pick                 native file dialog → {"path"}, "" if cancelled (desktop only)
+//	POST /api/pick-folder          native folder dialog → {"path"}, "" if cancelled (desktop only)
+//	GET  /api/settings             Settings plus {gameDataStatus} (desktop only)
+//	PUT  /api/settings             Settings → the same as GET, or 400 with a message for the user
 //	GET  /api/r/{id}/timeline      binary timeline (application/x-protobuf)
 //	GET  /api/r/{id}/map           map JSON (404 when no map)
 //	GET  /api/r/{id}/minimap       PNG (404 when none)
@@ -15,6 +20,7 @@
 //	GET  /api/r/{id}/analysis      JSON reports of the analysis plugins (build orders, battles, ...)
 //	POST /api/r/{id}/map           body = map bytes, X-Filename header → Summary
 //	POST /api/r/{id}/download-map  fetch the map from Blizzard's depot (user-initiated) → Summary
+//	POST /api/r/{id}/find-map      look for a missing map again (after the settings change) → Summary
 //	GET  /api/startup              Summary of a replay opened at launch, or null
 //	GET  /api/assets               {available, build}: whether 3D models can be served
 //	GET  /api/assets/unit/{type}   binary glTF of a unit type's model (404 when none)
@@ -62,6 +68,17 @@ type Server struct {
 	// Startup, if set, is a replay already loaded at launch (desktop "Open
 	// with"); the viewer shows it on start.
 	Startup *app.Loaded
+	// OpenPaths lets the viewer open replays by their path on disk, so maps
+	// kept beside them are found. Only the desktop app sets it: its viewer
+	// is the local user's own, while `serve` may be reached by any page.
+	OpenPaths bool
+	// PickReplay, if set, shows a native open dialog and returns the chosen
+	// path ("" if cancelled), so the viewer gets a path, not just bytes.
+	PickReplay func() (string, error)
+	// PickFolder, if set, shows a native folder dialog (for the settings).
+	PickFolder func() (string, error)
+	// Settings, if set, backs the settings page (the desktop app's).
+	Settings SettingsStore
 
 	assets atomic.Pointer[assets.Library]
 
@@ -72,6 +89,24 @@ type Server struct {
 // SetAssets makes 3D models available once the game data has been opened
 // (which takes a moment, so callers may do it in the background).
 func (s *Server) SetAssets(l *assets.Library) { s.assets.Store(l) }
+
+// Settings are what the desktop app's settings page edits.
+type Settings struct {
+	// GameData is the StarCraft II folder; "" finds the install.
+	GameData string `json:"gameData"`
+	// MapFolders are searched for local maps, after the defaults.
+	MapFolders []string `json:"mapFolders"`
+}
+
+// SettingsStore keeps and applies the settings.
+type SettingsStore interface {
+	Settings() Settings
+	// Apply checks, saves and applies new settings. Its error is shown
+	// to the user as is.
+	Apply(Settings) error
+	// GameDataStatus says which game data is in use, or why there is none.
+	GameDataStatus() string
+}
 
 // Summary is what the viewer needs to know after loading a replay.
 type Summary struct {
@@ -108,11 +143,44 @@ func summarize(l *app.Loaded) Summary {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/config", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"network": s.App.Resolver != nil && s.App.Resolver.AllowNetwork})
+		writeJSON(w, map[string]any{
+			"network":    s.App.Resolver != nil && s.App.Resolver.AllowNetwork,
+			"openPaths":  s.OpenPaths,
+			"pick":       s.PickReplay != nil,
+			"pickFolder": s.PickFolder != nil,
+			"settings":   s.Settings != nil,
+		})
 	})
+	mux.HandleFunc("POST /api/pick-folder", func(w http.ResponseWriter, r *http.Request) {
+		if s.PickFolder == nil {
+			httpError(w, http.StatusNotFound, errors.New("no folder dialog here"))
+			return
+		}
+		p, err := s.PickFolder()
+		if err != nil {
+			httpError(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, map[string]string{"path": p})
+	})
+	mux.HandleFunc("GET /api/settings", s.settings)
+	mux.HandleFunc("PUT /api/settings", s.settings)
 	mux.HandleFunc("GET /api/library", s.library)
 	mux.HandleFunc("POST /api/library/open", s.libraryOpen)
 	mux.HandleFunc("POST /api/open", s.open)
+	mux.HandleFunc("POST /api/open-path", s.openPath)
+	mux.HandleFunc("POST /api/pick", func(w http.ResponseWriter, r *http.Request) {
+		if s.PickReplay == nil {
+			httpError(w, http.StatusNotFound, errors.New("no file dialog here"))
+			return
+		}
+		p, err := s.PickReplay()
+		if err != nil {
+			httpError(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, map[string]string{"path": p})
+	})
 	mux.HandleFunc("GET /api/r/{id}/timeline", s.blob(func(l *app.Loaded) ([]byte, string) {
 		return l.Timeline, "application/x-protobuf"
 	}))
@@ -137,6 +205,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/r/{id}/map", s.setMap)
 	mux.HandleFunc("POST /api/r/{id}/download-map", func(w http.ResponseWriter, r *http.Request) {
 		l, err := s.App.DownloadMap(r.Context(), r.PathValue("id"))
+		if err != nil {
+			httpError(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+		writeJSON(w, summarize(l))
+	})
+	mux.HandleFunc("POST /api/r/{id}/find-map", func(w http.ResponseWriter, r *http.Request) {
+		l, err := s.App.FindMap(r.Context(), r.PathValue("id"))
 		if err != nil {
 			httpError(w, http.StatusUnprocessableEntity, err)
 			return
@@ -308,6 +384,60 @@ func (s *Server) libraryOpen(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	httpError(w, http.StatusNotFound, errors.New("no such replay in the library"))
+}
+
+// settings reads (GET) or changes (PUT) the desktop app's settings.
+func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
+	if s.Settings == nil {
+		httpError(w, http.StatusNotFound, errors.New("no settings here"))
+		return
+	}
+	if r.Method == http.MethodPut {
+		var in Settings
+		if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil {
+			httpError(w, http.StatusBadRequest, err)
+			return
+		}
+		if err := s.Settings.Apply(in); err != nil {
+			httpError(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+	cur := s.Settings.Settings()
+	if cur.MapFolders == nil {
+		cur.MapFolders = []string{}
+	}
+	writeJSON(w, struct {
+		Settings
+		GameDataStatus string `json:"gameDataStatus"`
+	}{cur, s.Settings.GameDataStatus()})
+}
+
+// openPath opens a replay by its absolute path (desktop only).
+func (s *Server) openPath(w http.ResponseWriter, r *http.Request) {
+	if !s.OpenPaths {
+		httpError(w, http.StatusNotFound, errors.New("opening by path is not enabled"))
+		return
+	}
+	var req struct{ Path string }
+	if err := json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&req); err != nil {
+		httpError(w, http.StatusBadRequest, err)
+		return
+	}
+	if !filepath.IsAbs(req.Path) || !strings.EqualFold(filepath.Ext(req.Path), ".SC2Replay") {
+		httpError(w, http.StatusBadRequest, errors.New("not a replay path"))
+		return
+	}
+	l, err := s.App.LoadFile(r.Context(), req.Path)
+	if err != nil {
+		code := http.StatusUnprocessableEntity
+		if errors.Is(err, os.ErrNotExist) {
+			code = http.StatusNotFound
+		}
+		httpError(w, code, err)
+		return
+	}
+	writeJSON(w, summarize(l))
 }
 
 func (s *Server) open(w http.ResponseWriter, r *http.Request) {
