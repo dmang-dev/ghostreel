@@ -9,8 +9,8 @@
 //
 // Plugins register themselves with Register, usually from an init function,
 // and a binary includes a plugin by importing its package. The built-in ones
-// are build orders, battles, expansions, supply blocks and the economy
-// charts.
+// are build orders, battles, expansions, supply blocks, the economy charts,
+// APM, production idle time, army composition, upgrades and hotspots.
 package analysis
 
 import (

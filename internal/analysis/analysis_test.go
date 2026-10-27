@@ -148,7 +148,7 @@ func TestRunIsolatesFailures(t *testing.T) {
 	for _, p := range Plugins() {
 		ids = append(ids, p.ID())
 	}
-	if strings.Join(ids, ",") != "battles,build-order,economy,expansions,hotspots,supply-blocks" {
+	if strings.Join(ids, ",") != "apm,army,battles,build-order,economy,expansions,hotspots,production,supply-blocks,upgrades" {
 		t.Errorf("built-in plugins = %v", ids)
 	}
 }
