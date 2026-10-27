@@ -86,6 +86,9 @@ func (st *settingsStore) Apply(s server.Settings) error {
 		folders = append(folders, filepath.Clean(f))
 	}
 	s.MapFolders = folders
+	if s.CheckUpdates == nil {
+		s.CheckUpdates = st.Settings().CheckUpdates
+	}
 
 	b, _ := json.MarshalIndent(s, "", "  ")
 	if st.path == "" {

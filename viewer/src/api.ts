@@ -98,12 +98,44 @@ export interface Config {
   pickFolder?: boolean;
   /** The settings page is available (the desktop app). */
   settings?: boolean;
+  /** The app can check for and install new releases (getUpdate). */
+  update?: boolean;
+}
+
+/** Where the desktop app's updater stands (desktop/update.go). */
+export interface UpdateStatus {
+  current: string;
+  latest?: string;
+  available: boolean;
+  notesUrl?: string;
+  /** This copy can install the update itself; otherwise link to the release. */
+  canApply: boolean;
+  state: "idle" | "checking" | "downloading" | "installing" | "error";
+  progress?: number;
+  error?: string;
+  checked?: string;
+}
+
+export async function getUpdate(): Promise<UpdateStatus> {
+  return (await check(await apiFetch("/api/update"))).json();
+}
+
+/** Looks for a newer release now. */
+export async function checkUpdate(): Promise<UpdateStatus> {
+  return (await check(await apiFetch("/api/update/check", { method: "POST" }))).json();
+}
+
+/** Starts downloading and installing it; the app restarts when it's ready. */
+export async function applyUpdate(): Promise<UpdateStatus> {
+  return (await check(await apiFetch("/api/update/apply", { method: "POST" }))).json();
 }
 
 export interface Settings {
   /** The StarCraft II folder; "" finds the install. */
   gameData: string;
   mapFolders: string[];
+  /** Look for new releases at start; unset until the user has been asked. */
+  checkUpdates?: boolean;
   /** Which game data is in use, or why there is none (read-only). */
   gameDataStatus?: string;
 }
@@ -117,7 +149,7 @@ export async function saveSettings(s: Settings): Promise<Settings> {
   const resp = await apiFetch("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ gameData: s.gameData, mapFolders: s.mapFolders }),
+    body: JSON.stringify({ gameData: s.gameData, mapFolders: s.mapFolders, checkUpdates: s.checkUpdates }),
   });
   return (await check(resp)).json();
 }

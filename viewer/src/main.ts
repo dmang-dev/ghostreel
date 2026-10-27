@@ -15,6 +15,7 @@ import { UnitModels } from "./models";
 import { ReportsView } from "./reports";
 import { Scene } from "./scene";
 import { maskTextures } from "./ground";
+import { setupUpdates } from "./updates";
 import { blankGrid, hillshade, minimapTerrain } from "./terrain";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -615,6 +616,7 @@ api.config().then((c) => {
     };
   }
   if (c.settings) setupSettings(!!c.pickFolder);
+  if (c.update) void setupUpdates();
   if (c.openPaths && window.runtime?.OnFileDrop) {
     dropsByPath = true;
     window.runtime.OnFileDrop((_x, _y, paths) => {

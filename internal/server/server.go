@@ -4,7 +4,7 @@
 // handler backs `ghostreel serve` and the desktop app's asset server, so the
 // viewer talks to one API everywhere.
 //
-//	GET  /api/config               {network, openPaths, pick, pickFolder, settings}
+//	GET  /api/config               {network, openPaths, pick, pickFolder, settings, update}
 //	GET  /api/library              replays in the configured folders
 //	POST /api/library/open         {"name": "..."} → Summary
 //	POST /api/open                 body = replay bytes, X-Filename header → Summary
@@ -13,6 +13,9 @@
 //	POST /api/pick-folder          native folder dialog → {"path"}, "" if cancelled (desktop only)
 //	GET  /api/settings             Settings plus {gameDataStatus} (desktop only)
 //	PUT  /api/settings             Settings → the same as GET, or 400 with a message for the user
+//	GET  /api/update               UpdateStatus (desktop only)
+//	POST /api/update/check         look for a newer release now → UpdateStatus
+//	POST /api/update/apply         download, verify and install it; the app restarts
 //	GET  /api/r/{id}/timeline      binary timeline (application/x-protobuf)
 //	GET  /api/r/{id}/map           map JSON (404 when no map)
 //	GET  /api/r/{id}/minimap       PNG (404 when none)
@@ -34,6 +37,7 @@ package server
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -79,6 +83,8 @@ type Server struct {
 	PickFolder func() (string, error)
 	// Settings, if set, backs the settings page (the desktop app's).
 	Settings SettingsStore
+	// Updater, if set, checks for and installs new releases (desktop app).
+	Updater Updater
 
 	assets atomic.Pointer[assets.Library]
 
@@ -96,6 +102,35 @@ type Settings struct {
 	GameData string `json:"gameData"`
 	// MapFolders are searched for local maps, after the defaults.
 	MapFolders []string `json:"mapFolders"`
+	// CheckUpdates: look for a new release when the app starts. Unset
+	// until the user has been asked; left as it is when a change omits it.
+	CheckUpdates *bool `json:"checkUpdates,omitempty"`
+}
+
+// UpdateStatus is where the desktop app's updater stands.
+type UpdateStatus struct {
+	Current   string `json:"current"`
+	Latest    string `json:"latest,omitempty"`
+	Available bool   `json:"available"`
+	NotesURL  string `json:"notesUrl,omitempty"`
+	// CanApply: this copy can install the update itself (otherwise the
+	// viewer links to the release).
+	CanApply bool `json:"canApply"`
+	// State is "idle", "checking", "downloading", "installing" or "error".
+	State    string  `json:"state"`
+	Progress float64 `json:"progress,omitempty"` // 0-1 while downloading
+	Error    string  `json:"error,omitempty"`
+	Checked  string  `json:"checked,omitempty"` // RFC 3339, the last check
+}
+
+// Updater checks GitHub releases and installs a newer one.
+type Updater interface {
+	Status() UpdateStatus
+	// Check looks for a newer release and returns the new status.
+	Check(ctx context.Context) UpdateStatus
+	// Apply starts downloading and installing the update in the
+	// background; the app quits and restarts when it's ready.
+	Apply() error
 }
 
 // SettingsStore keeps and applies the settings.
@@ -149,7 +184,33 @@ func (s *Server) Handler() http.Handler {
 			"pick":       s.PickReplay != nil,
 			"pickFolder": s.PickFolder != nil,
 			"settings":   s.Settings != nil,
+			"update":     s.Updater != nil,
 		})
+	})
+	mux.HandleFunc("GET /api/update", func(w http.ResponseWriter, r *http.Request) {
+		if s.Updater == nil {
+			httpError(w, http.StatusNotFound, errors.New("no updater here"))
+			return
+		}
+		writeJSON(w, s.Updater.Status())
+	})
+	mux.HandleFunc("POST /api/update/check", func(w http.ResponseWriter, r *http.Request) {
+		if s.Updater == nil {
+			httpError(w, http.StatusNotFound, errors.New("no updater here"))
+			return
+		}
+		writeJSON(w, s.Updater.Check(r.Context()))
+	})
+	mux.HandleFunc("POST /api/update/apply", func(w http.ResponseWriter, r *http.Request) {
+		if s.Updater == nil {
+			httpError(w, http.StatusNotFound, errors.New("no updater here"))
+			return
+		}
+		if err := s.Updater.Apply(); err != nil {
+			httpError(w, http.StatusConflict, err)
+			return
+		}
+		writeJSON(w, s.Updater.Status())
 	})
 	mux.HandleFunc("POST /api/pick-folder", func(w http.ResponseWriter, r *http.Request) {
 		if s.PickFolder == nil {

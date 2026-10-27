@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -55,7 +56,18 @@ func main() {
 	}
 	// The settings page: the game data folder (read in the background) and
 	// extra map folders.
-	srv.Settings = newSettingsStore(srv, svc)
+	st := newSettingsStore(srv, svc)
+	srv.Settings = st
+	// New releases from GitHub, only if the user agreed to look (the viewer
+	// asks once).
+	upd := newUpdater(func() { wailsruntime.Quit(appCtx) })
+	srv.Updater = upd
+	if c := st.Settings().CheckUpdates; c != nil && *c {
+		go func() {
+			time.Sleep(3 * time.Second)
+			upd.Check(context.Background())
+		}()
+	}
 
 	// "Open with ghostreel": a replay passed on the command line opens at start.
 	if len(os.Args) > 1 && strings.EqualFold(filepath.Ext(os.Args[1]), ".SC2Replay") {
