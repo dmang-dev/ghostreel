@@ -42,7 +42,7 @@ Then open <http://127.0.0.1:8080/>. Other commands: `ghostreel info`, `dump-time
 
 A replay stores what players clicked, not where units were, so movement is reconstructed. Births, deaths, buildings, upgrades and player stats are always exact. The badge at the top says how positions were filled in:
 
-- **Command tier** (the default): units follow their players' orders along the map's paths. They mine, walk to rally points, stop at enemies on attack-move, and use Stimpack and creep speed. The estimate snaps to the real position whenever the replay recorded one. Players without recorded orders (the built-in AI) fall back to the tracker tier.
+- **Command tier** (the default): units follow their players' orders along the map's paths. They mine, walk to rally points, stop at enemies on attack-move, and use Stimpack and creep speed. The estimate snaps to the real position whenever the replay recorded one. Players without recorded orders (the built-in AI) fall back to the tracker tier; their workers are drawn mining at the base they stand by (which field is a guess).
 - **Tracker tier:** positions are known only when the replay sampled them (about every 11 s, mostly in fights) and at deaths. In between, units hold their last known position. This is used when the map is missing.
 - **Engine tier:** exact positions, recorded by playing the replay in the real game with `ghostreel-engine`. Keep the resulting `.engine.pb.gz` next to the replay.
 
@@ -109,7 +109,7 @@ The video is made in the app, frame by frame, as fast as your computer can draw 
 
 ## 3D
 
-Press **3**. With StarCraft II installed on the same computer, units are the game's own models with their animations, and the map shows its rocks, plants and wreckage, and the ground painted with the map's own textures. The terrain menu calls this **Ground textures**, and it works in 2D too. How sharp the ground looks depends on your install: a full Windows or macOS install has the game's full-size textures, while slimmed-down copies (such as Blizzard's Linux package) have only small versions, which look soft up close. Zerg creep shows as a purple layer around hatcheries and creep tumors; it is an estimate of how far it spread. The models are converted from your install the first time they're needed and kept in ghostreel's cache folder; nothing is downloaded or shared. If the game is installed somewhere unusual, point to the folder that contains `.build.info`, using `--gamedata` or the `GHOSTREEL_GAMEDATA` environment variable. To convert everything up front and see what's missing, run `ghostreel assets`.
+Press **3**. With StarCraft II installed on the same computer, units are the game's own models with their animations, buildings go up the way they do in the game (scaffolding, morphing, warping in), and the map shows its rocks, plants and wreckage, its cliffs built from the game's cliff models, and the ground painted with the map's own textures. The terrain menu calls this **Ground textures**, and it works in 2D too. How sharp the ground looks depends on your install: a full Windows or macOS install has the game's full-size textures, while slimmed-down copies (such as Blizzard's Linux package) have only small versions, which look soft up close. Zerg creep shows as a purple layer around hatcheries and creep tumors; it is an estimate of how far it spread. The models are converted from your install the first time they're needed and kept in ghostreel's cache folder; nothing is downloaded or shared. If the game is installed somewhere unusual, point to the folder that contains `.build.info`, using `--gamedata` or the `GHOSTREEL_GAMEDATA` environment variable. To convert everything up front and see what's missing, run `ghostreel assets`.
 
 Without the game (and in the browser build), units are plain shapes in team colors, which is also what you see while a model loads and when zoomed far out.
 
@@ -130,7 +130,7 @@ Delete that folder to clear it.
 ## Troubleshooting
 
 - **"Decoded with the protocol of build …"**: the replay is from a game version newer than ghostreel knows. It is decoded with the nearest older version, which usually works. Update ghostreel when a new version is out.
-- **Units stand still:** the replay is on the tracker tier (no map, or AI players). Add the map.
+- **Units stand still:** the replay is on the tracker tier (no map, or AI players). Add the map. The built-in AI's army moves only when the replay sampled it; its workers are drawn mining.
 - **The map doesn't match:** a map of the right name but a different size was found. Pick the right file.
 - **3D shows shapes only:** no game installation was found. In the desktop app, open **Settings** and choose the StarCraft II folder (the one with `.build.info`, such as `D:\Games\StarCraft II`); the models load without a restart. With `ghostreel serve`, check the log line "3D models from …", or set `--gamedata`.
 

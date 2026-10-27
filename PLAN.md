@@ -185,7 +185,7 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 **D. 3D fidelity** — exit: a ladder map in 3D reads like the game at a glance, at 60 fps on a mid-range GPU.
 
 1. A performance pass on a real GPU: so far it was measured only on a software renderer, 55 ms per frame with 96 models (Phase 3).
-2. Cliff meshes from the tile set's cliff models in place of the heightfield's walls (Phase 3/5).
+2. ~~Cliff meshes from the tile set's cliff models in place of the heightfield's walls (Phase 3/5).~~ Done 2026-10-27 (see DECISIONS).
 3. Water, and creep that recedes after its source dies rather than vanishing (Phase 3/5).
 4. Weapon and attachment models, per-actor scale, and lighting per tile set (Phase 3).
 5. The minimap's handling of fog-hidden units: it may lag a frame; unverified (Phase 3).

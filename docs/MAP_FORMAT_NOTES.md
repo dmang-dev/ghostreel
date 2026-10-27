@@ -24,13 +24,25 @@ The parser scans for the two printable strings followed by bounds inside the map
 
 ## `t3SyncHeightMap` (gameplay heights)
 
-`SMAP`, version 0x66, u32 w, u32 h (**vertices**: cells + 1 each way), header up to `len − w·h·4` (64 bytes so far). The header contains three u32 4096 values. Then one u32 per vertex, value ÷ 32768 = height in game units **above an unrecorded base** (2 units per cliff level). (Phase 0 read ÷ 4096, which made terrain 8 times too tall; fixed in Phase 3.) The base comes from the visual height map below; command target points then match within about 0.1.
+`SMAP`, version 0x66, u32 w, u32 h (**vertices**: cells + 1 each way), header up to `len − w·h·4` (64 bytes so far). The header contains three u32 4096 values. Then one u32 per vertex, value ÷ 32768 = height in game units **above an unrecorded base** (2 units per cliff level). (Phase 0 read ÷ 4096, which made terrain 8 times too tall; fixed in Phase 3.) The base comes from the doodads: they are placed at absolute heights, most of them on the ground, so the most common gap between a doodad's height and the sync map is the base (when at least a quarter of 50 or more doodads agree). Otherwise it comes from the visual height map below. Command target points then match within about 0.05 on every map checked. The visual height map alone is off by a constant on some maps (Ultralove, by 5.9).
 
-`t3HeightMap` (`HMAP`, version 0x65) is the visual height map: a 32-byte header, then 6 bytes per vertex: u16 (unknown), u16 quantized height, u16 cliff level. Height = q × `quantizeScale` + `standardHeight` − `quantizeBias`, from `<vertData>` in `t3Terrain.xml`. It is used only to find the sync map's base; the sync map is what the game uses for gameplay.
+`t3HeightMap` (`HMAP`, version 0x65) is the visual height map: a 32-byte header, then 6 bytes per vertex: u16 (unknown), u16 quantized height, u16 cliff level. Height = q × `quantizeScale` + `standardHeight` − `quantizeBias`, from `<vertData>` in `t3Terrain.xml`. It is used to find the sync map's base (the sync map is what the game uses for gameplay) and for the cliff levels (see Cliffs).
 
 ## `t3Terrain.xml` and `t3TextureMasks`
 
 `<heightMap tileSet=…>` holds `<vertData>` (above) and `<textureList>`, 64 `CTerrainTex` ids, 8 per texture set; set 0 is the terrain's own. `t3TextureMasks` (`MASK`, version 0x66, 64-byte header; u32 at 16 = texel height) holds 8 layers, one weight byte per texel. Each layer is 4 texels per cell across and 8 up. The weights of a texel sum to 255, and layer *i* paints texture *i* of `textureList`. A layer is stored as 32×32-byte tiles in strips two tiles high: tile *t* of a strip is column *t*/2, row *t*%2. Strips run left to right; strip rows run from the bottom of the map up; layers follow one another. (The u32 at 12 is twice the layer width.) Textures repeat across the map as `uvtiling` on `<heightMap>` says: x and y repeats, then offsets. (Maps without `uvtiling` are drawn with a repeat every 32/3 cells.) The API serves the layers as `GET /api/r/{id}/masks`: gzip of two RGBA planes of the mask's size (layers 0–3, then 4–7), rows from the bottom of the map; the map JSON's `terrainMasks` gives the size and tiling.
+
+## Cliffs (`t3Terrain.xml`, `t3HeightMap`, the game's cliff data)
+
+The game draws cliffs as models, one piece per **cliff cell** of 2×2 cells:
+
+- `t3Terrain.xml`'s `<cliffSetList>` names the map's cliff sets (`CCliff` ids, such as `ProtossBaseManmadeCliffs`), and `<cliffCellList num=…>` has a `<cc i= f= cid= cvar=/>` per painted cliff cell: `i` is the cell index (row-major, rows from the bottom of the map), `cid` the cliff set, `cvar` the piece variation, and `f` flags not understood. A 248×248 map has 124×124 cliff cells.
+- The cliff level at each vertex is the third u16 of `t3HeightMap` (0–3 on the maps seen). It follows the ground: on Pylon AIE every vertex of level *L* ≥ 1 is at height 2(*L* − 1). A cliff cell's corners are every second vertex.
+- In the game data, `CliffData.xml`'s `CCliff` gives the set's `CliffMesh` (a `CCliffMesh` id; `ShakurasEx1Cliff0` uses `CliffNatural0Ex1`) and `CliffMaterial` (default `Assets\Cliffs\##id##_Material\##id##_Material.m3`, a small model whose material the pieces are drawn with). `CliffMeshData.xml`'s `CCliffMesh` gives `ModelPath` (`Assets\Cliffs\##id##\`) and `CliffHeights` by index.
+- Pieces are `<mesh>_<corners>_<nn>.m3`, the corners lettered south-west, south-east, north-east, north-west, "a" for the cell's lowest level ("cliffnatural0ex1_aaab_02.m3"). Only one rotation of each shape is stored (the smallest in letter order), so a cell takes the stored shape turned by quarter turns. Pieces are 2 units across (−1 to 1) and in world units vertically: letter *k* stands at `CliffHeights[k]` − `CliffHeights[0]` (0, 8, 10, 12 with the usual −8, 0, 2, 4), so "b" is 8 above "a". The piece's "b" goes at the ground height of the level above the cell's lowest; the wall runs on 6 units below the lower ground, hidden, except where the ground falls away into space.
+- Natural cliff pieces carry vertex colors whose alpha fades the piece into the ground: 0 along the top, 255 on the wall. Manmade pieces have none and are opaque.
+
+The API places the pieces (`GET /api/r/{id}/cliffs`) and serves them as glTF (`/api/assets/cliff/{mesh}/{corners}?v=`, `/api/assets/cliffmaterial/{set}`); this needs the game data as well as the map.
 
 ## `t3SyncCliffLevel`
 
