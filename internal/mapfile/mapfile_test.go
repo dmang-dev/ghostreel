@@ -256,3 +256,23 @@ func TestGroundTiling(t *testing.T) {
 		t.Errorf("unset in the map: %v", got)
 	}
 }
+
+func TestDoodadBase(t *testing.T) {
+	// A flat 8x8 map whose sync heights read 0 where the ground is at 5.9.
+	m := &Map{Width: 8, Height: 8, Heights: make([]float32, 81)}
+	for i := 0; i < 60; i++ {
+		m.Objects = append(m.Objects, Object{Kind: ObjectDoodad, X: float64(i%8) + 0.5, Y: float64(i/8%8) + 0.5, Z: 5.9})
+	}
+	// A few float (props in the air) and don't move the answer.
+	for i := 0; i < 10; i++ {
+		m.Objects = append(m.Objects, Object{Kind: ObjectDoodad, X: 1, Y: 1, Z: 12 + float64(i)})
+	}
+	if b, ok := doodadBase(m); !ok || b != 5.9 {
+		t.Errorf("base %v %v, want 5.9", b, ok)
+	}
+	// Too few doodads: no answer.
+	m.Objects = m.Objects[:10]
+	if _, ok := doodadBase(m); ok {
+		t.Error("base from 10 doodads")
+	}
+}

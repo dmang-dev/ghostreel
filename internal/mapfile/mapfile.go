@@ -217,6 +217,9 @@ func groundBase(m *Map, visual []float32) float32 {
 	if m.Heights == nil {
 		return 0
 	}
+	if b, ok := doodadBase(m); ok {
+		return b
+	}
 	var off []float64
 	if len(visual) == len(m.Heights) {
 		for i := 0; i < len(visual); i += 7 {
@@ -240,6 +243,50 @@ func groundBase(m *Map, visual []float32) float32 {
 	}
 	sort.Float64s(off)
 	return float32(math.Round(off[len(off)/2]*4) / 4)
+}
+
+// doodadBase finds the sync map's base from the doodads: they are placed
+// at absolute heights, most of them on the ground, so the most common gap
+// between a doodad and the sync map is the base. Some maps' visual height
+// map is off by a constant (Ultralove by 5.9) where the doodads and the
+// replays' command targets agree. ok is false when no gap is common enough
+// (few doodads, or most floating, as over a space map's void).
+func doodadBase(m *Map) (base float32, ok bool) {
+	w := m.Width + 1
+	var off []float64
+	for _, o := range m.Objects {
+		if o.Kind != ObjectDoodad || o.X < 0 || o.Y < 0 || int(o.X) >= m.Width || int(o.Y) >= m.Height {
+			continue
+		}
+		x, y := int(o.X), int(o.Y)
+		fx, fy := float32(o.X)-float32(x), float32(o.Y)-float32(y)
+		h := (m.Heights[y*w+x]*(1-fx)+m.Heights[y*w+x+1]*fx)*(1-fy) + (m.Heights[(y+1)*w+x]*(1-fx)+m.Heights[(y+1)*w+x+1]*fx)*fy
+		off = append(off, o.Z-float64(h))
+	}
+	if len(off) < 50 {
+		return 0, false
+	}
+	bins := map[int]int{}
+	for _, v := range off {
+		bins[int(math.Round(v*10))]++
+	}
+	best, n := 0, 0
+	for b, c := range bins {
+		if c > n || (c == n && b < best) {
+			best, n = b, c
+		}
+	}
+	if n*4 < len(off) {
+		return 0, false
+	}
+	var in []float64
+	for _, v := range off {
+		if math.Abs(v-float64(best)/10) <= 0.1 {
+			in = append(in, v)
+		}
+	}
+	sort.Float64s(in)
+	return float32(math.Round(in[len(in)/2]*100) / 100), true
 }
 
 // HeightAt returns the height at a cell's center (average of its corners).
