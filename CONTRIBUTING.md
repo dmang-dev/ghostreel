@@ -122,4 +122,12 @@ Push a tag `vX.Y.Z`. `.github/workflows/release.yml` then builds:
 - the browser build;
 - the desktop app: a Windows installer plus a portable zip, a macOS universal app, and a Linux binary.
 
-It collects them in a **draft** release with SHA-256 checksums. Check the draft (install it on each OS if you can), then publish. The builds are not code-signed; adding signing needs certificates held by maintainers.
+It publishes them as a GitHub release with SHA-256 checksums and `latest.json`, the update manifest the desktop app reads. A tag with a suffix (`v1.3.0-rc1`) makes a pre-release, which installed apps don't offer; use one to try a build before everyone gets it. Running the workflow by hand (Actions → release → Run workflow) only builds the artifacts. The builds are not code-signed; adding signing needs certificates held by maintainers.
+
+### Update signing
+
+`latest.json` lists each file's size and SHA-256 and is signed (`latest.json.sig`, Ed25519). The app accepts a manifest only if the signature matches `update.PublicKey` (`internal/update`), and a download only if it matches the manifest. The private key is the repository secret `GHOSTREEL_UPDATE_KEY`; without it the release still goes out, with a warning, but apps won't see it.
+
+- Make a key: `go run ./cmd/releasetool keygen -out <file outside the repo>`. It prints the public key, which goes in `update.PublicKey`. Keep the file somewhere safe, and set the secret with `gh secret set GHOSTREEL_UPDATE_KEY < <file>`.
+- Changing the key means apps built with the old public key can't verify new releases; their users have to download one new version by hand.
+- The updater reads `https://github.com/dmang-dev/ghostreel/releases/latest/download/latest.json` without signing in, so it only works once the repository is public. `GHOSTREEL_UPDATE_URL` points an app at another manifest for testing.

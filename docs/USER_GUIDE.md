@@ -117,7 +117,7 @@ Known gaps: cliffs are plain walls rather than the game's cliff models, and ther
 
 ## Privacy
 
-ghostreel makes no network requests unless you ask for a map download. The server only listens on your own computer by default. Replays, maps and converted models stay in your local cache:
+ghostreel makes no network requests unless you ask: for a map download, or, in the desktop app, for update checks (see [Updates](#updates)). The server only listens on your own computer by default. Replays, maps and converted models stay in your local cache:
 
 | OS | Cache |
 | --- | --- |
@@ -133,6 +133,12 @@ Delete that folder to clear it.
 - **Units stand still:** the replay is on the tracker tier (no map, or AI players). Add the map.
 - **The map doesn't match:** a map of the right name but a different size was found. Pick the right file.
 - **3D shows shapes only:** no game installation was found. In the desktop app, open **Settings** and choose the StarCraft II folder (the one with `.build.info`, such as `D:\Games\StarCraft II`); the models load without a restart. With `ghostreel serve`, check the log line "3D models from …", or set `--gamedata`.
+
+## Updates
+
+The first time the desktop app starts, it asks whether to look for new versions on GitHub when it starts. If you say yes and one is out, a banner offers **Update and restart**: the app downloads the new version, checks that it's the genuine release (it's signed, and its checksum must match), installs it and starts again. An installed copy runs the new installer, which asks Windows for permission as the first install did; the portable `ghostreel-desktop.exe` replaces itself. On macOS and Linux the banner links to the download instead.
+
+You can change your answer, see your version and check right away in **Settings**. Builds made from source never replace themselves.
 
 ## Settings (desktop app)
 
