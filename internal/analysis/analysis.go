@@ -138,6 +138,17 @@ func runOne(p Plugin, tl *pb.Timeline) (rep Report) {
 		return Report{Plugin: p.ID(), Title: p.ID()}
 	}
 	r.Plugin = p.ID()
+	// Empty tables and series are [] in JSON, not null, for the viewer.
+	for i := range r.Tables {
+		if r.Tables[i].Rows == nil {
+			r.Tables[i].Rows = []Row{}
+		}
+	}
+	for i := range r.Series {
+		if r.Series[i].Points == nil {
+			r.Series[i].Points = []Point{}
+		}
+	}
 	return *r
 }
 

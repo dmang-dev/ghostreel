@@ -3,6 +3,7 @@
 package analysis
 
 import (
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -312,5 +313,22 @@ func TestHotspotsReal(t *testing.T) {
 				t.Logf("    %s %-5s %.2f %s", clock(m.Loop), m.Tier, m.Score, m.Label)
 			}
 		}
+	}
+}
+
+type emptyTables struct{}
+
+func (emptyTables) ID() string { return "empty" }
+func (emptyTables) Analyze(*pb.Timeline) (*Report, error) {
+	return &Report{Tables: []Table{{Title: "t"}}, Series: []Series{{Title: "s"}}}, nil
+}
+
+func TestEmptyRowsAreNotNull(t *testing.T) {
+	b, err := json.Marshal(runOne(emptyTables{}, game()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := string(b); !strings.Contains(s, `"rows":[]`) || !strings.Contains(s, `"points":[]`) {
+		t.Errorf("report JSON = %s", s)
 	}
 }
