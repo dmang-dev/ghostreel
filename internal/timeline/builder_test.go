@@ -271,3 +271,50 @@ func TestSimplifyKeepsShape(t *testing.T) {
 		}
 	}
 }
+
+func TestCreatorAndActionCounts(t *testing.T) {
+	info := &replay.Info{Loops: 400, HasTracker: true, Players: []replay.Player{{ID: 1}, {ID: 2}}}
+	tag := replay.MakeTag
+	ev := []replay.Event{
+		{Loop: 0, Kind: replay.KindUnitBorn, Tag: tag(1, 1), UnitType: "Barracks", Player: 1},
+		{Loop: 0, Kind: replay.KindUnitBorn, Tag: tag(2, 1), UnitType: "BeaconArmy", Player: 1},
+		{Loop: 10, Kind: replay.KindSelection, Player: 1},
+		{Loop: 20, Kind: replay.KindCommand, Player: 1, AbilityLink: 3},
+		{Loop: 30, Kind: replay.KindControlGroup, Player: 1},
+		{Loop: 40, Kind: replay.KindCommand, Player: 0}, // an observer: not counted
+		{Loop: 200, Kind: replay.KindUnitBorn, Tag: tag(3, 1), UnitType: "Marine", Player: 1, Creator: tag(1, 1)},
+		{Loop: 210, Kind: replay.KindUnitBorn, Tag: tag(4, 1), UnitType: "Marine", Player: 1, Creator: tag(2, 1)}, // hidden creator
+		{Loop: 250, Kind: replay.KindCommand, Player: 1},
+	}
+	tl, err := Build(info, ev, Options{SkipCommands: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := tl.Units[1].Creator; c == nil || *c != 0 {
+		t.Errorf("marine's creator = %v, want the barracks (0)", c)
+	}
+	if tl.Units[2].Creator != nil {
+		t.Errorf("hidden creator kept: %v", *tl.Units[2].Creator)
+	}
+	ac := tl.Actions
+	if ac == nil || ac.BinLoops != ActionBinLoops || len(ac.Players) != 2 {
+		t.Fatalf("actions = %v", ac)
+	}
+	p1 := ac.Players[0]
+	if p1.Player != 1 || !reflect.DeepEqual(p1.Actions, []uint32{3, 0, 1}) || !reflect.DeepEqual(p1.Commands, []uint32{1, 0, 1}) {
+		t.Errorf("player 1 actions = %v", p1)
+	}
+	if p2 := ac.Players[1]; p2.Player != 2 || len(p2.Actions) != 0 {
+		t.Errorf("player 2 actions = %v", p2)
+	}
+	for _, e := range tl.Events {
+		if e.GetCommand() != nil {
+			t.Errorf("command kept despite SkipCommands")
+		}
+	}
+	// Without game events there is nothing to count.
+	tl, _ = Build(info, ev[:2], Options{})
+	if tl.Actions != nil {
+		t.Errorf("actions without game events = %v", tl.Actions)
+	}
+}

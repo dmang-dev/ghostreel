@@ -17,6 +17,8 @@ Files are binary protobuf (`.pb`). `dump-timeline --json` writes the protobuf JS
 
 `type` is the type at birth, an index into `unit_types`. `morphs` lists later type changes (larva → egg → drone, Barracks → BarracksFlying, …). Owner changes work the same way. Use the last morph or owner change at or before the loop.
 
+`creator` is the unit this one came out of: the building that trained it, the egg a Zerg unit hatched from, the hatchery that spawned a larva. The replay names it only for units born complete, so it is unset for construction sites and warp-ins (and in timelines written before it was added).
+
 `unit_types[].class` says how to draw a type. `UNIT_CLASS_HIDDEN` types are UI-only and never appear in `units`. `known = false` means the sizes are defaults for a type the game-data table doesn't list. `speed` is cells per game second, 0 for things that never move.
 
 ## Tracks and interpolation
@@ -40,6 +42,12 @@ The reference implementation is `timeline.PositionAt`. Frontends must match it s
 ## Events
 
 `events` is loop-ordered and holds one of: `unit_born`, `unit_done`, `unit_died`, `morph`, `upgrade`, `player_stats` (every 160 loops per player), `chat`, `command`. Commands carry the raw, build-specific ability link (-1 for a right-click "smart" command) and the target point or unit. Ability names need per-build game data and aren't resolved yet. Commands are left out when the timeline was built with `--no-commands`.
+
+## Actions
+
+`actions` counts each player's actions, for APM, in bins of `bin_loops` game loops (112, which is 5 s on the clock): `players[].actions[i]` is the number in loops `[i × bin_loops, (i + 1) × bin_loops)`. An action is a command (including the retargets the game records when a player repeats an order), a selection change or a control-group update; camera moves don't count. `commands[i]` counts just the commands. The arrays end at a player's last action, so a player may have fewer bins than the game has.
+
+Counts are kept even when commands are left out of the event feed. `actions` is unset when the timeline was built without the replay's game events (the tracker tier with commands left out), and in timelines written before it was added.
 
 ## Fidelity
 

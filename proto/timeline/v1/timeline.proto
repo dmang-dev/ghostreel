@@ -33,6 +33,9 @@ message Timeline {
   repeated Snapshot snapshots = 6;
   // Loop-ordered feed of everything that happened.
   repeated Event events = 7;
+  // Player actions counted over the game, for APM. Kept when the command
+  // feed is left out; unset when the replay's game events weren't decoded.
+  ActionCounts actions = 8;
 }
 
 // Which reconstruction produced a keyframe or a whole timeline.
@@ -109,6 +112,9 @@ message Unit {
   uint32 killer_player = 9;
   repeated Morph morphs = 10;
   repeated OwnerChange owner_changes = 11;
+  // The unit this one came out of (the building that trained it, the egg it
+  // hatched from), when the replay says and that unit is in the timeline.
+  optional uint32 creator = 12;
 }
 
 message Morph {
@@ -205,6 +211,22 @@ message PlayerStats {
   uint32 lost_vespene = 12;
   uint32 killed_minerals = 13;
   uint32 killed_vespene = 14;
+}
+
+// Actions per player in fixed bins of game loops.
+message ActionCounts {
+  uint32 bin_loops = 1; // bin width; 112 loops = 5 s on the clock
+  repeated PlayerActions players = 2;
+}
+
+message PlayerActions {
+  uint32 player = 1;
+  // actions[i] counts the actions in loops [i * bin_loops, (i + 1) * bin_loops):
+  // commands (including retargets), selection changes and control-group
+  // updates. Camera moves are not actions.
+  repeated uint32 actions = 2;
+  // commands[i] counts just the commands among them.
+  repeated uint32 commands = 3;
 }
 
 message Chat {
