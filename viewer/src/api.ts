@@ -235,6 +235,20 @@ export async function fetchAnalysis(id: string): Promise<Report[]> {
 }
 
 /** The map's doodads, for the 3D view (empty when there is no map). */
+/** Where the game draws a map's cliff pieces (internal/assets/cliffs.go). */
+export interface CliffLayout {
+  sets: { name: string; mesh: string }[];
+  /** s: set, n: corner letters, v: variation, x/y/z: position, r: quarter turns counter-clockwise. */
+  pieces: { s: number; n: string; v: number; x: number; y: number; z: number; r: number }[];
+}
+
+/** A replay map's cliff pieces, or null without game data. */
+export async function fetchCliffs(id: string): Promise<CliffLayout | null> {
+  const resp = await apiFetch(`/api/r/${id}/cliffs`);
+  if (resp.status === 404) return null;
+  return (await check(resp)).json();
+}
+
 export async function fetchDoodads(id: string): Promise<Doodad[]> {
   const resp = await apiFetch(`/api/r/${id}/doodads`);
   if (resp.status === 404) return [];

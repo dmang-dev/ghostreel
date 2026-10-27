@@ -18,7 +18,7 @@
 // units there, like the in-game player view.
 
 import * as THREE from "three";
-import { disposeLayers, fineHeights, splat, SUB, type GroundLayers } from "./ground";
+import { disposeLayers, fineHeights, splat, stepCliffs, SUB, type GroundLayers } from "./ground";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, isAlive, positionAt, type UnitState } from "./model";
 import type { UnitInstance, UnitModels } from "./models";
 
@@ -96,6 +96,8 @@ export class Scene {
   private model?: Model;
   private worldW = 1;
   private worldH = 1;
+  private corners?: Float32Array; // the map's corner heights, (w+1)*(h+1)
+  private cliffMask?: Float32Array; // 1 at heightfield vertices that cliff pieces cover
   private heights?: Float32Array; // smoothed heightfield, SUB vertices per cell (see ground.ts), row 0 at y=0
   private playerColors = new Map<number, THREE.Color>();
 
@@ -172,7 +174,9 @@ export class Scene {
     this.model = model;
     this.worldW = width;
     this.worldH = height;
-    this.heights = heights && heights.length === (width + 1) * (height + 1) ? fineHeights(heights, width, height) : undefined;
+    this.corners = heights && heights.length === (width + 1) * (height + 1) ? Float32Array.from(heights) : undefined;
+    this.heights = this.corners && fineHeights(this.corners, width, height);
+    this.cliffMask = undefined;
     this.playerColors.clear();
     for (const p of model.tl.meta?.players ?? []) this.playerColors.set(p.id, new THREE.Color(p.color));
 
@@ -347,6 +351,11 @@ export class Scene {
       const row = fh - Math.floor(i / (fw + 1)); // PlaneGeometry rows run top to bottom
       pos.setXYZ(i, col / SUB, row / SUB, this.heights ? this.heights[row * (fw + 1) + col] : 0);
     }
+    if (this.cliffMask) {
+      const mask = new Float32Array(pos.count);
+      for (let i = 0; i < pos.count; i++) mask[i] = this.cliffMask[(fh - Math.floor(i / (fw + 1))) * (fw + 1) + (i % (fw + 1))];
+      geo.setAttribute("cliffMask", new THREE.BufferAttribute(mask, 1));
+    }
     pos.needsUpdate = true;
     geo.computeVertexNormals();
     return geo;
@@ -396,6 +405,18 @@ export class Scene {
   }
 
   /** Shows a map's doodads in 3D (see doodads.ts); undefined removes them. */
+  /**
+   * Cliff cells (2×2 cells, by index) that the game's cliff pieces draw:
+   * the ground steps there instead of sloping, so it stays behind the walls.
+   */
+  setCliffCells(cells: readonly (readonly [number, number])[]): void {
+    if (!this.corners || !this.terrainTex) return;
+    this.heights = fineHeights(this.corners, this.worldW, this.worldH);
+    this.cliffMask = new Float32Array(this.heights.length);
+    stepCliffs(this.heights, this.corners, this.worldW, this.worldH, cells, this.cliffMask);
+    this.setTerrain(this.terrainTex.image as HTMLCanvasElement, this.useDetail);
+  }
+
   setDoodads(group: THREE.Group | undefined): void {
     if (this.doodads) {
       this.scene.remove(this.doodads);

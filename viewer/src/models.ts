@@ -407,7 +407,7 @@ function withTeamColor(mat: THREE.Material, team: { value: THREE.Color }): void 
 }
 
 /** Makes a blended material's opacity come from opacity alone, not its texture. */
-function ignoreMapAlpha(mat: THREE.Material): void {
+export function ignoreMapAlpha(mat: THREE.Material): void {
   mat.onBeforeCompile = (shader) => {
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <map_fragment>",

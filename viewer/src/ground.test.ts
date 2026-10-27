@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { fineHeights, SUB } from "./ground";
+import { fineHeights, stepCliffs, SUB } from "./ground";
 
 /** Corner heights for a w x h map from f(x, y). */
 function corners(w: number, h: number, f: (x: number, y: number) => number): number[] {
@@ -30,5 +30,25 @@ describe("fineHeights", () => {
     // Rounded: the edge starts a little before the top corner of the step.
     expect(row[6 * SUB]).toBeGreaterThan(8);
     expect(row[6 * SUB]).toBeLessThan(9);
+  });
+});
+
+describe("stepCliffs", () => {
+  it("steps the ground in cliff cells instead of sloping it", () => {
+    // 4x2 cells: the east half 2 units up; one cliff cell between them.
+    const w = 4, h = 2;
+    const corners = new Float32Array((w + 1) * (h + 1));
+    for (let y = 0; y <= h; y++) for (let x = 0; x <= w; x++) corners[y * (w + 1) + x] = x >= 2 ? 2 : 0;
+    const fine = fineHeights(corners, w, h);
+    const mask = new Float32Array(fine.length);
+    stepCliffs(fine, corners, w, h, [[0, 0]], mask);
+    const fw = w * SUB + 1;
+    const row = SUB; // a row through the middle of the cell
+    const xs = Array.from({ length: 2 * SUB + 1 }, (_, i) => fine[row * fw + i]);
+    // Low up to the middle (ties go low), then the high side's height.
+    expect(xs.slice(0, SUB + 1).every((v) => v === 0)).toBe(true);
+    expect(xs.slice(SUB + 1).every((v) => v === 2)).toBe(true);
+    expect(mask[row * fw]).toBe(1);
+    expect(mask[row * fw + 3 * SUB]).toBe(0); // outside the cell
   });
 });

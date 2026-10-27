@@ -8,6 +8,7 @@ import * as THREE from "three";
 import * as api from "./api";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, decodeTimeline, formatClock, isAlive, ownerAt, typeAt } from "./model";
 import { Director } from "./director";
+import { buildCliffs } from "./cliffs";
 import { buildDoodads } from "./doodads";
 import { canExport, exportVideo, frameCount, plan, type ExportOptions } from "./exporter";
 import type { Marker } from "./reports";
@@ -948,11 +949,12 @@ async function loadDoodads(): Promise<void> {
     });
   }
   try {
-    const list = await api.fetchDoodads(id);
+    const [list, cliffs] = await Promise.all([api.fetchDoodads(id), api.fetchCliffs(id).catch(() => null)]);
     if (cur?.summary.id !== id) return;
     const group = new THREE.Group();
     scene.setDoodads(group);
-    await buildDoodads(group, list, unitModels);
+    if (cliffs?.pieces.length) scene.setCliffCells(cliffs.pieces.map((p) => [(p.x - 1) / 2, (p.y - 1) / 2] as const));
+    await Promise.all([buildDoodads(group, list, unitModels), cliffs && buildCliffs(group, cliffs, unitModels)]);
   } catch (e) {
     console.warn("doodads:", e);
   }
