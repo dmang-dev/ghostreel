@@ -221,3 +221,44 @@ A light procedural grain (value noise, every 3 cells) keeps low-detail textures 
 - **Applying an update (Windows).** An installed copy (its `uninstall.exe` is beside it) downloads the new installer and runs it silently into the same folder (`/S /D=`) through `cmd /C start`, so Windows shows its usual elevation prompt. It waits for the app to exit, then starts the new version. A portable copy renames its running exe aside (Windows allows that), writes the new one in its place, starts it, and the next start deletes the old one. macOS and Linux link to the release instead. Builds from source (`version` = `dev`) never replace themselves.
 - **Asked, not assumed.** ghostreel made no network requests unless asked, so the app asks once whether to check on start. The answer is in the desktop settings (`checkUpdates`), with **Check now** there.
 - **Not checked end to end.** Check, download, verification, the swap decision and quitting are tested against a local fake release (`desktop/update_test.go`), and a manifest made with the real key verifies. Running a real installer over an installed copy, and the portable swap, can only be tried with two published releases. The repository is private, so the unauthenticated manifest URL returns 404 until it's public.
+
+## Command tier, round 4 (2026-10-27)
+
+Phase 6 track C, items 1–4, measured as before on the five engine recordings (`ghostreel accuracy`): the commanded player's moving units, mean (median), in cells. A change was kept only if it lowered the error without raising another game's mean or median.
+
+| Game | Round 3 (baseline) | Now |
+| --- | --- | --- |
+| Persephone 13:26 | 4.32 (2.54) | 4.32 (2.53) |
+| Ultralove 19:33 | 6.12 (2.57) | 4.52 (2.54) |
+| Torches 15:06 | 2.91 (2.20) | 2.88 (2.18) |
+| Ley Lines 15:43 | 3.37 (2.04) | 3.18 (2.01) |
+| Ley Lines 8:56 | 2.62 (1.92) | 2.62 (1.92) |
+
+### Kept
+
+- **Siege Tanks path with a cell of clearance** (item 3). The Ultralove jam was not tanks blocking each other. Every tank there stopped at the same spot because the main's ramp is too narrow *for a tank* once a Barracks stands at its foot: Marauders (radius 0.56) still walk down it, tanks (0.875) never do. The engine gives up on an unreachable move and leaves the tank where it got stuck. The 2×2 rule for big units lets a unit through a one-cell diagonal gap (1.4 cells wide), so the tier walked the tanks out. Units with a radius over 0.8 now search the corners between cells instead (`pathing.Huge`): a corner is open when its four cells are walkable and on one level, a diagonal step needs the 3×3 cells around the cell it crosses, and string-pulled segments keep 0.875 cells clear. That is a disc of a tank's radius moving through the grid, so a straight two-cell gap still fits. Ultralove's Siege Tank error fell from 44.6 to 12.7 cells.
+
+  | Game | Before | After |
+  | --- | --- | --- |
+  | Persephone | 4.32 (2.54) | 4.32 (2.53) |
+  | Ultralove | 6.12 (2.57) | 4.53 (2.55) |
+  | Torches | 2.91 (2.20) | 2.91 (2.20) |
+  | Ley Lines 15:43 | 3.37 (2.04) | 3.36 (2.03) |
+  | Ley Lines 8:56 | 2.62 (1.92) | 2.62 (1.92) |
+
+  A plain 3×3 block rule was tried first and dropped: it fixed Ultralove (4.69) but sealed tanks inside their own bases elsewhere (Persephone 4.32 → 4.78, Ley Lines 3.37 → 3.65; Persephone's tanks 3.4 → 22.9 cells).
+- **Paths start on the goal's side of a wall.** A unit standing on a blocked cell (a Ghost born at the foot of its Barracks, on a cliff edge) snapped to the first passable cell in ring order, which could lie below the cliff and wall it in for good. It now takes, among the nearest passable cells, one in the goal's region. Ley Lines 15:43: 3.36 (2.03) → 3.18 (2.01); the other games unchanged.
+- **Workers leave mined-out fields.** When a mineral field runs out, its workers move to the fields left within 8 cells, the least used first, as the game does; before, they shuttled to a field that was gone. Torches 2.91 (2.20) → 2.88 (2.18), Ultralove 4.53 (2.55) → 4.52 (2.54), the others unchanged. Sending them to the nearest field instead raised Torches' median (2.20 → 2.21).
+- **Selection tracking is better than it looked** (item 1). On Ultralove 85% recall meant 15% of ordered units missing from the tracked selection, but nearly all of those were ordered by a neighbouring command: the bot orders one unit per command, often to points a fraction of a cell apart, or a few loops before the engine frame. `CheckSelection` judged each command alone. It now judges a command together with every command since the previous frame whose target matches (the same unit, or a point within half a cell), and leaves out units that already carried the order. Recall: Persephone 95% → 97%, Ultralove 85% → 96% (point targets 86% → 97%, exact 74% → 87%), Torches 95% → 97%, Ley Lines 95% → 98% and 98% → 98%. Most of what remains is units taking the same unit target on their own (workers moving to a free field, units acquiring an attacker). No control-group or raw-API case was found where the tracker misses a commanded unit, so the tracker is unchanged; this is a measurement fix and timelines are unchanged.
+
+### Reverted
+
+- **Unreachable goals: go as close as possible.** The engine's tanks stop at the reachable point nearest their target; the tier leaves them where they are. Moving them there (nearest node of the unit's region, `Grid.Closest`): Persephone 4.32 → 4.28, Ultralove 4.53 → 4.22 (2.55 → 2.44), Torches 2.91 → 2.90, but Ley Lines 15:43 3.18 → 3.21. Limited to units whose way is blocked only for their size (a Small unit could pass): Ultralove 4.52 → 4.22 (2.54 → 2.42), Torches 2.880 → 2.877, but Persephone 4.317 → 4.319 and Ley Lines 3.18 → 3.20, 2.622 → 2.626. On Ley Lines a tank born in a pocket of buildings that the corner graph considers sealed walks to the pocket's edge, while the real tank finds its way out. Worth retrying if those false walls are found.
+- **Siege Tanks blocking their cells while sieged** (other units path around them): Persephone 4.317 → 4.323, Ultralove 4.52 → 4.61 (2.54 → 2.57), Ley Lines 3.18 → 3.22.
+- **Fights: chasing** (item 2). Engaged units closed to weapon range of the nearest enemy instead of holding: with the current acquisition slack (1 cell) nothing changed (Ultralove 4.53 → 4.54, Torches median 2.20 → 2.22); with 3 or 5 cells of slack it got worse (Ultralove 4.64 / 4.68). Enemy positions come from the tracker tier and are too coarse to chase. For reference, turning engagement off costs 0.6 cells over the five games (total of means 17.56 → 18.18), so stopping at enemies still pays.
+- **Mining timing.** The engine's SCVs stand still at the field for about 25% of a gather cycle, so they mine for about 44 loops (2.8 game seconds) and spend the rest walking or waiting at the base; the tier stands them at the field for the whole cycle minus a full-speed walk (about 95 of 112 loops at the near fields). A 45-loop dwell with slower trips filling the cycle lowered every mean (Persephone 4.317 → 4.284, Ultralove 4.520 → 4.489, Torches 2.880 → 2.853, Ley Lines 3.178 → 3.147, 2.622 → 2.598) but raised four medians (2.533 → 2.534, 2.541 → 2.544, 2.006 → 2.020, 1.922 → 1.933). Waiting at the base instead of slowing down, or dwelling 52–70 loops, did the same. The cycle length itself (108–120 loops) changes nothing at two decimals. The mining error (about 3 cells, a third to half of the remaining error) is mostly phase: nothing in the replay says where in its trip a worker is.
+
+### Not done
+
+- **Medivac boost** (item 4). The bot never uses it: no command in the five recorded games classifies as afterburners, and the two pro TvT replays here have none either, so there is nothing to measure it against. It stays unapplied.
+- **The built-in AI** (item 5) was out of scope; the viewer draws its mining itself now.
