@@ -14,7 +14,7 @@ import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { apiFetch } from "./api";
 
 /** Extras the exporter (internal/m3) writes on each animation. */
-interface ClipInfo {
+export interface ClipInfo {
   clip: THREE.AnimationClip;
   words: string[]; // lower-case name tokens
   looping: boolean;
@@ -35,11 +35,20 @@ export interface Pose {
   time: number;
   /** Walking speed in cells per second, for matching the walk cycle. */
   speed: number;
+  /** "build": how far construction has come (0-1), and the whole build time in seconds. */
+  progress?: number;
+  buildTime?: number;
 }
 
 // The game's models face -y in their own space; the timeline's facing is
 // measured from +x, so a quarter turn lines them up.
 const MODEL_FACING = Math.PI / 2;
+
+/** Stand-in models for resources, by type name, in order of preference. */
+const RESOURCE_ALIASES: [RegExp, string[]][] = [
+  [/MineralField/, ["MineralField", "MineralField750", "LabMineralField", "PurifierMineralField", "BattleStationMineralField"]],
+  [/VespeneGeyser/, ["VespeneGeyser", "ProtossVespeneGeyser", "SpacePlatformGeyser", "RichVespeneGeyser"]],
+];
 
 export class UnitModels {
   available = false;
@@ -71,6 +80,12 @@ export class UnitModels {
     const key = death ? `death/${type}` : `unit/${type}`;
     const t = this.templates.get(key);
     if (t === undefined) void this.template(key);
+    if (t === null && !death) {
+      // Resources whose own model is missing borrow a related one: a
+      // crystal of another kind beats a box in the mineral line.
+      const alias = RESOURCE_ALIASES.find(([re]) => re.test(type))?.[1].find((a) => a !== type && this.templates.get(`unit/${a}`) !== null);
+      if (alias) return this.get(alias);
+    }
     return t;
   }
 
@@ -153,6 +168,8 @@ export class UnitInstance {
   private readonly team = new THREE.Color();
   private readonly teamUniform = { value: new THREE.Color() };
   lastSeen = 0; // frame counter, for evicting units that left the screen
+  /** Materials as they were before a warp-in changed them. */
+  private warped?: { mat: THREE.MeshStandardMaterial; transparent: boolean; opacity: number; emissive: THREE.Color; depthWrite: boolean }[];
 
   constructor(private readonly tpl: Template, team: THREE.Color) {
     this.root = SkeletonUtils.clone(tpl.root);
@@ -180,9 +197,60 @@ export class UnitInstance {
     this.teamUniform.value.copy(c);
   }
 
+  /**
+   * A Protoss-style warp-in while under construction: translucent and
+   * glowing blue at first, solid when done. undefined restores the model.
+   */
+  private setWarp(w: number | undefined): void {
+    if (w === undefined) {
+      for (const s of this.warped ?? []) {
+        s.mat.transparent = s.transparent;
+        s.mat.opacity = s.opacity;
+        s.mat.depthWrite = s.depthWrite;
+        s.mat.emissive?.copy(s.emissive);
+        s.mat.needsUpdate = true;
+      }
+      this.warped = undefined;
+      return;
+    }
+    if (!this.warped) {
+      this.warped = [];
+      this.root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        for (const mat of materialsOf(m) as THREE.MeshStandardMaterial[]) {
+          this.warped!.push({ mat, transparent: mat.transparent, opacity: mat.opacity, emissive: mat.emissive?.clone() ?? new THREE.Color(), depthWrite: mat.depthWrite });
+          mat.transparent = true;
+          mat.depthWrite = false;
+          mat.needsUpdate = true;
+        }
+      });
+    }
+    for (const s of this.warped) {
+      s.mat.opacity = s.opacity * (0.25 + 0.75 * w);
+      s.mat.emissive?.copy(WARP_GLOW).multiplyScalar(1 - w).add(s.emissive);
+    }
+  }
+
   /** Poses the model for this frame. */
   pose(p: Pose): void {
-    const info = pickClip(this.tpl.clips, p.action);
+    let info: ClipInfo | undefined;
+    let t = p.time;
+    let warp: number | undefined;
+    if (p.action === "build" && p.progress !== undefined) {
+      const b = buildPose(this.tpl.clips, p.progress, p.buildTime ?? 45);
+      if (b) {
+        info = b.info;
+        t = b.time;
+      } else {
+        // No construction clips (Protoss): warp in.
+        info = pickClip(this.tpl.clips, "stand");
+        warp = p.progress;
+      }
+    } else {
+      info = pickClip(this.tpl.clips, p.action);
+    }
+    this.setWarp(warp);
     if (!info) {
       if (this.current) {
         this.current.action.stop();
@@ -197,7 +265,6 @@ export class UnitInstance {
       this.current = { info, action };
     }
     const dur = info.clip.duration;
-    let t = p.time;
     if (p.action === "walk" && info.moveSpeed > 0 && p.speed > 0) {
       t *= THREE.MathUtils.clamp(p.speed / info.moveSpeed, 0.5, 2);
     }
@@ -213,6 +280,34 @@ export class UnitInstance {
       if (m.isMesh) for (const mat of materialsOf(m)) mat.dispose();
     });
   }
+}
+
+const WARP_GLOW = new THREE.Color(0.25, 0.55, 1.0);
+
+/**
+ * The clip and time for a building under construction. The game builds in
+ * stages A to D (Terran scaffolding, Zerg morphs): each plays its start
+ * clip, then its looping stand clip. Here each stage takes an equal share of
+ * the build time (an estimate). Models with no stages but a birth clip play
+ * it over the build; undefined when there's neither.
+ */
+export function buildPose(clips: ClipInfo[], progress: number, seconds: number): { info: ClipInfo; time: number } | undefined {
+  const find = (w: string[]) => clips.find((c) => c.words.length === w.length && w.every((x, i) => c.words[i] === x));
+  const stages = ["a", "b", "c", "d"]
+    .map((s) => ({ start: find(["build", s, "start"]), stand: find(["build", s, "stand"]) }))
+    .filter((s) => s.start || s.stand);
+  if (!stages.length) {
+    const birth = find(["birth"]);
+    return birth && { info: birth, time: Math.min(progress, 1) * birth.clip.duration };
+  }
+  const p = Math.min(Math.max(progress, 0), 1);
+  const k = Math.min(stages.length - 1, Math.floor(p * stages.length));
+  const st = stages[k];
+  const elapsed = ((p * stages.length - k) * seconds) / stages.length;
+  if (st.start && (elapsed < st.start.clip.duration || !st.stand)) {
+    return { info: st.start, time: Math.min(elapsed, st.start.clip.duration - 1e-3) };
+  }
+  return { info: st.stand!, time: elapsed - (st.start?.clip.duration ?? 0) };
 }
 
 const SKIP = new Set(["start", "end", "cover", "flail", "unload", "spell", "morph"]);

@@ -186,8 +186,12 @@ func (l *Library) file(path string) (string, bool) {
 		return n, true
 	}
 	if strings.HasSuffix(key, ".m3") {
-		if n, ok := l.files[strings.TrimSuffix(key, ".m3")+"_00.m3"]; ok {
-			return n, true
+		// Models with several variations have only numbered files, and
+		// game versions differ in which numbers they ship.
+		for i := 0; i < 10; i++ {
+			if n, ok := l.files[fmt.Sprintf("%s_%02d.m3", strings.TrimSuffix(key, ".m3"), i)]; ok {
+				return n, true
+			}
 		}
 	}
 	return "", false
