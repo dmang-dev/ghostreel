@@ -10,10 +10,14 @@ import (
 	"time"
 )
 
-// openTestStorage opens the local test install, skipping the test if absent.
+// openTestStorage opens the local test install (testdata/casc, or the
+// folder in GHOSTREEL_TEST_GAMEDATA), skipping the test if absent.
 func openTestStorage(t *testing.T) *Storage {
 	t.Helper()
-	const dir = "../../testdata/casc"
+	dir := os.Getenv("GHOSTREEL_TEST_GAMEDATA")
+	if dir == "" {
+		dir = "../../testdata/casc"
+	}
 	if _, err := os.Stat(dir); err != nil {
 		t.Skip("no test storage at", dir)
 	}

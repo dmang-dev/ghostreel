@@ -33,7 +33,7 @@ Put your own files in `testdata/` (git-ignored):
 | `testdata/replays/` | `.SC2Replay` files | replay, timeline, analysis, server tests |
 | `testdata/replays/engine/` | replays with `.engine.pb.gz` recordings | accuracy tests |
 | `testdata/maps/` | `.SC2Map` files | map and command-tier tests |
-| `testdata/casc/` | a game install's `SC2Data` folder and `.build.info` | CASC, model and asset tests |
+| `testdata/casc/` | a game install's `SC2Data` folder and `.build.info` (or set `GHOSTREEL_TEST_GAMEDATA` to an install folder instead of copying it) | CASC, model and asset tests |
 
 Tests that need them say so in their skip message. Golden files (`viewer/src/testdata`) are regenerated with `GHOSTREEL_UPDATE_GOLDEN=1 go test ./internal/timeline -run Golden`.
 

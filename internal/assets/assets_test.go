@@ -17,7 +17,15 @@ import (
 	"github.com/dmang-dev/ghostreel/internal/mapfile"
 )
 
-const cascDir = "../../testdata/casc"
+// cascDir is the game data the tests read: testdata/casc, or the install
+// folder in GHOSTREEL_TEST_GAMEDATA (for checking against another install
+// without copying it).
+var cascDir = func() string {
+	if d := os.Getenv("GHOSTREEL_TEST_GAMEDATA"); d != "" {
+		return d
+	}
+	return "../../testdata/casc"
+}()
 
 var (
 	libOnce sync.Once
@@ -28,7 +36,7 @@ var (
 func openLib(t *testing.T) *Library {
 	t.Helper()
 	if _, err := os.Stat(cascDir + "/.build.info"); err != nil {
-		t.Skip("no game data in testdata/casc")
+		t.Skip("no game data in", cascDir)
 	}
 	libOnce.Do(func() { lib, libErr = Open(cascDir, "") })
 	if libErr != nil {
