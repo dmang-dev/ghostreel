@@ -29,6 +29,8 @@ To place a unit at loop L, find the keyframes k0 ≤ L < k1. Then:
 2. Otherwise travel time = distance / (speed / 16) loops (use 2.5 cells/s when speed is 0), and departure = max(k0.loop, k1.loop − travel).
 3. Before departure, stay at k0. After it, move linearly to arrive at k1 exactly at k1.loop, facing the direction of travel.
 
+A track may also carry `vitals`: health, shields and energy, each with its maximum (a maximum of 0: the unit has none). Only engine-tier timelines have them, from an engine recording made with them; replays themselves record no hit points. A key holds from its loop until the next. Keys are stored when a value moves by more than 1% of its maximum or a maximum changes (upgrades, morphs), so slow energy regeneration gives a key every 1% or so. Timelines written before vitals existed have none and still read.
+
 `facing` on keyframes is derived from movement (no replay stream records it): radians, counter-clockwise from +x. Exact-source timelines may space keyframes densely, and then this rule reduces to plain linear interpolation.
 
 The reference implementation is `timeline.PositionAt`. Frontends must match it so Go and TypeScript agree.

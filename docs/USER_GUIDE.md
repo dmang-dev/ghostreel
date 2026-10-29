@@ -63,6 +63,7 @@ Click a unit to inspect it; the panel says when its position was last actually o
 | B | Events / build order / battles |
 | D | Director camera on or off |
 | L / M / F | Labels / map art / frame-rate counter |
+| H | Health bars: damaged units, all units, none |
 
 The minimap moves the camera when clicked. Bars under the scrubber show deaths; yellow bands are battles; ticks at the top are upgrades (short) and expansions (long).
 
@@ -106,6 +107,10 @@ In the browser, none of that is possible: browsers can't read your Battle.net ca
 - **Options:** speed 1×–8× (1× is real time), 720p or 1080p, and the director's camera or the current view.
 
 The video is made in the app, frame by frame, as fast as your computer can draw it, and then saved as a download. A graphics card helps; on a machine without one it managed about 11 frames a second, roughly a third of real time at 30 fps. It needs WebCodecs, which Chrome, Edge, the Windows app and (recent) macOS have. The Linux app's WebKitGTK doesn't, so on Linux use `ghostreel serve` with Chrome or the browser build.
+
+## Health, shields and energy
+
+Replays don't record hit points, so ordinary replays have no health bars; the inspect panel says "not in the replay". A replay with an engine recording (see the README's `ghostreel-engine`) made by a version that keeps health, shields and energy shows bars above units in 2D, 3D and exported video, in the game's colours: shields blue, health green to red, energy purple. By default only damaged units and the selected one have bars; **H** switches between damaged units, all units and none, and the inspect panel shows the numbers.
 
 ## 3D
 
