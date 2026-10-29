@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { fineHeights, stepCliffs, SUB } from "./ground";
+import type * as THREE from "three";
+import { fineHeights, grainFor, stepCliffs, SUB } from "./ground";
 
 /** Corner heights for a w x h map from f(x, y). */
 function corners(w: number, h: number, f: (x: number, y: number) => number): number[] {
@@ -50,5 +51,16 @@ describe("stepCliffs", () => {
     expect(xs.slice(SUB + 1).every((v) => v === 2)).toBe(true);
     expect(mask[row * fw]).toBe(1);
     expect(mask[row * fw + 3 * SUB]).toBe(0); // outside the cell
+  });
+});
+
+describe("grainFor", () => {
+  const tex = (width: number) => ({ image: { width } }) as unknown as THREE.Texture;
+  it("is full for the small copies and off for full-size textures", () => {
+    expect(grainFor([tex(64), tex(64)])).toBe(1);
+    expect(grainFor([tex(512), undefined, tex(1024)])).toBe(0);
+    expect(grainFor([tex(512), tex(64)])).toBe(1); // the smallest decides
+    expect(grainFor([tex(160)])).toBeCloseTo(0.5);
+    expect(grainFor([undefined])).toBe(0);
   });
 });

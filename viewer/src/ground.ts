@@ -165,6 +165,20 @@ const GRAIN_CELLS = 3; // cells per repeat of the grain
 const GRAIN = 0.22; // grain strength: brightness varies by about this much
 
 /**
+ * How much grain the layers need: all of it for the 64-pixel copies, none
+ * for textures 256 pixels or more across (a full install's), which have
+ * their own detail.
+ */
+export function grainFor(textures: (THREE.Texture | undefined)[]): number {
+  let size = Infinity;
+  for (const t of textures) {
+    const w = (t?.image as { width?: number } | undefined)?.width;
+    if (w) size = Math.min(size, w);
+  }
+  return size === Infinity ? 0 : Math.min(1, Math.max(0, (256 - size) / 192));
+}
+
+/**
  * Patches a terrain material's shaders (in onBeforeCompile) to paint the
  * blended layers in place of its map. The material needs a map, for the
  * map's UVs (0-1 across the world). sides: project textures sideways on
@@ -181,6 +195,7 @@ export function splat(shader: THREE.WebGLProgramParametersWithUniforms, l: Groun
   shader.uniforms.gTiling = { value: new THREE.Vector4(...[0, 1, 2, 3].map((i) => l.tiling[i] ?? 0)) };
   shader.uniforms.gWorld = { value: new THREE.Vector2(worldW, worldH) };
   shader.uniforms.gGrain = { value: grain };
+  shader.uniforms.gGrainAmount = { value: GRAIN * grainFor(l.textures) };
   if (sides) {
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vGPos;\nvarying vec3 vGNormal;\nattribute float cliffMask;\nvarying float vGCliff;")
@@ -198,6 +213,7 @@ uniform vec4 gHave1;
 uniform vec4 gTiling;
 uniform vec2 gWorld;
 uniform sampler2D gGrain;
+uniform float gGrainAmount;
 ${sides ? "#define G_SIDES\nvarying vec3 vGPos;\nvarying vec3 vGNormal;\nvarying float vGCliff;" : ""}
 // The blend at uv. Most points have one to three layers, so the others are
 // skipped; the UV derivatives come from the caller, outside any branch, so
@@ -248,6 +264,6 @@ vec3 gSplat( vec2 uv, vec2 dx, vec2 dy, vec4 w0, vec4 w1 ) {
 #endif
   // Grain, fading out with distance as the mipmaps flatten it.
   float gG = texture2D( gGrain, vMapUv * gWorld / ${GRAIN_CELLS.toFixed(1)} ).r - 0.5;
-  diffuseColor.rgb = gColor * ( 1.0 + ${GRAIN.toFixed(2)} * 2.0 * gG );`,
+  diffuseColor.rgb = gColor * ( 1.0 + gGrainAmount * 2.0 * gG );`,
     );
 }
