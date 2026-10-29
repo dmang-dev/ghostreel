@@ -221,3 +221,31 @@ A light procedural grain (value noise, every 3 cells) keeps low-detail textures 
 - **Applying an update (Windows).** An installed copy (its `uninstall.exe` is beside it) downloads the new installer and runs it silently into the same folder (`/S /D=`) through `cmd /C start`, so Windows shows its usual elevation prompt. It waits for the app to exit, then starts the new version. A portable copy renames its running exe aside (Windows allows that), writes the new one in its place, starts it, and the next start deletes the old one. macOS and Linux link to the release instead. Builds from source (`version` = `dev`) never replace themselves.
 - **Asked, not assumed.** ghostreel made no network requests unless asked, so the app asks once whether to check on start. The answer is in the desktop settings (`checkUpdates`), with **Check now** there.
 - **Not checked end to end.** Check, download, verification, the swap decision and quitting are tested against a local fake release (`desktop/update_test.go`), and a manifest made with the real key verifies. Running a real installer over an installed copy, and the portable swap, can only be tried with two published releases. The repository is private, so the unauthenticated manifest URL returns 404 until it's public.
+
+## Smaller browser build (2026-10-27)
+
+- **The protocol tables weren't the bulk.** PLAN.md and the Phase 4 notes blamed s2prot's protocol tables for most of `ghostreel.wasm`. Measured from the module's own sections, the 157 protocols are 0.82 MB of source text, 4% of the file. Consecutive builds barely differ, so they shrink to 37 KB gzipped and 18 KB with Brotli. Most of the file was code the browser build can't use.
+- **Loading only the replay's protocol: not done.** It would save 0.82 MB raw but under 40 KB on the wire. The cost would be replacing s2prot's `build` package in the wasm build (an overlay over a dependency) and a round trip to the page before each decode.
+- **What the browser can't run is compiled out.** The browser build already had no map lookup, engine recordings or game data, but their code was still linked. It now sits behind `runtime.GOOS == "js"` (map lookup in `internal/app`, the asset routes in `internal/server`) or a `js` build tag (`internal/app/engine_js.go`), so the compiler drops it. Other builds are unchanged.
+
+| Step | `ghostreel.wasm` |
+| --- | --- |
+| Before (already built with `-trimpath -ldflags "-s -w"`) | 21.10 MB |
+| Map lookup out: the depot client brought in net/http's client, TLS, x509 and HTTP/2 | −4.77 MB |
+| Engine recordings out: package `engine` and the SC2 API's protobuf types | −1.13 MB |
+| Asset routes out: packages `assets`, `m3`, `casc`, `dds`, image codecs | −0.80 MB |
+| `gamedata` without its one regexp | −0.11 MB |
+| After | 14.30 MB |
+
+- **Linker flags were already in place.** `-ldflags "-s -w"` saves 0.33 MB (the name section) and `-trimpath` saves 25 KB, both since Phase 4. Turning inlining off (`-gcflags=all=-l`) made the file bigger (15.2 MB).
+- **What's left** (8.8 MB code, 5.6 MB data): the Go runtime (1.2 MB of code), the protobuf runtime for timelines (1.8 MB), `encoding/json` (0.65 MB), our own packages (0.65 MB), and about 0.8 MB of crypto (P-256, ML-DSA, `math/big`) kept alive by the package initializers of `crypto/tls` and `crypto/x509`, which `net/http` always imports. Only dropping `net/http` would remove those, and that would mean not reusing the server's handler, which is the reason the browser build exists. `httptest` and `flag` add 24 KB.
+- **The core ships compressed, and the page decodes it.** `npm run build:web` also writes `ghostreel.wasm.gz` (gzip -9) and `ghostreel.wasm.br` (Brotli quality 11, 16 MB window, about 30 s). The worker fetches the best one it can decode with `DecompressionStream`, so the download is small on any static host with no `Content-Encoding` setup. The order is Brotli, then gzip, then the raw file. No browser decodes Brotli this way yet (Chrome 155 offers gzip and deflate), so in practice it fetches the `.gz`. A host may send the `.gz` with `Content-Encoding: gzip` (`vite preview` does), in which case the browser has already decoded it; the worker checks for the wasm magic number before decompressing. A missing or failing variant falls back to the next. `npm run dev:web` skips compression and deletes stale copies, so it always runs the fresh raw file.
+
+| | Raw | gzip -9 | Brotli 11 |
+| --- | --- | --- | --- |
+| Before | 21.10 MB | 4.78 MB | 3.42 MB |
+| After | 14.30 MB | 3.39 MB | 2.42 MB |
+
+- **As transferred.** Before, the worker fetched the raw file, so a host that doesn't compress `.wasm` (as `vite preview` doesn't) sent 21.10 MB, and one that gzips on the fly sent about 4.8 MB. Now Chrome fetches the 3.39 MB `.gz` from any host. The release's web zip grows from about 5 MB to 9.3 MB, because it holds the raw file and both compressed copies.
+- **Checked end to end** in headless Chrome against `vite preview`. The page opened a replay and its map through the file pickers, and every replay in `testdata/replays` gave a timeline byte-identical to `ghostreel serve`'s (with its map, where `testdata/maps` has it). The worker's other paths were checked by rewriting responses: a plain `.gz` (decoded by `DecompressionStream`), a missing `.gz` answered with a dev server's HTML fallback, and a 404 (both use the raw file).
+- **Hosting needs nothing special.** Serve `dist-web/` as static files. The compressed copies work under any `Content-Type`, with or without `Content-Encoding`; only the raw fallback needs `application/wasm` (for streaming compilation). The `ghostreel.wasm*` names carry no content hash, so they should be revalidated (ETag or `Last-Modified`) rather than cached for a long time. A host that compresses on the fly gains nothing for the `.gz`, which is already compressed.

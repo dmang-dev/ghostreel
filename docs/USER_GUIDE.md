@@ -26,7 +26,7 @@ Open a replay with **Open replay…**, by dropping it on the window, or from the
 
 ### In the browser
 
-The browser build runs entirely on your machine. The replay is decoded in the page and is never uploaded anywhere. Drop a `.SC2Replay` on the page, then drop the map file to get terrain (see [Maps](#maps)). Anyone can host it: it is a folder of static files (`ghostreel_…_web.zip`), and the server only has to serve `.wasm` files as `application/wasm`.
+The browser build runs entirely on your machine. The replay is decoded in the page and is never uploaded anywhere. Drop a `.SC2Replay` on the page, then drop the map file to get terrain (see [Maps](#maps)). Anyone can host it: it is a folder of static files (`ghostreel_…_web.zip`) that needs no server setup. The page downloads the core compressed (about 3.4 MB) and unpacks it itself.
 
 Long games take longer in the browser than in the app: the 30-minute games we tested take about a minute after the map is added, while a typical ladder game takes a few seconds.
 
