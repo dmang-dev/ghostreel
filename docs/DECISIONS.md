@@ -241,3 +241,12 @@ PLAN.md Phase 6 track F, steps 1–4. Replays have no hit points, so these come 
 - **Timeline:** `Track.vitals`, built by `timeline.ApplyEngine`, keyed when a value moves by more than 1% of its maximum or a maximum changes. A key holds until the next: damage is discrete, so no interpolation. Engine-tier timelines aren't cached, so no cache version change.
 - **Viewer:** bars above units on the labels layer (so exported video has them), drawn for damaged and selected units by default, **H** for all or none; none for units hidden by fog; numbers in the inspect panel. Checked with sample values injected in the browser.
 - **Not yet:** none of the five recordings has vitals; re-recording them needs a run on the sc2-headless VM, which waits for its owner's go-ahead (step 5).
+
+## Getting ready to be public (2026-10-29)
+
+Checked before making the repository public: the whole history (81 commits, every version of every file) has no tokens, keys, passwords, private addresses, local paths or email addresses (commits use the GitHub noreply address), and no game files; the demo GIFs show only Shaded terrain and stand-ins. Changes made:
+
+- **CascLib's MIT notice.** `internal/casc/mndx.go` is a port of CascLib's MNDX parser; its license now sits in `third_party/casclib/` like the other borrowed code, and the file is marked `Apache-2.0 AND MIT`.
+- **Workflow permissions.** Both workflows are read-only by default; in the release workflow only the job that publishes can write, so the build jobs (which run `npm ci` and Go module downloads) can't touch releases. The two third-party actions (`softprops/action-gh-release`, `bufbuild/buf-action`) are pinned to commits rather than tags their owners can move; GitHub's own `actions/*` stay on major tags.
+- **Third-party notices in downloads.** `releasetool notices` collects the license files of Go, every Go module linked on each release OS, the viewer's production npm packages and `third_party/`, and every archive ships them. `@bufbuild/protobuf` ships no license file, so its entry gives the declared licenses and the source.
+- **`SECURITY.md`** asks for private reports through GitHub's private vulnerability reporting, which has to be turned on in the repository settings once it is public.

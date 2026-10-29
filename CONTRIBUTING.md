@@ -122,6 +122,8 @@ Push a tag `vX.Y.Z`. `.github/workflows/release.yml` then builds:
 - the browser build;
 - the desktop app: a Windows installer plus a portable zip, a macOS universal app, and a Linux binary.
 
+Every download carries `LICENSE` and `THIRD_PARTY_NOTICES.txt`, the licenses of everything built in (Go, the Go modules, the viewer's npm packages and `third_party/`), made by `go run ./cmd/releasetool notices`; the release page has a copy for the installer's users. Code ported or vendored from another project goes in `third_party/<project>/` with its LICENSE, so the notices pick it up.
+
 It publishes them as a GitHub release with SHA-256 checksums and `latest.json`, the update manifest the desktop app reads. A tag with a suffix (`v1.3.0-rc1`) makes a pre-release, which installed apps don't offer; use one to try a build before everyone gets it. Running the workflow by hand (Actions → release → Run workflow) only builds the artifacts. The builds are not code-signed; adding signing needs certificates held by maintainers.
 
 ### Update signing
