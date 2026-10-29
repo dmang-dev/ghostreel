@@ -142,6 +142,22 @@ message Keyframe {
 message Track {
   uint32 unit_id = 1;
   repeated Keyframe keyframes = 2; // sorted by loop, at most one per loop
+  // Health, shields and energy, engine tier only (replays don't record
+  // them); sorted by loop.
+  repeated Vitals vitals = 3;
+}
+
+// A unit's health, shields and energy from this loop until the next key.
+// Stored when a value moves by more than 1% of its maximum or a maximum
+// changes (upgrades, morphs). A maximum of 0: the unit has none.
+message Vitals {
+  uint32 loop = 1;
+  float health = 2;
+  float health_max = 3;
+  float shield = 4;
+  float shield_max = 5;
+  float energy = 6;
+  float energy_max = 7;
 }
 
 message Snapshot {

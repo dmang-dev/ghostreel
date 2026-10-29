@@ -137,6 +137,9 @@ func frame(loop uint32, units []*sc2.Unit) *enginev1.Frame {
 			X: u.GetPos().GetX(), Y: u.GetPos().GetY(), Z: u.GetPos().GetZ(),
 			Facing: u.GetFacing(), Radius: u.GetRadius(), Flying: u.GetIsFlying(),
 			BuildProgress: u.GetBuildProgress(),
+			Health:        u.GetHealth(), HealthMax: u.GetHealthMax(),
+			Shield: u.GetShield(), ShieldMax: u.GetShieldMax(),
+			Energy: u.GetEnergy(), EnergyMax: u.GetEnergyMax(),
 		}
 		for _, ord := range u.GetOrders() {
 			o := &enginev1.Order{AbilityId: ord.GetAbilityId(), TargetTag: ord.GetTargetUnitTag()}

@@ -392,6 +392,14 @@ type UnitSample struct {
 	Flying        bool     `protobuf:"varint,9,opt,name=flying,proto3" json:"flying,omitempty"`
 	BuildProgress float32  `protobuf:"fixed32,10,opt,name=build_progress,json=buildProgress,proto3" json:"build_progress,omitempty"`
 	Orders        []*Order `protobuf:"bytes,11,rep,name=orders,proto3" json:"orders,omitempty"` // observed player's units only
+	// Hit points, shields and energy, current and maximum (a maximum of 0:
+	// the unit has none). Zero in recordings made before they were kept.
+	Health        float32 `protobuf:"fixed32,12,opt,name=health,proto3" json:"health,omitempty"`
+	HealthMax     float32 `protobuf:"fixed32,13,opt,name=health_max,json=healthMax,proto3" json:"health_max,omitempty"`
+	Shield        float32 `protobuf:"fixed32,14,opt,name=shield,proto3" json:"shield,omitempty"`
+	ShieldMax     float32 `protobuf:"fixed32,15,opt,name=shield_max,json=shieldMax,proto3" json:"shield_max,omitempty"`
+	Energy        float32 `protobuf:"fixed32,16,opt,name=energy,proto3" json:"energy,omitempty"`
+	EnergyMax     float32 `protobuf:"fixed32,17,opt,name=energy_max,json=energyMax,proto3" json:"energy_max,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -503,6 +511,48 @@ func (x *UnitSample) GetOrders() []*Order {
 	return nil
 }
 
+func (x *UnitSample) GetHealth() float32 {
+	if x != nil {
+		return x.Health
+	}
+	return 0
+}
+
+func (x *UnitSample) GetHealthMax() float32 {
+	if x != nil {
+		return x.HealthMax
+	}
+	return 0
+}
+
+func (x *UnitSample) GetShield() float32 {
+	if x != nil {
+		return x.Shield
+	}
+	return 0
+}
+
+func (x *UnitSample) GetShieldMax() float32 {
+	if x != nil {
+		return x.ShieldMax
+	}
+	return 0
+}
+
+func (x *UnitSample) GetEnergy() float32 {
+	if x != nil {
+		return x.Energy
+	}
+	return 0
+}
+
+func (x *UnitSample) GetEnergyMax() float32 {
+	if x != nil {
+		return x.EnergyMax
+	}
+	return 0
+}
+
 type Order struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AbilityId     uint32                 `protobuf:"varint,1,opt,name=ability_id,json=abilityId,proto3" json:"ability_id,omitempty"` // s2client ability id (stable across builds)
@@ -610,7 +660,7 @@ const file_engine_v1_engine_proto_rawDesc = "" +
 	"\x0emovement_speed\x18\x03 \x01(\x02R\rmovementSpeed\"H\n" +
 	"\x05Frame\x12\x12\n" +
 	"\x04loop\x18\x01 \x01(\rR\x04loop\x12+\n" +
-	"\x05units\x18\x02 \x03(\v2\x15.engine.v1.UnitSampleR\x05units\"\x94\x02\n" +
+	"\x05units\x18\x02 \x03(\v2\x15.engine.v1.UnitSampleR\x05units\"\xb9\x03\n" +
 	"\n" +
 	"UnitSample\x12\x10\n" +
 	"\x03tag\x18\x01 \x01(\x04R\x03tag\x12\x1b\n" +
@@ -624,7 +674,16 @@ const file_engine_v1_engine_proto_rawDesc = "" +
 	"\x06flying\x18\t \x01(\bR\x06flying\x12%\n" +
 	"\x0ebuild_progress\x18\n" +
 	" \x01(\x02R\rbuildProgress\x12(\n" +
-	"\x06orders\x18\v \x03(\v2\x10.engine.v1.OrderR\x06orders\"\x98\x01\n" +
+	"\x06orders\x18\v \x03(\v2\x10.engine.v1.OrderR\x06orders\x12\x16\n" +
+	"\x06health\x18\f \x01(\x02R\x06health\x12\x1d\n" +
+	"\n" +
+	"health_max\x18\r \x01(\x02R\thealthMax\x12\x16\n" +
+	"\x06shield\x18\x0e \x01(\x02R\x06shield\x12\x1d\n" +
+	"\n" +
+	"shield_max\x18\x0f \x01(\x02R\tshieldMax\x12\x16\n" +
+	"\x06energy\x18\x10 \x01(\x02R\x06energy\x12\x1d\n" +
+	"\n" +
+	"energy_max\x18\x11 \x01(\x02R\tenergyMax\"\x98\x01\n" +
 	"\x05Order\x12\x1d\n" +
 	"\n" +
 	"ability_id\x18\x01 \x01(\rR\tabilityId\x12\x1b\n" +

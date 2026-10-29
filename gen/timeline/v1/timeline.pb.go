@@ -1021,9 +1021,12 @@ func (x *Keyframe) GetSource() Source {
 }
 
 type Track struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UnitId        uint32                 `protobuf:"varint,1,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
-	Keyframes     []*Keyframe            `protobuf:"bytes,2,rep,name=keyframes,proto3" json:"keyframes,omitempty"` // sorted by loop, at most one per loop
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	UnitId    uint32                 `protobuf:"varint,1,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
+	Keyframes []*Keyframe            `protobuf:"bytes,2,rep,name=keyframes,proto3" json:"keyframes,omitempty"` // sorted by loop, at most one per loop
+	// Health, shields and energy, engine tier only (replays don't record
+	// them); sorted by loop.
+	Vitals        []*Vitals `protobuf:"bytes,3,rep,name=vitals,proto3" json:"vitals,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1072,6 +1075,108 @@ func (x *Track) GetKeyframes() []*Keyframe {
 	return nil
 }
 
+func (x *Track) GetVitals() []*Vitals {
+	if x != nil {
+		return x.Vitals
+	}
+	return nil
+}
+
+// A unit's health, shields and energy from this loop until the next key.
+// Stored when a value moves by more than 1% of its maximum or a maximum
+// changes (upgrades, morphs). A maximum of 0: the unit has none.
+type Vitals struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Loop          uint32                 `protobuf:"varint,1,opt,name=loop,proto3" json:"loop,omitempty"`
+	Health        float32                `protobuf:"fixed32,2,opt,name=health,proto3" json:"health,omitempty"`
+	HealthMax     float32                `protobuf:"fixed32,3,opt,name=health_max,json=healthMax,proto3" json:"health_max,omitempty"`
+	Shield        float32                `protobuf:"fixed32,4,opt,name=shield,proto3" json:"shield,omitempty"`
+	ShieldMax     float32                `protobuf:"fixed32,5,opt,name=shield_max,json=shieldMax,proto3" json:"shield_max,omitempty"`
+	Energy        float32                `protobuf:"fixed32,6,opt,name=energy,proto3" json:"energy,omitempty"`
+	EnergyMax     float32                `protobuf:"fixed32,7,opt,name=energy_max,json=energyMax,proto3" json:"energy_max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Vitals) Reset() {
+	*x = Vitals{}
+	mi := &file_timeline_v1_timeline_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Vitals) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Vitals) ProtoMessage() {}
+
+func (x *Vitals) ProtoReflect() protoreflect.Message {
+	mi := &file_timeline_v1_timeline_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Vitals.ProtoReflect.Descriptor instead.
+func (*Vitals) Descriptor() ([]byte, []int) {
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Vitals) GetLoop() uint32 {
+	if x != nil {
+		return x.Loop
+	}
+	return 0
+}
+
+func (x *Vitals) GetHealth() float32 {
+	if x != nil {
+		return x.Health
+	}
+	return 0
+}
+
+func (x *Vitals) GetHealthMax() float32 {
+	if x != nil {
+		return x.HealthMax
+	}
+	return 0
+}
+
+func (x *Vitals) GetShield() float32 {
+	if x != nil {
+		return x.Shield
+	}
+	return 0
+}
+
+func (x *Vitals) GetShieldMax() float32 {
+	if x != nil {
+		return x.ShieldMax
+	}
+	return 0
+}
+
+func (x *Vitals) GetEnergy() float32 {
+	if x != nil {
+		return x.Energy
+	}
+	return 0
+}
+
+func (x *Vitals) GetEnergyMax() float32 {
+	if x != nil {
+		return x.EnergyMax
+	}
+	return 0
+}
+
 type Snapshot struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Loop  uint32                 `protobuf:"varint,1,opt,name=loop,proto3" json:"loop,omitempty"`
@@ -1085,7 +1190,7 @@ type Snapshot struct {
 
 func (x *Snapshot) Reset() {
 	*x = Snapshot{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[9]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1097,7 +1202,7 @@ func (x *Snapshot) String() string {
 func (*Snapshot) ProtoMessage() {}
 
 func (x *Snapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[9]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1110,7 +1215,7 @@ func (x *Snapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Snapshot.ProtoReflect.Descriptor instead.
 func (*Snapshot) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{9}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Snapshot) GetLoop() uint32 {
@@ -1154,7 +1259,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[10]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1166,7 +1271,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[10]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1179,7 +1284,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{10}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Event) GetLoop() uint32 {
@@ -1329,7 +1434,7 @@ type UnitBorn struct {
 
 func (x *UnitBorn) Reset() {
 	*x = UnitBorn{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[11]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1341,7 +1446,7 @@ func (x *UnitBorn) String() string {
 func (*UnitBorn) ProtoMessage() {}
 
 func (x *UnitBorn) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[11]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1354,7 +1459,7 @@ func (x *UnitBorn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitBorn.ProtoReflect.Descriptor instead.
 func (*UnitBorn) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{11}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *UnitBorn) GetUnitId() uint32 {
@@ -1373,7 +1478,7 @@ type UnitDone struct {
 
 func (x *UnitDone) Reset() {
 	*x = UnitDone{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[12]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1385,7 +1490,7 @@ func (x *UnitDone) String() string {
 func (*UnitDone) ProtoMessage() {}
 
 func (x *UnitDone) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[12]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1398,7 +1503,7 @@ func (x *UnitDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitDone.ProtoReflect.Descriptor instead.
 func (*UnitDone) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{12}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UnitDone) GetUnitId() uint32 {
@@ -1418,7 +1523,7 @@ type UnitDied struct {
 
 func (x *UnitDied) Reset() {
 	*x = UnitDied{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[13]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1430,7 +1535,7 @@ func (x *UnitDied) String() string {
 func (*UnitDied) ProtoMessage() {}
 
 func (x *UnitDied) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[13]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1443,7 +1548,7 @@ func (x *UnitDied) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitDied.ProtoReflect.Descriptor instead.
 func (*UnitDied) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{13}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *UnitDied) GetUnitId() uint32 {
@@ -1470,7 +1575,7 @@ type UnitMorph struct {
 
 func (x *UnitMorph) Reset() {
 	*x = UnitMorph{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[14]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1482,7 +1587,7 @@ func (x *UnitMorph) String() string {
 func (*UnitMorph) ProtoMessage() {}
 
 func (x *UnitMorph) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[14]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1495,7 +1600,7 @@ func (x *UnitMorph) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitMorph.ProtoReflect.Descriptor instead.
 func (*UnitMorph) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{14}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UnitMorph) GetUnitId() uint32 {
@@ -1523,7 +1628,7 @@ type Upgrade struct {
 
 func (x *Upgrade) Reset() {
 	*x = Upgrade{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[15]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1535,7 +1640,7 @@ func (x *Upgrade) String() string {
 func (*Upgrade) ProtoMessage() {}
 
 func (x *Upgrade) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[15]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1548,7 +1653,7 @@ func (x *Upgrade) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Upgrade.ProtoReflect.Descriptor instead.
 func (*Upgrade) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{15}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Upgrade) GetPlayer() uint32 {
@@ -1594,7 +1699,7 @@ type PlayerStats struct {
 
 func (x *PlayerStats) Reset() {
 	*x = PlayerStats{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[16]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1606,7 +1711,7 @@ func (x *PlayerStats) String() string {
 func (*PlayerStats) ProtoMessage() {}
 
 func (x *PlayerStats) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[16]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1619,7 +1724,7 @@ func (x *PlayerStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerStats.ProtoReflect.Descriptor instead.
 func (*PlayerStats) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{16}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PlayerStats) GetPlayer() uint32 {
@@ -1730,7 +1835,7 @@ type Chat struct {
 
 func (x *Chat) Reset() {
 	*x = Chat{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[17]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1742,7 +1847,7 @@ func (x *Chat) String() string {
 func (*Chat) ProtoMessage() {}
 
 func (x *Chat) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[17]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1755,7 +1860,7 @@ func (x *Chat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Chat.ProtoReflect.Descriptor instead.
 func (*Chat) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{17}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Chat) GetPlayer() uint32 {
@@ -1790,7 +1895,7 @@ type Command struct {
 
 func (x *Command) Reset() {
 	*x = Command{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[18]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1802,7 +1907,7 @@ func (x *Command) String() string {
 func (*Command) ProtoMessage() {}
 
 func (x *Command) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[18]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1815,7 +1920,7 @@ func (x *Command) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Command.ProtoReflect.Descriptor instead.
 func (*Command) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{18}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Command) GetPlayer() uint32 {
@@ -1958,10 +2063,22 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\x01y\x18\x03 \x01(\x02R\x01y\x12\x16\n" +
 	"\x06facing\x18\x04 \x01(\x02R\x06facing\x12,\n" +
 	"\x05state\x18\x05 \x01(\x0e2\x16.timeline.v1.UnitStateR\x05state\x12+\n" +
-	"\x06source\x18\x06 \x01(\x0e2\x13.timeline.v1.SourceR\x06source\"U\n" +
+	"\x06source\x18\x06 \x01(\x0e2\x13.timeline.v1.SourceR\x06source\"\x82\x01\n" +
 	"\x05Track\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\rR\x06unitId\x123\n" +
-	"\tkeyframes\x18\x02 \x03(\v2\x15.timeline.v1.KeyframeR\tkeyframes\"d\n" +
+	"\tkeyframes\x18\x02 \x03(\v2\x15.timeline.v1.KeyframeR\tkeyframes\x12+\n" +
+	"\x06vitals\x18\x03 \x03(\v2\x13.timeline.v1.VitalsR\x06vitals\"\xc1\x01\n" +
+	"\x06Vitals\x12\x12\n" +
+	"\x04loop\x18\x01 \x01(\rR\x04loop\x12\x16\n" +
+	"\x06health\x18\x02 \x01(\x02R\x06health\x12\x1d\n" +
+	"\n" +
+	"health_max\x18\x03 \x01(\x02R\thealthMax\x12\x16\n" +
+	"\x06shield\x18\x04 \x01(\x02R\x06shield\x12\x1d\n" +
+	"\n" +
+	"shield_max\x18\x05 \x01(\x02R\tshieldMax\x12\x16\n" +
+	"\x06energy\x18\x06 \x01(\x02R\x06energy\x12\x1d\n" +
+	"\n" +
+	"energy_max\x18\a \x01(\x02R\tenergyMax\"d\n" +
 	"\bSnapshot\x12\x12\n" +
 	"\x04loop\x18\x01 \x01(\rR\x04loop\x12\x14\n" +
 	"\x05alive\x18\x02 \x03(\rR\x05alive\x12.\n" +
@@ -2059,7 +2176,7 @@ func file_timeline_v1_timeline_proto_rawDescGZIP() []byte {
 }
 
 var file_timeline_v1_timeline_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_timeline_v1_timeline_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_timeline_v1_timeline_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_timeline_v1_timeline_proto_goTypes = []any{
 	(SchemaVersion)(0),  // 0: timeline.v1.SchemaVersion
 	(Source)(0),         // 1: timeline.v1.Source
@@ -2074,16 +2191,17 @@ var file_timeline_v1_timeline_proto_goTypes = []any{
 	(*OwnerChange)(nil), // 10: timeline.v1.OwnerChange
 	(*Keyframe)(nil),    // 11: timeline.v1.Keyframe
 	(*Track)(nil),       // 12: timeline.v1.Track
-	(*Snapshot)(nil),    // 13: timeline.v1.Snapshot
-	(*Event)(nil),       // 14: timeline.v1.Event
-	(*UnitBorn)(nil),    // 15: timeline.v1.UnitBorn
-	(*UnitDone)(nil),    // 16: timeline.v1.UnitDone
-	(*UnitDied)(nil),    // 17: timeline.v1.UnitDied
-	(*UnitMorph)(nil),   // 18: timeline.v1.UnitMorph
-	(*Upgrade)(nil),     // 19: timeline.v1.Upgrade
-	(*PlayerStats)(nil), // 20: timeline.v1.PlayerStats
-	(*Chat)(nil),        // 21: timeline.v1.Chat
-	(*Command)(nil),     // 22: timeline.v1.Command
+	(*Vitals)(nil),      // 13: timeline.v1.Vitals
+	(*Snapshot)(nil),    // 14: timeline.v1.Snapshot
+	(*Event)(nil),       // 15: timeline.v1.Event
+	(*UnitBorn)(nil),    // 16: timeline.v1.UnitBorn
+	(*UnitDone)(nil),    // 17: timeline.v1.UnitDone
+	(*UnitDied)(nil),    // 18: timeline.v1.UnitDied
+	(*UnitMorph)(nil),   // 19: timeline.v1.UnitMorph
+	(*Upgrade)(nil),     // 20: timeline.v1.Upgrade
+	(*PlayerStats)(nil), // 21: timeline.v1.PlayerStats
+	(*Chat)(nil),        // 22: timeline.v1.Chat
+	(*Command)(nil),     // 23: timeline.v1.Command
 }
 var file_timeline_v1_timeline_proto_depIdxs = []int32{
 	0,  // 0: timeline.v1.Timeline.schema_version:type_name -> timeline.v1.SchemaVersion
@@ -2091,8 +2209,8 @@ var file_timeline_v1_timeline_proto_depIdxs = []int32{
 	7,  // 2: timeline.v1.Timeline.unit_types:type_name -> timeline.v1.UnitType
 	8,  // 3: timeline.v1.Timeline.units:type_name -> timeline.v1.Unit
 	12, // 4: timeline.v1.Timeline.tracks:type_name -> timeline.v1.Track
-	13, // 5: timeline.v1.Timeline.snapshots:type_name -> timeline.v1.Snapshot
-	14, // 6: timeline.v1.Timeline.events:type_name -> timeline.v1.Event
+	14, // 5: timeline.v1.Timeline.snapshots:type_name -> timeline.v1.Snapshot
+	15, // 6: timeline.v1.Timeline.events:type_name -> timeline.v1.Event
 	6,  // 7: timeline.v1.Meta.players:type_name -> timeline.v1.Player
 	1,  // 8: timeline.v1.Meta.fidelity:type_name -> timeline.v1.Source
 	2,  // 9: timeline.v1.UnitType.class:type_name -> timeline.v1.UnitClass
@@ -2101,20 +2219,21 @@ var file_timeline_v1_timeline_proto_depIdxs = []int32{
 	3,  // 12: timeline.v1.Keyframe.state:type_name -> timeline.v1.UnitState
 	1,  // 13: timeline.v1.Keyframe.source:type_name -> timeline.v1.Source
 	11, // 14: timeline.v1.Track.keyframes:type_name -> timeline.v1.Keyframe
-	20, // 15: timeline.v1.Snapshot.stats:type_name -> timeline.v1.PlayerStats
-	15, // 16: timeline.v1.Event.unit_born:type_name -> timeline.v1.UnitBorn
-	17, // 17: timeline.v1.Event.unit_died:type_name -> timeline.v1.UnitDied
-	18, // 18: timeline.v1.Event.morph:type_name -> timeline.v1.UnitMorph
-	19, // 19: timeline.v1.Event.upgrade:type_name -> timeline.v1.Upgrade
-	20, // 20: timeline.v1.Event.player_stats:type_name -> timeline.v1.PlayerStats
-	21, // 21: timeline.v1.Event.chat:type_name -> timeline.v1.Chat
-	22, // 22: timeline.v1.Event.command:type_name -> timeline.v1.Command
-	16, // 23: timeline.v1.Event.unit_done:type_name -> timeline.v1.UnitDone
-	24, // [24:24] is the sub-list for method output_type
-	24, // [24:24] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	13, // 15: timeline.v1.Track.vitals:type_name -> timeline.v1.Vitals
+	21, // 16: timeline.v1.Snapshot.stats:type_name -> timeline.v1.PlayerStats
+	16, // 17: timeline.v1.Event.unit_born:type_name -> timeline.v1.UnitBorn
+	18, // 18: timeline.v1.Event.unit_died:type_name -> timeline.v1.UnitDied
+	19, // 19: timeline.v1.Event.morph:type_name -> timeline.v1.UnitMorph
+	20, // 20: timeline.v1.Event.upgrade:type_name -> timeline.v1.Upgrade
+	21, // 21: timeline.v1.Event.player_stats:type_name -> timeline.v1.PlayerStats
+	22, // 22: timeline.v1.Event.chat:type_name -> timeline.v1.Chat
+	23, // 23: timeline.v1.Event.command:type_name -> timeline.v1.Command
+	17, // 24: timeline.v1.Event.unit_done:type_name -> timeline.v1.UnitDone
+	25, // [25:25] is the sub-list for method output_type
+	25, // [25:25] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_timeline_v1_timeline_proto_init() }
@@ -2123,7 +2242,7 @@ func file_timeline_v1_timeline_proto_init() {
 		return
 	}
 	file_timeline_v1_timeline_proto_msgTypes[4].OneofWrappers = []any{}
-	file_timeline_v1_timeline_proto_msgTypes[10].OneofWrappers = []any{
+	file_timeline_v1_timeline_proto_msgTypes[11].OneofWrappers = []any{
 		(*Event_UnitBorn)(nil),
 		(*Event_UnitDied)(nil),
 		(*Event_Morph)(nil),
@@ -2139,7 +2258,7 @@ func file_timeline_v1_timeline_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_timeline_v1_timeline_proto_rawDesc), len(file_timeline_v1_timeline_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

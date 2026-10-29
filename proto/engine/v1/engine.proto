@@ -67,6 +67,14 @@ message UnitSample {
   bool flying = 9;
   float build_progress = 10;
   repeated Order orders = 11; // observed player's units only
+  // Hit points, shields and energy, current and maximum (a maximum of 0:
+  // the unit has none). Zero in recordings made before they were kept.
+  float health = 12;
+  float health_max = 13;
+  float shield = 14;
+  float shield_max = 15;
+  float energy = 16;
+  float energy_max = 17;
 }
 
 message Order {
