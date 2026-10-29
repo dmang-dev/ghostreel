@@ -21,7 +21,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file timeline/v1/timeline.proto.
  */
 export const file_timeline_v1_timeline: GenFile = /*@__PURE__*/
-  fileDesc("Chp0aW1lbGluZS92MS90aW1lbGluZS5wcm90bxILdGltZWxpbmUudjEingIKCFRpbWVsaW5lEjIKDnNjaGVtYV92ZXJzaW9uGAEgASgOMhoudGltZWxpbmUudjEuU2NoZW1hVmVyc2lvbhIfCgRtZXRhGAIgASgLMhEudGltZWxpbmUudjEuTWV0YRIpCgp1bml0X3R5cGVzGAMgAygLMhUudGltZWxpbmUudjEuVW5pdFR5cGUSIAoFdW5pdHMYBCADKAsyES50aW1lbGluZS52MS5Vbml0EiIKBnRyYWNrcxgFIAMoCzISLnRpbWVsaW5lLnYxLlRyYWNrEigKCXNuYXBzaG90cxgGIAMoCzIVLnRpbWVsaW5lLnYxLlNuYXBzaG90EiIKBmV2ZW50cxgHIAMoCzISLnRpbWVsaW5lLnYxLkV2ZW50IssCCgRNZXRhEhMKC3JlcGxheV9oYXNoGAEgASgJEg8KB3ZlcnNpb24YAiABKAkSEgoKYmFzZV9idWlsZBgDIAEoDRIcChRwcm90b2NvbF9hcHByb3hfZnJvbRgEIAEoDRINCgVsb29wcxgFIAEoDRIRCgltYXBfdGl0bGUYBiABKAkSEAoIbWFwX2hhc2gYByABKAkSFQoNbWFwX2ZpbGVfbmFtZRgIIAEoCRIRCgltYXBfd2lkdGgYCSABKA0SEgoKbWFwX2hlaWdodBgKIAEoDRIkCgdwbGF5ZXJzGAsgAygLMhMudGltZWxpbmUudjEuUGxheWVyEiUKCGZpZGVsaXR5GAwgASgOMhMudGltZWxpbmUudjEuU291cmNlEhkKEXNuYXBzaG90X2ludGVydmFsGA0gASgNEhEKCWdlbmVyYXRvchgOIAEoCSJxCgZQbGF5ZXISCgoCaWQYASABKA0SDAoEbmFtZRgCIAEoCRIMCgRyYWNlGAMgASgJEg4KBnJlc3VsdBgEIAEoCRINCgVjb2xvchgFIAEoDRIPCgdzdGFydF94GAYgASgCEg8KB3N0YXJ0X3kYByABKAIixAEKCFVuaXRUeXBlEgwKBG5hbWUYASABKAkSJQoFY2xhc3MYAiABKA4yFi50aW1lbGluZS52MS5Vbml0Q2xhc3MSDgoGcmFkaXVzGAMgASgCEhMKC2Zvb3RwcmludF93GAQgASgNEhMKC2Zvb3RwcmludF9oGAUgASgNEgsKA2FpchgGIAEoCBIPCgdtb3ZhYmxlGAcgASgIEg0KBWtub3duGAggASgIEg0KBXNwZWVkGAkgASgCEg0KBXNpZ2h0GAogASgCIpwCCgRVbml0EgoKAmlkGAEgASgNEgsKA3RhZxgCIAEoDRINCgVvd25lchgDIAEoDRIMCgR0eXBlGAQgASgNEhEKCWJvcm5fbG9vcBgFIAEoDRIWCglkb25lX2xvb3AYBiABKA1IAIgBARITCgtjb25zdHJ1Y3RlZBgHIAEoCBIWCglkaWVkX2xvb3AYCCABKA1IAYgBARIVCg1raWxsZXJfcGxheWVyGAkgASgNEiIKBm1vcnBocxgKIAMoCzISLnRpbWVsaW5lLnYxLk1vcnBoEi8KDW93bmVyX2NoYW5nZXMYCyADKAsyGC50aW1lbGluZS52MS5Pd25lckNoYW5nZUIMCgpfZG9uZV9sb29wQgwKCl9kaWVkX2xvb3AiIwoFTW9ycGgSDAoEbG9vcBgBIAEoDRIMCgR0eXBlGAIgASgNIioKC093bmVyQ2hhbmdlEgwKBGxvb3AYASABKA0SDQoFb3duZXIYAiABKA0iigEKCEtleWZyYW1lEgwKBGxvb3AYASABKA0SCQoBeBgCIAEoAhIJCgF5GAMgASgCEg4KBmZhY2luZxgEIAEoAhIlCgVzdGF0ZRgFIAEoDjIWLnRpbWVsaW5lLnYxLlVuaXRTdGF0ZRIjCgZzb3VyY2UYBiABKA4yEy50aW1lbGluZS52MS5Tb3VyY2UiQgoFVHJhY2sSDwoHdW5pdF9pZBgBIAEoDRIoCglrZXlmcmFtZXMYAiADKAsyFS50aW1lbGluZS52MS5LZXlmcmFtZSJQCghTbmFwc2hvdBIMCgRsb29wGAEgASgNEg0KBWFsaXZlGAIgAygNEicKBXN0YXRzGAMgAygLMhgudGltZWxpbmUudjEuUGxheWVyU3RhdHMi8QIKBUV2ZW50EgwKBGxvb3AYASABKA0SKgoJdW5pdF9ib3JuGAIgASgLMhUudGltZWxpbmUudjEuVW5pdEJvcm5IABIqCgl1bml0X2RpZWQYAyABKAsyFS50aW1lbGluZS52MS5Vbml0RGllZEgAEicKBW1vcnBoGAQgASgLMhYudGltZWxpbmUudjEuVW5pdE1vcnBoSAASJwoHdXBncmFkZRgFIAEoCzIULnRpbWVsaW5lLnYxLlVwZ3JhZGVIABIwCgxwbGF5ZXJfc3RhdHMYBiABKAsyGC50aW1lbGluZS52MS5QbGF5ZXJTdGF0c0gAEiEKBGNoYXQYByABKAsyES50aW1lbGluZS52MS5DaGF0SAASJwoHY29tbWFuZBgIIAEoCzIULnRpbWVsaW5lLnYxLkNvbW1hbmRIABIqCgl1bml0X2RvbmUYCSABKAsyFS50aW1lbGluZS52MS5Vbml0RG9uZUgAQgYKBGtpbmQiGwoIVW5pdEJvcm4SDwoHdW5pdF9pZBgBIAEoDSIbCghVbml0RG9uZRIPCgd1bml0X2lkGAEgASgNIjIKCFVuaXREaWVkEg8KB3VuaXRfaWQYASABKA0SFQoNa2lsbGVyX3BsYXllchgCIAEoDSIqCglVbml0TW9ycGgSDwoHdW5pdF9pZBgBIAEoDRIMCgR0eXBlGAIgASgNIjYKB1VwZ3JhZGUSDgoGcGxheWVyGAEgASgNEgwKBG5hbWUYAiABKAkSDQoFY291bnQYAyABKAUisgIKC1BsYXllclN0YXRzEg4KBnBsYXllchgBIAEoDRITCgtzdXBwbHlfdXNlZBgCIAEoAhITCgtzdXBwbHlfbWFkZRgDIAEoAhIQCghtaW5lcmFscxgEIAEoDRIPCgd2ZXNwZW5lGAUgASgNEhQKDG1pbmVyYWxfcmF0ZRgGIAEoDRIUCgx2ZXNwZW5lX3JhdGUYByABKA0SDwoHd29ya2VycxgIIAEoDRIVCg1hcm15X21pbmVyYWxzGAkgASgNEhQKDGFybXlfdmVzcGVuZRgKIAEoDRIVCg1sb3N0X21pbmVyYWxzGAsgASgNEhQKDGxvc3RfdmVzcGVuZRgMIAEoDRIXCg9raWxsZWRfbWluZXJhbHMYDSABKA0SFgoOa2lsbGVkX3Zlc3BlbmUYDiABKA0iJAoEQ2hhdBIOCgZwbGF5ZXIYASABKA0SDAoEdGV4dBgCIAEoCSKgAQoHQ29tbWFuZBIOCgZwbGF5ZXIYASABKA0SDwoHYWJpbGl0eRgCIAEoBRIZChFhYmlsaXR5X2NtZF9pbmRleBgDIAEoDRISCgpoYXNfdGFyZ2V0GAQgASgIEgkKAXgYBSABKAISCQoBeRgGIAEoAhIWCg50YXJnZXRfdW5pdF9pZBgHIAEoDRIXCg9oYXNfdGFyZ2V0X3VuaXQYCCABKAgqRQoNU2NoZW1hVmVyc2lvbhIeChpTQ0hFTUFfVkVSU0lPTl9VTlNQRUNJRklFRBAAEhQKEFNDSEVNQV9WRVJTSU9OXzEQASpbCgZTb3VyY2USFgoSU09VUkNFX1VOU1BFQ0lGSUVEEAASEgoOU09VUkNFX1RSQUNLRVIQARISCg5TT1VSQ0VfQ09NTUFORBACEhEKDVNPVVJDRV9FTkdJTkUQAyq0AQoJVW5pdENsYXNzEhoKFlVOSVRfQ0xBU1NfVU5TUEVDSUZJRUQQABITCg9VTklUX0NMQVNTX0FSTVkQARIVChFVTklUX0NMQVNTX1dPUktFUhACEhcKE1VOSVRfQ0xBU1NfQlVJTERJTkcQAxIXChNVTklUX0NMQVNTX1JFU09VUkNFEAQSFgoSVU5JVF9DTEFTU19ORVVUUkFMEAUSFQoRVU5JVF9DTEFTU19ISURERU4QBiqfAQoJVW5pdFN0YXRlEhoKFlVOSVRfU1RBVEVfVU5TUEVDSUZJRUQQABITCg9VTklUX1NUQVRFX0lETEUQARIVChFVTklUX1NUQVRFX01PVklORxACEhgKFFVOSVRfU1RBVEVfQVRUQUNLSU5HEAMSGwoXVU5JVF9TVEFURV9DT05TVFJVQ1RJTkcQBBITCg9VTklUX1NUQVRFX0RFQUQQBUI7WjlnaXRodWIuY29tL2RtYW5nLWRldi9naG9zdHJlZWwvZ2VuL3RpbWVsaW5lL3YxO3RpbWVsaW5ldjFiBnByb3RvMw");
+  fileDesc("Chp0aW1lbGluZS92MS90aW1lbGluZS5wcm90bxILdGltZWxpbmUudjEingIKCFRpbWVsaW5lEjIKDnNjaGVtYV92ZXJzaW9uGAEgASgOMhoudGltZWxpbmUudjEuU2NoZW1hVmVyc2lvbhIfCgRtZXRhGAIgASgLMhEudGltZWxpbmUudjEuTWV0YRIpCgp1bml0X3R5cGVzGAMgAygLMhUudGltZWxpbmUudjEuVW5pdFR5cGUSIAoFdW5pdHMYBCADKAsyES50aW1lbGluZS52MS5Vbml0EiIKBnRyYWNrcxgFIAMoCzISLnRpbWVsaW5lLnYxLlRyYWNrEigKCXNuYXBzaG90cxgGIAMoCzIVLnRpbWVsaW5lLnYxLlNuYXBzaG90EiIKBmV2ZW50cxgHIAMoCzISLnRpbWVsaW5lLnYxLkV2ZW50IssCCgRNZXRhEhMKC3JlcGxheV9oYXNoGAEgASgJEg8KB3ZlcnNpb24YAiABKAkSEgoKYmFzZV9idWlsZBgDIAEoDRIcChRwcm90b2NvbF9hcHByb3hfZnJvbRgEIAEoDRINCgVsb29wcxgFIAEoDRIRCgltYXBfdGl0bGUYBiABKAkSEAoIbWFwX2hhc2gYByABKAkSFQoNbWFwX2ZpbGVfbmFtZRgIIAEoCRIRCgltYXBfd2lkdGgYCSABKA0SEgoKbWFwX2hlaWdodBgKIAEoDRIkCgdwbGF5ZXJzGAsgAygLMhMudGltZWxpbmUudjEuUGxheWVyEiUKCGZpZGVsaXR5GAwgASgOMhMudGltZWxpbmUudjEuU291cmNlEhkKEXNuYXBzaG90X2ludGVydmFsGA0gASgNEhEKCWdlbmVyYXRvchgOIAEoCSJxCgZQbGF5ZXISCgoCaWQYASABKA0SDAoEbmFtZRgCIAEoCRIMCgRyYWNlGAMgASgJEg4KBnJlc3VsdBgEIAEoCRINCgVjb2xvchgFIAEoDRIPCgdzdGFydF94GAYgASgCEg8KB3N0YXJ0X3kYByABKAIixAEKCFVuaXRUeXBlEgwKBG5hbWUYASABKAkSJQoFY2xhc3MYAiABKA4yFi50aW1lbGluZS52MS5Vbml0Q2xhc3MSDgoGcmFkaXVzGAMgASgCEhMKC2Zvb3RwcmludF93GAQgASgNEhMKC2Zvb3RwcmludF9oGAUgASgNEgsKA2FpchgGIAEoCBIPCgdtb3ZhYmxlGAcgASgIEg0KBWtub3duGAggASgIEg0KBXNwZWVkGAkgASgCEg0KBXNpZ2h0GAogASgCIpwCCgRVbml0EgoKAmlkGAEgASgNEgsKA3RhZxgCIAEoDRINCgVvd25lchgDIAEoDRIMCgR0eXBlGAQgASgNEhEKCWJvcm5fbG9vcBgFIAEoDRIWCglkb25lX2xvb3AYBiABKA1IAIgBARITCgtjb25zdHJ1Y3RlZBgHIAEoCBIWCglkaWVkX2xvb3AYCCABKA1IAYgBARIVCg1raWxsZXJfcGxheWVyGAkgASgNEiIKBm1vcnBocxgKIAMoCzISLnRpbWVsaW5lLnYxLk1vcnBoEi8KDW93bmVyX2NoYW5nZXMYCyADKAsyGC50aW1lbGluZS52MS5Pd25lckNoYW5nZUIMCgpfZG9uZV9sb29wQgwKCl9kaWVkX2xvb3AiIwoFTW9ycGgSDAoEbG9vcBgBIAEoDRIMCgR0eXBlGAIgASgNIioKC093bmVyQ2hhbmdlEgwKBGxvb3AYASABKA0SDQoFb3duZXIYAiABKA0iigEKCEtleWZyYW1lEgwKBGxvb3AYASABKA0SCQoBeBgCIAEoAhIJCgF5GAMgASgCEg4KBmZhY2luZxgEIAEoAhIlCgVzdGF0ZRgFIAEoDjIWLnRpbWVsaW5lLnYxLlVuaXRTdGF0ZRIjCgZzb3VyY2UYBiABKA4yEy50aW1lbGluZS52MS5Tb3VyY2UiZwoFVHJhY2sSDwoHdW5pdF9pZBgBIAEoDRIoCglrZXlmcmFtZXMYAiADKAsyFS50aW1lbGluZS52MS5LZXlmcmFtZRIjCgZ2aXRhbHMYAyADKAsyEy50aW1lbGluZS52MS5WaXRhbHMiggEKBlZpdGFscxIMCgRsb29wGAEgASgNEg4KBmhlYWx0aBgCIAEoAhISCgpoZWFsdGhfbWF4GAMgASgCEg4KBnNoaWVsZBgEIAEoAhISCgpzaGllbGRfbWF4GAUgASgCEg4KBmVuZXJneRgGIAEoAhISCgplbmVyZ3lfbWF4GAcgASgCIlAKCFNuYXBzaG90EgwKBGxvb3AYASABKA0SDQoFYWxpdmUYAiADKA0SJwoFc3RhdHMYAyADKAsyGC50aW1lbGluZS52MS5QbGF5ZXJTdGF0cyLxAgoFRXZlbnQSDAoEbG9vcBgBIAEoDRIqCgl1bml0X2Jvcm4YAiABKAsyFS50aW1lbGluZS52MS5Vbml0Qm9ybkgAEioKCXVuaXRfZGllZBgDIAEoCzIVLnRpbWVsaW5lLnYxLlVuaXREaWVkSAASJwoFbW9ycGgYBCABKAsyFi50aW1lbGluZS52MS5Vbml0TW9ycGhIABInCgd1cGdyYWRlGAUgASgLMhQudGltZWxpbmUudjEuVXBncmFkZUgAEjAKDHBsYXllcl9zdGF0cxgGIAEoCzIYLnRpbWVsaW5lLnYxLlBsYXllclN0YXRzSAASIQoEY2hhdBgHIAEoCzIRLnRpbWVsaW5lLnYxLkNoYXRIABInCgdjb21tYW5kGAggASgLMhQudGltZWxpbmUudjEuQ29tbWFuZEgAEioKCXVuaXRfZG9uZRgJIAEoCzIVLnRpbWVsaW5lLnYxLlVuaXREb25lSABCBgoEa2luZCIbCghVbml0Qm9ybhIPCgd1bml0X2lkGAEgASgNIhsKCFVuaXREb25lEg8KB3VuaXRfaWQYASABKA0iMgoIVW5pdERpZWQSDwoHdW5pdF9pZBgBIAEoDRIVCg1raWxsZXJfcGxheWVyGAIgASgNIioKCVVuaXRNb3JwaBIPCgd1bml0X2lkGAEgASgNEgwKBHR5cGUYAiABKA0iNgoHVXBncmFkZRIOCgZwbGF5ZXIYASABKA0SDAoEbmFtZRgCIAEoCRINCgVjb3VudBgDIAEoBSKyAgoLUGxheWVyU3RhdHMSDgoGcGxheWVyGAEgASgNEhMKC3N1cHBseV91c2VkGAIgASgCEhMKC3N1cHBseV9tYWRlGAMgASgCEhAKCG1pbmVyYWxzGAQgASgNEg8KB3Zlc3BlbmUYBSABKA0SFAoMbWluZXJhbF9yYXRlGAYgASgNEhQKDHZlc3BlbmVfcmF0ZRgHIAEoDRIPCgd3b3JrZXJzGAggASgNEhUKDWFybXlfbWluZXJhbHMYCSABKA0SFAoMYXJteV92ZXNwZW5lGAogASgNEhUKDWxvc3RfbWluZXJhbHMYCyABKA0SFAoMbG9zdF92ZXNwZW5lGAwgASgNEhcKD2tpbGxlZF9taW5lcmFscxgNIAEoDRIWCg5raWxsZWRfdmVzcGVuZRgOIAEoDSIkCgRDaGF0Eg4KBnBsYXllchgBIAEoDRIMCgR0ZXh0GAIgASgJIqABCgdDb21tYW5kEg4KBnBsYXllchgBIAEoDRIPCgdhYmlsaXR5GAIgASgFEhkKEWFiaWxpdHlfY21kX2luZGV4GAMgASgNEhIKCmhhc190YXJnZXQYBCABKAgSCQoBeBgFIAEoAhIJCgF5GAYgASgCEhYKDnRhcmdldF91bml0X2lkGAcgASgNEhcKD2hhc190YXJnZXRfdW5pdBgIIAEoCCpFCg1TY2hlbWFWZXJzaW9uEh4KGlNDSEVNQV9WRVJTSU9OX1VOU1BFQ0lGSUVEEAASFAoQU0NIRU1BX1ZFUlNJT05fMRABKlsKBlNvdXJjZRIWChJTT1VSQ0VfVU5TUEVDSUZJRUQQABISCg5TT1VSQ0VfVFJBQ0tFUhABEhIKDlNPVVJDRV9DT01NQU5EEAISEQoNU09VUkNFX0VOR0lORRADKrQBCglVbml0Q2xhc3MSGgoWVU5JVF9DTEFTU19VTlNQRUNJRklFRBAAEhMKD1VOSVRfQ0xBU1NfQVJNWRABEhUKEVVOSVRfQ0xBU1NfV09SS0VSEAISFwoTVU5JVF9DTEFTU19CVUlMRElORxADEhcKE1VOSVRfQ0xBU1NfUkVTT1VSQ0UQBBIWChJVTklUX0NMQVNTX05FVVRSQUwQBRIVChFVTklUX0NMQVNTX0hJRERFThAGKp8BCglVbml0U3RhdGUSGgoWVU5JVF9TVEFURV9VTlNQRUNJRklFRBAAEhMKD1VOSVRfU1RBVEVfSURMRRABEhUKEVVOSVRfU1RBVEVfTU9WSU5HEAISGAoUVU5JVF9TVEFURV9BVFRBQ0tJTkcQAxIbChdVTklUX1NUQVRFX0NPTlNUUlVDVElORxAEEhMKD1VOSVRfU1RBVEVfREVBRBAFQjtaOWdpdGh1Yi5jb20vZG1hbmctZGV2L2dob3N0cmVlbC9nZW4vdGltZWxpbmUvdjE7dGltZWxpbmV2MWIGcHJvdG8z");
 
 /**
  * @generated from message timeline.v1.Timeline
@@ -479,6 +479,14 @@ export type Track = Message<"timeline.v1.Track"> & {
    * @generated from field: repeated timeline.v1.Keyframe keyframes = 2;
    */
   keyframes: Keyframe[];
+
+  /**
+   * Health, shields and energy, engine tier only (replays don't record
+   * them); sorted by loop.
+   *
+   * @generated from field: repeated timeline.v1.Vitals vitals = 3;
+   */
+  vitals: Vitals[];
 };
 
 /**
@@ -487,6 +495,57 @@ export type Track = Message<"timeline.v1.Track"> & {
  */
 export const TrackSchema: GenMessage<Track> = /*@__PURE__*/
   messageDesc(file_timeline_v1_timeline, 8);
+
+/**
+ * A unit's health, shields and energy from this loop until the next key.
+ * Stored when a value moves by more than 1% of its maximum or a maximum
+ * changes (upgrades, morphs). A maximum of 0: the unit has none.
+ *
+ * @generated from message timeline.v1.Vitals
+ */
+export type Vitals = Message<"timeline.v1.Vitals"> & {
+  /**
+   * @generated from field: uint32 loop = 1;
+   */
+  loop: number;
+
+  /**
+   * @generated from field: float health = 2;
+   */
+  health: number;
+
+  /**
+   * @generated from field: float health_max = 3;
+   */
+  healthMax: number;
+
+  /**
+   * @generated from field: float shield = 4;
+   */
+  shield: number;
+
+  /**
+   * @generated from field: float shield_max = 5;
+   */
+  shieldMax: number;
+
+  /**
+   * @generated from field: float energy = 6;
+   */
+  energy: number;
+
+  /**
+   * @generated from field: float energy_max = 7;
+   */
+  energyMax: number;
+};
+
+/**
+ * Describes the message timeline.v1.Vitals.
+ * Use `create(VitalsSchema)` to create a new message.
+ */
+export const VitalsSchema: GenMessage<Vitals> = /*@__PURE__*/
+  messageDesc(file_timeline_v1_timeline, 9);
 
 /**
  * @generated from message timeline.v1.Snapshot
@@ -517,7 +576,7 @@ export type Snapshot = Message<"timeline.v1.Snapshot"> & {
  * Use `create(SnapshotSchema)` to create a new message.
  */
 export const SnapshotSchema: GenMessage<Snapshot> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 9);
+  messageDesc(file_timeline_v1_timeline, 10);
 
 /**
  * @generated from message timeline.v1.Event
@@ -587,7 +646,7 @@ export type Event = Message<"timeline.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export const EventSchema: GenMessage<Event> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 10);
+  messageDesc(file_timeline_v1_timeline, 11);
 
 /**
  * @generated from message timeline.v1.UnitBorn
@@ -604,7 +663,7 @@ export type UnitBorn = Message<"timeline.v1.UnitBorn"> & {
  * Use `create(UnitBornSchema)` to create a new message.
  */
 export const UnitBornSchema: GenMessage<UnitBorn> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 11);
+  messageDesc(file_timeline_v1_timeline, 12);
 
 /**
  * @generated from message timeline.v1.UnitDone
@@ -621,7 +680,7 @@ export type UnitDone = Message<"timeline.v1.UnitDone"> & {
  * Use `create(UnitDoneSchema)` to create a new message.
  */
 export const UnitDoneSchema: GenMessage<UnitDone> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 12);
+  messageDesc(file_timeline_v1_timeline, 13);
 
 /**
  * @generated from message timeline.v1.UnitDied
@@ -643,7 +702,7 @@ export type UnitDied = Message<"timeline.v1.UnitDied"> & {
  * Use `create(UnitDiedSchema)` to create a new message.
  */
 export const UnitDiedSchema: GenMessage<UnitDied> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 13);
+  messageDesc(file_timeline_v1_timeline, 14);
 
 /**
  * @generated from message timeline.v1.UnitMorph
@@ -665,7 +724,7 @@ export type UnitMorph = Message<"timeline.v1.UnitMorph"> & {
  * Use `create(UnitMorphSchema)` to create a new message.
  */
 export const UnitMorphSchema: GenMessage<UnitMorph> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 14);
+  messageDesc(file_timeline_v1_timeline, 15);
 
 /**
  * @generated from message timeline.v1.Upgrade
@@ -692,7 +751,7 @@ export type Upgrade = Message<"timeline.v1.Upgrade"> & {
  * Use `create(UpgradeSchema)` to create a new message.
  */
 export const UpgradeSchema: GenMessage<Upgrade> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 15);
+  messageDesc(file_timeline_v1_timeline, 16);
 
 /**
  * @generated from message timeline.v1.PlayerStats
@@ -776,7 +835,7 @@ export type PlayerStats = Message<"timeline.v1.PlayerStats"> & {
  * Use `create(PlayerStatsSchema)` to create a new message.
  */
 export const PlayerStatsSchema: GenMessage<PlayerStats> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 16);
+  messageDesc(file_timeline_v1_timeline, 17);
 
 /**
  * @generated from message timeline.v1.Chat
@@ -798,7 +857,7 @@ export type Chat = Message<"timeline.v1.Chat"> & {
  * Use `create(ChatSchema)` to create a new message.
  */
 export const ChatSchema: GenMessage<Chat> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 17);
+  messageDesc(file_timeline_v1_timeline, 18);
 
 /**
  * @generated from message timeline.v1.Command
@@ -854,7 +913,7 @@ export type Command = Message<"timeline.v1.Command"> & {
  * Use `create(CommandSchema)` to create a new message.
  */
 export const CommandSchema: GenMessage<Command> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 18);
+  messageDesc(file_timeline_v1_timeline, 19);
 
 /**
  * Bumped on any incompatible change. Readers refuse versions they don't know.

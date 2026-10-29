@@ -5,6 +5,8 @@
 // Go change, regenerate the golden files and port the change here.
 
 import { readFileSync } from "node:fs";
+import { create } from "@bufbuild/protobuf";
+import { TimelineSchema } from "./gen/timeline/v1/timeline_pb";
 import { describe, expect, it } from "vitest";
 import { Model, decodeTimeline, formatClock, positionAt } from "./model";
 import type { Keyframe } from "./gen/timeline/v1/timeline_pb";
@@ -59,5 +61,33 @@ describe("formatClock", () => {
     expect(formatClock(22)).toBe("0:00");
     expect(formatClock(5174)).toBe("3:50");
     expect(formatClock(80640)).toBe("1:00:00");
+  });
+});
+
+describe("vitalsAt", () => {
+  it("holds each key until the next", () => {
+    const tl = create(TimelineSchema, {
+      meta: { loops: 1000 },
+      units: [{ id: 0, bornLoop: 0 }, { id: 1, bornLoop: 0 }],
+      tracks: [
+        {
+          unitId: 0,
+          keyframes: [{ loop: 0, x: 1, y: 1 }],
+          vitals: [
+            { loop: 100, health: 45, healthMax: 45 },
+            { loop: 300, health: 20, healthMax: 45 },
+          ],
+        },
+        { unitId: 1, keyframes: [{ loop: 0, x: 2, y: 2 }] },
+      ],
+    });
+    const m = new Model(tl);
+    expect(m.hasVitals).toBe(true);
+    expect(m.vitalsAt(0, 50)).toBeUndefined();
+    expect(m.vitalsAt(0, 100)?.health).toBe(45);
+    expect(m.vitalsAt(0, 299)?.health).toBe(45);
+    expect(m.vitalsAt(0, 900)?.health).toBe(20);
+    expect(m.vitalsAt(1, 500)).toBeUndefined();
+    expect(new Model(create(TimelineSchema, { meta: { loops: 10 } })).hasVitals).toBe(false);
   });
 });

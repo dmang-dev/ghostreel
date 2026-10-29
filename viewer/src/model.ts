@@ -13,6 +13,7 @@ import {
   type Timeline,
   type Unit,
   type UnitType,
+  type Vitals,
   TimelineSchema,
   SchemaVersion,
   UnitClass,
@@ -170,6 +171,10 @@ export class Model {
   readonly feed: FeedItem[] = [];
   /** Drawn mining for workers of players without orders (mining.ts). */
   readonly mining: Mining;
+  /** Health, shields and energy by unit, engine tier only (replays don't record them). */
+  readonly vitals: (Vitals[] | undefined)[];
+  /** Whether any unit has them. */
+  readonly hasVitals: boolean;
   /** Typical construction time per type in loops, from buildings that finished. */
   private readonly buildLoops = new Map<number, number>();
 
@@ -180,7 +185,16 @@ export class Model {
     this.types = tl.unitTypes;
     this.loops = tl.meta?.loops ?? 0;
     this.tracks = new Array(tl.units.length);
-    for (const t of tl.tracks) this.tracks[t.unitId] = t.keyframes;
+    this.vitals = new Array(tl.units.length);
+    let hasVitals = false;
+    for (const t of tl.tracks) {
+      this.tracks[t.unitId] = t.keyframes;
+      if (t.vitals.length) {
+        this.vitals[t.unitId] = t.vitals;
+        hasVitals = true;
+      }
+    }
+    this.hasVitals = hasVitals;
     this.mining = new Mining(this.units, this.types, this.tracks, ownerAt, (t) => this.types[t]?.class === UnitClass.WORKER);
     if (opts.mining === false) this.mining.players.clear();
     const durations = new Map<number, number[]>();
@@ -276,6 +290,20 @@ export class Model {
     const speed = this.types[t]?.speed ?? 0;
     positionAt(this.tracks[u.id], speed, loop, out);
     this.mining.apply(u, t, out.owner, this.tracks[u.id], loop, speed || DEFAULT_SPEED, out);
+  }
+
+  /** A unit's health, shields and energy at loop (the last key at or before it), if recorded. */
+  vitalsAt(id: number, loop: number): Vitals | undefined {
+    const keys = this.vitals[id];
+    if (!keys) return undefined;
+    let lo = 0;
+    let hi = keys.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (keys[mid].loop > loop) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo > 0 ? keys[lo - 1] : undefined;
   }
 
   /**

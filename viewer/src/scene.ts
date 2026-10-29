@@ -18,6 +18,7 @@
 // units there, like the in-game player view.
 
 import * as THREE from "three";
+import type { Vitals } from "./gen/timeline/v1/timeline_pb";
 import { disposeLayers, fineHeights, splat, stepCliffs, SUB, type GroundLayers } from "./ground";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, isAlive, positionAt, type UnitState } from "./model";
 import type { UnitInstance, UnitModels } from "./models";
@@ -112,6 +113,8 @@ export class Scene {
   /** Player whose vision to show (0 = everything). */
   fogPlayer = 0;
   showLabels = true;
+  /** Health, shield and energy bars (engine-tier replays): damaged and selected units, all, or none. */
+  healthBars: "damaged" | "all" | "off" = "damaged";
   onViewChange?: () => void;
   /** The user moved the camera (drag, rotate, zoom). */
   onUserMove?: () => void;
@@ -566,7 +569,7 @@ export class Scene {
       sel.visible = false;
     }
     this.renderer.render(this.scene, this.camera());
-    this.drawLabels(selected);
+    this.drawLabels(selected, loop);
   }
 
   /**
@@ -724,7 +727,7 @@ export class Scene {
     mesh.setMatrixAt(i, this.m4);
   }
 
-  private drawLabels(selected: number | undefined): void {
+  private drawLabels(selected: number | undefined, loop: number): void {
     const ctx = this.labels.getContext("2d")!;
     const dpr = this.labels.width / Math.max(this.size().w, 1);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -736,9 +739,12 @@ export class Scene {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     const { w, h } = this.size();
+    const bars = this.healthBars !== "off" && model.hasVitals;
     for (let i = 0; i < this.drawnCount; i++) {
       const d = this.drawn[i];
-      if (d.hidden || (!show && d.id !== selected)) continue;
+      if (d.hidden) continue;
+      if (bars && d.owner !== 0) this.drawVitals(ctx, d, model.vitalsAt(d.id, loop), d.id === selected, w, h);
+      if (!show && d.id !== selected) continue;
       if (d.owner === 0 && d.id !== selected) continue; // resources are recognizable by color
       const lift = this.mode === "3d" && d.air ? AIR_HEIGHT : 0;
       const [sx, sy] = this.worldToScreen(d.x, d.y - (d.h ? d.h / 2 : d.r), lift);
@@ -749,6 +755,40 @@ export class Scene {
       ctx.fillRect(sx - tw / 2 - 2, sy + 1, tw + 4, 13);
       ctx.fillStyle = d.id === selected ? "#ffffff" : "#d8dde3";
       ctx.fillText(name, sx, sy + 2);
+    }
+  }
+
+  /**
+   * Bars over a unit in the game's style: shields (blue) over health
+   * (green, yellow, red as it falls), and a thin energy bar (purple).
+   */
+  private drawVitals(ctx: CanvasRenderingContext2D, d: DrawnUnit, v: Vitals | undefined, selected: boolean, w: number, h: number): void {
+    if (!v) return;
+    const damaged = v.health < v.healthMax || v.shield < v.shieldMax;
+    if (this.healthBars === "damaged" && !damaged && !selected) return;
+    const three = this.mode === "3d";
+    const size = d.w || d.r * 2;
+    // Above the unit: its top in 3D (roughly; models vary), its far edge in 2D.
+    const lift = three ? (d.air ? AIR_HEIGHT : 0) + Math.max(1, d.w ? d.w * 0.6 : d.r * 2.2) : 0;
+    const [sx, sy] = this.worldToScreen(d.x, three ? d.y : d.y + (d.h ? d.h / 2 : d.r), lift);
+    if (sx < -60 || sx > w + 60 || sy < -30 || sy > h + 30) return;
+    const ppc = three ? this.pixelsPerCellAt(d.x, d.y) : this.view.ppc;
+    const bw = Math.round(Math.min(90, Math.max(18, size * ppc * 0.9)));
+    const rows: [number, string, number][] = [];
+    if (v.shieldMax > 0) rows.push([v.shield / v.shieldMax, "#4fa3ff", 4]);
+    if (v.healthMax > 0) {
+      const f = v.health / v.healthMax;
+      rows.push([f, f > 0.66 ? "#3ddc4f" : f > 0.33 ? "#f2d24b" : "#e5483f", 4]);
+    }
+    if (v.energyMax > 0) rows.push([v.energy / v.energyMax, "#c77dff", 2]);
+    let y = Math.round(sy - 4 - rows.reduce((s, r) => s + r[2] + 1, 0));
+    const x = Math.round(sx - bw / 2);
+    for (const [f, color, rh] of rows) {
+      ctx.fillStyle = "rgba(0,0,0,0.75)";
+      ctx.fillRect(x - 1, y - 1, bw + 2, rh + 2);
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, Math.round(bw * Math.min(Math.max(f, 0), 1)), rh);
+      y += rh + 1;
     }
   }
 

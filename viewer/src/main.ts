@@ -11,6 +11,7 @@ import { Director } from "./director";
 import { buildCliffs } from "./cliffs";
 import { buildDoodads } from "./doodads";
 import { canExport, exportVideo, frameCount, plan, type ExportOptions } from "./exporter";
+import type { Vitals } from "./gen/timeline/v1/timeline_pb";
 import type { Marker } from "./reports";
 import { UnitModels } from "./models";
 import { ReportsView } from "./reports";
@@ -354,6 +355,16 @@ function select(id: number | undefined, center = false): void {
   updateInspect();
 }
 
+/** Health, shields and energy rows for the inspect panel. */
+function vitalsRows(v: Vitals | undefined, recorded: boolean): string {
+  if (!v) {
+    return recorded ? "" : `<div class="row"><span>Health</span><span class="muted">not in the replay</span></div>`;
+  }
+  const row = (name: string, value: number, max: number) =>
+    max > 0 ? `<div class="row"><span>${name}</span><span>${Math.round(value)} / ${Math.round(max)}</span></div>` : "";
+  return row("Health", v.health, v.healthMax) + row("Shields", v.shield, v.shieldMax) + row("Energy", v.energy, v.energyMax);
+}
+
 function updateInspect(): void {
   const box = $("inspect");
   if (!cur || selected === undefined) {
@@ -384,10 +395,20 @@ function updateInspect(): void {
     <div class="row"><span>Born</span><span>${formatClock(u.bornLoop)}</span></div>
     ${u.diedLoop !== undefined && u.diedLoop <= loop ? `<div class="row"><span>Died</span><span>${formatClock(u.diedLoop)}${u.killerPlayer ? ` (by ${escapeHTML(playerName(u.killerPlayer))})` : ""}</span></div>` : ""}
     ${d ? `<div class="row"><span>Position</span><span>${d.x.toFixed(1)}, ${d.y.toFixed(1)}</span></div>` : ""}
+    ${alive && owner !== 0 ? vitalsRows(model.vitalsAt(selected, loop), model.hasVitals) : ""}
     <div class="row"><span>Unit</span><span>#${u.id} · tag ${u.tag >>> 18}/${u.tag & 0x3ffff}</span></div>
     ${note ? `<div class="note">${note}</div>` : ""}
     <button id="center-sel">Center</button>`;
   $("center-sel").onclick = () => select(selected, true);
+}
+
+// Health bars: damaged (and selected) units, then all, then none.
+function cycleHealthBars(): void {
+  const next = { damaged: "all", all: "off", off: "damaged" } as const;
+  scene.healthBars = next[scene.healthBars];
+  if (cur && !cur.model.hasVitals) {
+    showError("Health bars need an engine recording of the replay: replays themselves don't record health.");
+  }
 }
 
 function escapeHTML(s: string): string {
@@ -776,6 +797,10 @@ window.addEventListener("keydown", (e) => {
     case "f":
     case "F":
       $("fps").hidden = !$("fps").hidden;
+      break;
+    case "h":
+    case "H":
+      cycleHealthBars();
       break;
     case "?":
       $("help").hidden = !$("help").hidden;
