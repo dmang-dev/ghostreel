@@ -30,7 +30,7 @@
 //	GET  /api/assets/death/{type}  binary glTF of its death model (404 when none)
 //	GET  /api/assets/icon/{type}   PNG command-card icon (404 when none)
 //	GET  /api/assets/model/{id}    binary glTF of a model by id, ?v= variation (doodads)
-//	GET  /api/assets/terrain/{id}  PNG terrain texture layer (map JSON's terrainTextures)
+//	GET  /api/assets/terrain/{id}  PNG terrain texture layer (map JSON's terrainTextures); ?height=1 puts its height in alpha
 //	GET  /api/r/{id}/ground        JPEG of the map's painted ground, from the game's textures
 //	GET  /api/r/{id}/masks         gzipped texture-mask planes (map JSON's terrainMasks)
 //	GET  /api/r/{id}/cliffs        JSON of the map's cliff pieces (assets.CliffLayout)
@@ -310,7 +310,13 @@ func (s *Server) Handler() http.Handler {
 		return l.UnitGLB(t, true)
 	}))
 	mux.HandleFunc("GET /api/assets/icon/{type}", s.asset("image/png", (*assets.Library).IconPNG))
-	mux.HandleFunc("GET /api/assets/terrain/{type}", s.asset("image/png", (*assets.Library).TerrainPNG))
+	mux.HandleFunc("GET /api/assets/terrain/{type}", func(w http.ResponseWriter, r *http.Request) {
+		get := (*assets.Library).TerrainPNG
+		if r.URL.Query().Get("height") == "1" {
+			get = (*assets.Library).TerrainHeightPNG
+		}
+		s.asset("image/png", get)(w, r)
+	})
 	mux.HandleFunc("GET /api/r/{id}/ground", s.groundImage)
 	mux.HandleFunc("GET /api/r/{id}/masks", s.masks)
 	mux.HandleFunc("GET /api/r/{id}/cliffs", s.cliffs)

@@ -377,10 +377,22 @@ func (l *Library) texture(path string) image.Image {
 }
 
 // TerrainPNG returns a terrain texture layer (a CTerrainTex id, as a map's
-// t3Terrain.xml names them) as an opaque PNG. The alpha channel holds
-// something other than coverage, and browsers that premultiply it would
-// darken the colors.
+// t3Terrain.xml names them) as an opaque PNG. The texture's alpha is not
+// coverage but the surface's height (see TerrainHeightPNG), and browsers
+// that premultiply alpha would darken the colors.
 func (l *Library) TerrainPNG(id string) ([]byte, error) {
+	return l.terrainPNG(id, false)
+}
+
+// TerrainHeightPNG is TerrainPNG with the texture's height in alpha, for
+// blending layers by height: grass tufts over paving rather than a fade.
+// Height is scaled to the texture's own range and stored as 128-255, so a
+// browser that premultiplies alpha loses at most a bit of color.
+func (l *Library) TerrainHeightPNG(id string) ([]byte, error) {
+	return l.terrainPNG(id, true)
+}
+
+func (l *Library) terrainPNG(id string, height bool) ([]byte, error) {
 	if !safeName.MatchString(id) {
 		return nil, ErrNoModel
 	}
@@ -394,8 +406,19 @@ func (l *Library) TerrainPNG(id string) ([]byte, error) {
 	}
 	rgba := image.NewNRGBA(img.Bounds()) // a copy: img may be shared
 	draw.Draw(rgba, rgba.Rect, img, img.Bounds().Min, draw.Src)
+	hi := 0
 	for i := 3; i < len(rgba.Pix); i += 4 {
-		rgba.Pix[i] = 255
+		hi = max(hi, int(rgba.Pix[i]))
+	}
+	for i := 3; i < len(rgba.Pix); i += 4 {
+		switch {
+		case !height:
+			rgba.Pix[i] = 255
+		case hi == 0:
+			rgba.Pix[i] = 128 // flat
+		default:
+			rgba.Pix[i] = uint8(128 + int(rgba.Pix[i])*127/hi)
+		}
 	}
 	var out bytes.Buffer
 	if err := png.Encode(&out, rgba); err != nil {

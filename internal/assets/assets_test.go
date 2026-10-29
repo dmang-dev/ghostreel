@@ -132,7 +132,27 @@ func TestTerrainTextures(t *testing.T) {
 			t.Errorf("%s: %v", id, err)
 			continue
 		}
-		// Opaque, so browsers don't premultiply the colors away.
+		// Opaque, so browsers don't premultiply the colors away; the height
+		// variant keeps alpha at 128 or more.
+		hb, err := l.TerrainHeightPNG(id)
+		if err != nil {
+			t.Fatalf("%s height: %v", id, err)
+		}
+		himg, err := png.Decode(bytes.NewReader(hb))
+		if err != nil {
+			t.Fatalf("%s height: %v", id, err)
+		}
+		lo, hi := uint32(0xffff), uint32(0)
+		hr := himg.Bounds()
+		for y := hr.Min.Y; y < hr.Max.Y; y++ {
+			for x := hr.Min.X; x < hr.Max.X; x++ {
+				_, _, _, a := himg.At(x, y).RGBA()
+				lo, hi = min(lo, a>>8), max(hi, a>>8)
+			}
+		}
+		if lo < 128 || hi > 255 {
+			t.Errorf("%s: height alpha %d..%d, want within 128..255", id, lo, hi)
+		}
 		r := img.Bounds()
 		for y := r.Min.Y; y < r.Max.Y; y++ {
 			for x := r.Min.X; x < r.Max.X; x++ {
