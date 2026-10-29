@@ -14,8 +14,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Read-only by default: the build jobs run npm and Go installs. Only the job
+# that publishes the release can write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   cli:
@@ -57,6 +59,9 @@ jobs:
           go build -trimpath -ldflags "$flags" -o "$out/ghostreel-engine$ext" ./cmd/ghostreel-engine
           cp -r viewer/dist "$out/viewer/dist"
           cp LICENSE README.md "$out/"
+          # The licenses of everything built in (run for this machine, not the target).
+          env -u GOOS -u GOARCH -u CGO_ENABLED go run ./cmd/releasetool notices \
+            -out "$out/THIRD_PARTY_NOTICES.txt" -go . -npm viewer -third-party third_party
           if [ "$GOOS" = windows ]; then zip -qr "$out.zip" "$out"; else tar czf "$out.tar.gz" "$out"; fi
       - uses: actions/upload-artifact@v4
         with:
@@ -83,7 +88,10 @@ jobs:
         working-directory: viewer
         run: npm ci && npm run build:web
       - name: Package
-        run: cd viewer/dist-web && zip -qr "../../ghostreel_${GITHUB_REF_NAME}_web.zip" .
+        run: |
+          cp LICENSE viewer/dist-web/
+          go run ./cmd/releasetool notices -out viewer/dist-web/THIRD_PARTY_NOTICES.txt -go . -npm viewer -third-party third_party
+          cd viewer/dist-web && zip -qr "../../ghostreel_${GITHUB_REF_NAME}_web.zip" .
       - uses: actions/upload-artifact@v4
         with:
           name: web
@@ -138,27 +146,40 @@ jobs:
           wails build -clean -platform ${{ matrix.platform }} $extra -ldflags "-X main.version=${GITHUB_REF_NAME}"
       - name: Package
         run: |
+          # The licenses of everything built in, for every desktop platform.
+          go run ./cmd/releasetool notices -out THIRD_PARTY_NOTICES.txt -go . -go desktop -npm viewer -third-party third_party
           base="ghostreel-desktop_${GITHUB_REF_NAME}"
           cd desktop/build/bin || exit 1
+          cp ../../../THIRD_PARTY_NOTICES.txt ../../../LICENSE .
           case "$RUNNER_OS" in
             Windows)
               mv ./*installer.exe "../../../${base}_windows_amd64_setup.exe"
-              7z a "../../../${base}_windows_amd64_portable.zip" ghostreel-desktop.exe ;;
+              7z a "../../../${base}_windows_amd64_portable.zip" ghostreel-desktop.exe LICENSE THIRD_PARTY_NOTICES.txt ;;
             macOS)
               app=$(ls -d ./*.app | head -1)
-              ditto -c -k --keepParent "$app" "../../../${base}_macos_universal.zip" ;;
+              ditto -c -k --keepParent "$app" "../../../${base}_macos_universal.zip"
+              zip -j "../../../${base}_macos_universal.zip" LICENSE THIRD_PARTY_NOTICES.txt ;;
             Linux)
-              tar czf "../../../${base}_linux_amd64.tar.gz" ghostreel-desktop ;;
+              tar czf "../../../${base}_linux_amd64.tar.gz" ghostreel-desktop LICENSE THIRD_PARTY_NOTICES.txt ;;
           esac
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ runner.os }}
           path: ghostreel-desktop_*
+      # One copy of the notices for the release page, for the installer's
+      # users; the other downloads carry their own.
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: notices
+          path: THIRD_PARTY_NOTICES.txt
 
   release:
     needs: [cli, web, desktop]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -183,7 +204,8 @@ jobs:
           go run ./cmd/releasetool manifest -tag "$GITHUB_REF_NAME" -dir artifacts \
             -url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}" \
             -notes "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
-      - uses: softprops/action-gh-release@v2
+      # Third-party, with write access: pinned to a commit, not a movable tag.
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

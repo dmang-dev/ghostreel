@@ -7,6 +7,8 @@
 //	releasetool manifest -tag v1.2.3 -dir artifacts -url https://github.com/OWNER/REPO/releases/download/v1.2.3
 //	                                 write latest.json and latest.json.sig into the directory,
 //	                                 signed with the key in $GHOSTREEL_UPDATE_KEY
+//	releasetool notices -out THIRD_PARTY_NOTICES.txt -go . -go desktop -npm viewer -third-party third_party
+//	                                 collect the licenses of everything the builds include
 package main
 
 import (
@@ -31,7 +33,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: releasetool keygen|manifest [flags]")
+		fmt.Fprintln(os.Stderr, "usage: releasetool keygen|manifest|notices [flags]")
 		os.Exit(2)
 	}
 	var err error
@@ -40,6 +42,8 @@ func main() {
 		err = keygen(os.Args[2:])
 	case "manifest":
 		err = manifest(os.Args[2:])
+	case "notices":
+		err = notices(os.Args[2:])
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
