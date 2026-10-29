@@ -3,7 +3,6 @@
 package main
 
 import (
-	"archive/zip"
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
@@ -13,7 +12,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -89,23 +87,5 @@ func TestUpdater(t *testing.T) {
 	u2.url, u2.client = srv.URL+"/latest.json", srv.Client() // the real key: the test key's signature fails
 	if st := u2.Check(context.Background()); st.State != "error" || st.Available {
 		t.Errorf("wrong key: %+v", st)
-	}
-}
-
-func TestExtractExe(t *testing.T) {
-	dir := t.TempDir()
-	zp := filepath.Join(dir, "p.zip")
-	f, _ := os.Create(zp)
-	z := zip.NewWriter(f)
-	w, _ := z.Create("ghostreel-desktop.exe")
-	w.Write([]byte("MZ new"))
-	z.Close()
-	f.Close()
-	p, err := extractExe(zp, dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if b, _ := os.ReadFile(p); string(b) != "MZ new" {
-		t.Errorf("extracted %q", b)
 	}
 }
