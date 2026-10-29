@@ -196,6 +196,18 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 2. Production idle time, army composition over time, upgrade timings per player (Phase 5).
 3. Supply blocks to the loop, rather than to the 10 s stats interval, by tracking supply from births and deaths (Phase 5).
 
+**F. Health, shields and energy (engine tier)** — exit: an engine-tier replay shows each unit's health, shield and energy bars in 2D, 3D and exported video, matching the game's values at every recorded frame.
+
+Replays record no hit points: tracker events give births, deaths and position samples, and game events only commands. The only source is the game itself, through `ghostreel-engine`, which already observes every unit every 16 loops and drops these values. So bars exist only for replays with an engine recording; other tiers show none, and the inspect panel says why.
+
+1. **Record them.** Add `health`, `health_max`, `shield`, `shield_max`, `energy`, `energy_max` to `UnitSample` in `proto/engine/v1/engine.proto` (new fields, so older recordings still read, as "no vitals"), and fill them in `internal/engine/export.go` from the API's `Unit` (the 4.10 client has them). Measure the size: the five test recordings are 1–4.8 MB gzipped now; values that rarely change should compress well.
+2. **Carry them in the timeline.** A per-unit vitals track beside the keyframes in `proto/timeline/v1/timeline.proto`: keys of loop, health, shield, energy, stored only when a value changes by more than 1% of its maximum or a maximum changes (upgrades, morphs), with the maxima on the key. `timeline.ApplyEngine` builds it; other tiers leave it empty. Document in `docs/TIMELINE_FORMAT.md`, keep old timelines readable, and bump `CacheVersion`.
+3. **Draw them.** `Model.vitalsAt(unit, loop)` holds the last key (damage is discrete, so no interpolation). Bars in the game's style: shield (blue) over health (green to yellow to red) and a thin energy bar (purple), drawn on the labels canvas above each unit (screen-projected in 3D, like labels), so the video export gets them too. Shown for damaged units and the selected one by default, with a key to show all or none; none for units hidden by fog. The inspect panel shows the numbers.
+4. **Tests.** Engine samples round-trip with vitals; `ApplyEngine` keeps a key per real change and drops the rest; `vitalsAt` holds and steps; Go and TypeScript agree on a fixture with vitals.
+5. **Recordings.** Re-export the five test games on the sc2-headless VM (4.10 client) so the feature can be checked, under the VM's limits (one SC2 process, `nice 10`, pause above load 7). **Ask the VM's owner before this run.** For current-version games (your own ladder and bot games), `ghostreel-engine` would have to run on a Windows or macOS client of the same build; its launcher has a Windows branch that has never been tried (track B, item 2).
+
+Steps 1–4 need no game client and can be built and tested on the existing recordings, which simply have no vitals; step 5 is what makes bars appear.
+
 ## Legal, licensing and risks
 
 The code can be fully open source; Blizzard's art and data cannot be redistributed. The extractor reads the user's own install and writes a local cache, and the repo ships no models, textures, icons or map files. Avoid "StarCraft" in the project name and logo, and license the code Apache-2.0 to match s2prot.
