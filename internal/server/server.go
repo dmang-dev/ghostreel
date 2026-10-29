@@ -295,6 +295,15 @@ func (s *Server) Handler() http.Handler {
 		}
 		writeJSON(w, summarize(l))
 	})
+	if browser {
+		// No game data in the browser build, so no asset routes: leaving
+		// them out leaves packages assets, m3 and casc out of ghostreel.wasm.
+		mux.HandleFunc("GET /api/assets", func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, map[string]any{"available": false})
+		})
+		mux.HandleFunc("GET /api/r/{id}/masks", s.masks)
+		return mux
+	}
 	mux.HandleFunc("GET /api/assets", func(w http.ResponseWriter, r *http.Request) {
 		l := s.assets.Load()
 		if l == nil {

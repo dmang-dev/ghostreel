@@ -8,7 +8,6 @@
 package gamedata
 
 import (
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -69,7 +68,33 @@ var _ Provider = Stub{}
 // DefaultSpeed is used for unknown mobile units (cells per game second).
 const DefaultSpeed = 2.5
 
-var footprintRe = regexp.MustCompile(`(\d+)x(\d+)`)
+// footprint finds the first "<w>x<h>" in a unit name, as in
+// "Rocks2x2NonConjoined" (what the regexp \d+x\d+ would match; package
+// regexp would add about 200 KB to ghostreel.wasm for this one use).
+func footprint(name string) (w, h int, ok bool) {
+	digits := func(i int) int {
+		for i < len(name) && name[i] >= '0' && name[i] <= '9' {
+			i++
+		}
+		return i
+	}
+	for i := 0; i < len(name); {
+		j := digits(i)
+		if j == i {
+			i++
+			continue
+		}
+		if j < len(name) && name[j] == 'x' {
+			if k := digits(j + 1); k > j+1 {
+				w, _ = strconv.Atoi(name[i:j])
+				h, _ = strconv.Atoi(name[j+1 : k])
+				return w, h, true
+			}
+		}
+		i = j
+	}
+	return 0, 0, false
+}
 
 // Unit implements Provider.
 func (Stub) Unit(_ int, name string) Unit {
@@ -100,9 +125,8 @@ func guess(name string) Unit {
 		strings.Contains(name, "Inhibitor"), strings.Contains(name, "XelNaga"):
 		u.Class = ClassNeutral
 		u.FootprintW, u.FootprintH = 2, 2
-		if m := footprintRe.FindStringSubmatch(name); m != nil {
-			u.FootprintW, _ = strconv.Atoi(m[1])
-			u.FootprintH, _ = strconv.Atoi(m[2])
+		if w, h, ok := footprint(name); ok {
+			u.FootprintW, u.FootprintH = w, h
 		}
 		u.Radius = float64(max(u.FootprintW, u.FootprintH)) / 2
 	default:

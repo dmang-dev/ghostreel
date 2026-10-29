@@ -17,12 +17,12 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
 	"github.com/dmang-dev/ghostreel/internal/analysis"
 	"github.com/dmang-dev/ghostreel/internal/command"
-	"github.com/dmang-dev/ghostreel/internal/engine"
 	"github.com/dmang-dev/ghostreel/internal/mapcache"
 	"github.com/dmang-dev/ghostreel/internal/mapfile"
 	"github.com/dmang-dev/ghostreel/internal/replay"
@@ -32,6 +32,12 @@ import (
 // CacheVersion is part of every cached timeline's file name. Bump it whenever
 // the builders' output changes so stale timelines are rebuilt.
 const CacheVersion = "tl8"
+
+// browser is true in the browser build (GOOS=js, cmd/ghostreel-wasm). It
+// has no file system to look maps up in and can't reach Blizzard's depot,
+// so map lookup is compiled out of it: the HTTP client and TLS stack it
+// would pull in are about a quarter of ghostreel.wasm.
+const browser = runtime.GOOS == "js"
 
 // Tiers a Service can build.
 const (
@@ -210,11 +216,7 @@ func (s *Service) buildTimeline(l *Loaded) error {
 	}
 	switch fid {
 	case "engine":
-		smp, err := engine.ReadSamples(l.enginePath)
-		if err == nil {
-			err = timeline.ApplyEngine(tl, smp)
-		}
-		if err != nil {
+		if err := applyEngine(tl, l.enginePath); err != nil {
 			s.logf("%s: engine recording not used: %v", l.Name, err)
 			fid = TierTracker
 		}
@@ -362,8 +364,8 @@ func (s *Service) commitMap(cp *Loaded) (*Loaded, error) {
 // so the viewer can still play on a blank grid.
 func (s *Service) attachMap(ctx context.Context, l *Loaded, manual string, r *mapcache.Resolver) {
 	s.clearMap(l)
-	l.noLookup = r == nil
-	if r == nil {
+	l.noLookup = browser || r == nil
+	if browser || r == nil {
 		l.MapErr = "map lookup disabled"
 		return
 	}
