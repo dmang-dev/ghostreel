@@ -165,7 +165,7 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 4. Linux packages: `.deb` and AppImage, and a build for WebKitGTK 4.1 (Ubuntu 24.04+) (Phase 4).
 5. Code signing for Windows and notarization for macOS; needs maintainers' certificates (Phase 4).
 6. Host the browser build (GitHub Pages) and shrink `ghostreel.wasm` (20.6 MB, mostly s2prot's protocol tables): load only the replay's protocol, or compress better (Phase 4).
-7. Make the repository public once 1–2 are done; add screenshots made with Shaded terrain only (Phase 1 rule).
+7. Make the repository public once 1–2 are done; add screenshots (done; since 2026-10-29 they may show the game's art, see DECISIONS).
 
 **B. Checks against a current full game install** — exit: every ladder unit type verified, and ground truth exists for current game versions and for Zerg players.
 

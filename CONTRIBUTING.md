@@ -4,7 +4,7 @@ Thanks for helping. This guide covers setting up, the rules that keep the projec
 
 ## Ground rules
 
-- **No Blizzard assets in the repository, ever.** No replays, maps, models, textures, icons, sounds or game data files. That includes test fixtures and screenshots that show map art. Tests read real files from the git-ignored `testdata/` folder and skip when they're absent. Assets are read from the user's own install at run time.
+- **No Blizzard assets in the repository, ever.** No replays, maps, models, textures, icons, sounds or game data files. That includes test fixtures. Screenshots and recordings of ghostreel for the docs (`docs/media/`) may show the game's art: they are pictures of the program running, not asset files. Tests read real files from the git-ignored `testdata/` folder and skip when they're absent. Assets are read from the user's own install at run time.
 - **Don't put "StarCraft" in the project's name or branding.** Describing what the tool reads is fine.
 - **The Go core stays cgo-free.** It also compiles to WebAssembly for the browser build; CI checks `GOOS=js GOARCH=wasm`. Native and UI dependencies belong in `desktop/`, a separate module.
 - **User-facing times use the in-game clock** (loops ÷ 22.4).

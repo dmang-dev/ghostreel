@@ -14,15 +14,19 @@ ghostreel is a working name. The project is not affiliated with or endorsed by B
 
 ## Demo
 
-A 30-minute Terran vs Zerg game on Ley Lines. These recordings use only what ghostreel computes itself (Shaded terrain and stand-in shapes), so they contain no game art. With StarCraft II installed, the 3D view shows the game's own models and ground textures instead.
+A 30-minute Terran vs Zerg game on Ley Lines, recorded with StarCraft II installed: ghostreel draws the game's own models, doodads, cliffs and painted ground from the install. Without one it uses shaded terrain and plain shapes.
 
-**Playback:** the Zerg army hits the Terran natural at 9:14. Units follow their players' orders; deaths leave red rings, and the yellow ring on the minimap marks the battle.
+**3D:** the Zerg army hits the Terran natural at 9:14, camera orbiting.
 
-![2D playback of a battle](docs/media/playback.gif)
+![3D view of a battle at the Terran natural](docs/media/3d.webp)
 
-**3D:** the same fight on the map's heightfield, camera orbiting.
+**A base at 4:30:** SCVs mining, buildings going up, Marines and Marauders gathering.
 
-![3D view of the same battle](docs/media/3d.gif)
+![3D close-up of the Terran main base](docs/media/base.webp)
+
+**Playback in 2D:** the same fight from above. Units follow their players' orders; deaths leave red rings, and the yellow ring on the minimap marks the battle.
+
+![2D playback of the battle](docs/media/playback.gif)
 
 **Fog of war:** everything, then what the Terran player could see, then the Zerg player.
 
@@ -160,7 +164,7 @@ The code is Apache-2.0. StarCraft II's art, data and maps belong to Blizzard and
 - Maps are read from your own game install or cache, or downloaded from Blizzard's map server at your request. They are stored only in your local cache.
 - 3D models, textures and icons are converted from your own game install on your machine and cached there (in the ghostreel cache folder). Nothing converted is uploaded or shipped.
 - Replays and maps used by tests stay in the git-ignored `testdata/` folder.
-- Screenshots are not committed if they show map art. To make your own, open one of your replays and switch the terrain to "Shaded terrain", which is computed from height data and contains no Blizzard art.
+- The recordings in `docs/media/` are screenshots of ghostreel running with a local install, so they show StarCraft II's models, textures and map art, © Blizzard Entertainment. They are pictures of the program, not game files, in a free, unofficial, non-commercial project, as Blizzard's terms for fan content allow.
 
 ## Roadmap
 
