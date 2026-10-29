@@ -1,0 +1,5 @@
+CascLib by Ladislav Zezula, https://github.com/ladislav-zezula/CascLib (MIT, see LICENSE).
+
+No CascLib code is vendored here. internal/casc/mndx.go is a Go port of its
+CascRootFile_Mndx.cpp, and internal/casc follows its storage layouts, so its
+license applies to those parts.

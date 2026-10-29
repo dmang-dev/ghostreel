@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 AND MIT
 
 // MNDX root file parser.
 //
 // This file is a Go port of CascRootFile_Mndx.cpp from CascLib, Copyright (c)
-// Ladislav Zezula 2014, MIT license (https://github.com/ladislav-zezula/CascLib).
+// Ladislav Zezula 2014, MIT license (https://github.com/ladislav-zezula/CascLib;
+// the license text is in third_party/casclib/LICENSE).
 // The type and field names below follow CascLib's so the two can be read side
 // by side; only the parts needed to enumerate every name (CascLib's
 // TMndxHandler::Load, LoadFileNames and the empty-mask TFileNameDatabase
