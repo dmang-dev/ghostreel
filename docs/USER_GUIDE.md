@@ -67,15 +67,20 @@ Click a unit to inspect it; the panel says when its position was last actually o
 
 The minimap moves the camera when clicked. Bars under the scrubber show deaths; yellow bands are battles; ticks at the top are upgrades (short) and expansions (long).
 
-## Analysis: build orders, battles, economy
+## Analysis: build orders, battles, economy, APM
 
 Press **B** (or use the tabs on the events panel) to switch between:
+
+- **APM:** each player's actions per minute over the game, and commands alone, as charts (each point is the rate over the minute before it), with each player's average for the whole game below. Actions are commands, selection changes and control-group changes; camera moves don't count. Bots make thousands of actions a minute, and the built-in AI records none, so it has no line. APM needs the replay's game events, which the tracker tier skips: on the tracker tier there is no APM tab.
+- **Army:** each player's army supply over the game, and what the army was made of at every minute. Workers and units still in production don't count.
+- **Production:** how long each production building stood idle, with totals per player and a chart of how many were idle at once. A building is busy while it trains a unit, builds an add-on or upgrades (Orbital Command, Planetary Fortress), and idle the rest of the time it stands finished and on the ground; time lifted off counts as neither. Idle time includes supply blocks. Warp gates are counted together, each warp-in keeping one busy for its cooldown. A reactor's second slot isn't counted. For Zerg, production is larvae: a hatchery counts as idle while it holds three or more, since it stops making new ones. Train times are the current patch's, so Chrono Boost can make a Protoss building look idle for a few seconds.
+- **Upgrades:** when each player's research finished, for the whole game.
 
 - **Build order:** each player's structures, units, morphs and research for the first ten minutes, with supply. Structures appear when placed, units and research when finished (replays don't record when they were queued). Repeats a moment apart share a line ("Zergling ×6").
 - **Battles:** clusters of deaths close together in time and space, with each side's losses. They are also shown as yellow bands under the scrubber and as rings on the minimap while they happen.
 - **Economy:** charts of income, workers, army value, supply and resources lost for each player, with a line at the current moment. Click a chart to jump there.
 - **Expansions:** when and where each player took a new base, and when it finished.
-- **Supply blocks:** when each player had no free supply. These are accurate to about 10 s, the interval at which the replay records stats.
+- **Supply blocks:** when each player had no free supply, to the moment. ghostreel follows each player's supply as units start and die and supply buildings finish, and checks it against the stats the replay records every 10 s. The game also takes supply for units waiting in a queue, which the replay doesn't show; when the stats see a block the reconstruction misses, it is kept, with edges as close as the stats allow. Blocks shorter than a second are left out.
 
 Click any row to jump there. These come from analysis plugins; see [CONTRIBUTING.md](../CONTRIBUTING.md) to write your own.
 

@@ -31,7 +31,7 @@ import (
 
 // CacheVersion is part of every cached timeline's file name. Bump it whenever
 // the builders' output changes so stale timelines are rebuilt.
-const CacheVersion = "tl4"
+const CacheVersion = "tl5"
 
 // Tiers a Service can build.
 const (
@@ -196,7 +196,9 @@ func (s *Service) buildTimeline(l *Loaded) error {
 			return nil
 		}
 	}
-	needGame := s.Commands || fid == TierCommand
+	// Game events give the command tier its orders and every tier its action
+	// counts (APM); only an explicit tracker tier skips them, for speed.
+	needGame := s.Commands || fid != TierTracker
 	r, err := replay.DecodeWith(bytes.NewReader(l.data), replay.Options{SkipGameEvents: !needGame})
 	if err != nil {
 		return err

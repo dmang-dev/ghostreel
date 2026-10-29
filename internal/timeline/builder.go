@@ -19,6 +19,9 @@ import (
 // DefaultSnapshotInterval is the loop spacing of snapshots (~7 s on the clock).
 const DefaultSnapshotInterval = 160
 
+// ActionBinLoops is the width of the action-count bins (5 s on the clock).
+const ActionBinLoops = 112
+
 // Options control Build.
 type Options struct {
 	Data             gamedata.Provider // defaults to gamedata.Stub
@@ -45,6 +48,7 @@ type builder struct {
 	byTag     map[replay.Tag]*unitBuild
 	bySlot    map[uint32]*unitBuild
 	all       []*unitBuild
+	actions   map[uint32]*pb.PlayerActions // nil until a game event is seen
 }
 
 // Build reconstructs a tracker-tier timeline. Events must be loop-ordered,
@@ -189,6 +193,10 @@ func (b *builder) apply(e *replay.Event) {
 			cur:    data,
 			hidden: data.Class == gamedata.ClassHidden,
 		}
+		if c := b.byTag[e.Creator]; e.Creator != 0 && c != nil && !c.hidden {
+			id := c.emitted
+			u.pb.Creator = &id
+		}
 		b.byTag[e.Tag], b.bySlot[e.Tag.Index()] = u, u
 		b.all = append(b.all, u)
 		state := pb.UnitState_UNIT_STATE_IDLE
@@ -261,7 +269,11 @@ func (b *builder) apply(e *replay.Event) {
 	case replay.KindChat:
 		b.event(e.Loop, &pb.Event{Kind: &pb.Event_Chat{Chat: &pb.Chat{Player: uint32(e.Player), Text: e.Text}}})
 
+	case replay.KindSelection, replay.KindControlGroup:
+		b.countAction(e, false)
+
 	case replay.KindCommand:
+		b.countAction(e, true)
 		if b.opts.SkipCommands {
 			return
 		}
@@ -275,6 +287,30 @@ func (b *builder) apply(e *replay.Event) {
 			}
 		}
 		b.event(e.Loop, &pb.Event{Kind: &pb.Event_Command{Command: c}})
+	}
+}
+
+// countAction counts a player's action (for APM) in its bin.
+func (b *builder) countAction(e *replay.Event, command bool) {
+	if b.actions == nil {
+		b.actions = map[uint32]*pb.PlayerActions{}
+	}
+	if e.Player <= 0 {
+		return // observers
+	}
+	p := b.actions[uint32(e.Player)]
+	if p == nil {
+		p = &pb.PlayerActions{Player: uint32(e.Player)}
+		b.actions[p.Player] = p
+	}
+	bin := int(e.Loop / ActionBinLoops)
+	for len(p.Actions) <= bin {
+		p.Actions = append(p.Actions, 0)
+		p.Commands = append(p.Commands, 0)
+	}
+	p.Actions[bin]++
+	if command {
+		p.Commands[bin]++
 	}
 }
 
@@ -319,6 +355,17 @@ func (b *builder) finish() {
 		b.tl.Tracks = append(b.tl.Tracks, &pb.Track{UnitId: u.emitted, Keyframes: u.keys})
 	}
 	b.tl.Snapshots = snapshots(b.tl)
+	if b.actions != nil {
+		ac := &pb.ActionCounts{BinLoops: ActionBinLoops}
+		for _, p := range b.tl.Meta.Players {
+			if pa := b.actions[p.Id]; pa != nil {
+				ac.Players = append(ac.Players, pa)
+			} else {
+				ac.Players = append(ac.Players, &pb.PlayerActions{Player: p.Id})
+			}
+		}
+		b.tl.Actions = ac
+	}
 }
 
 // SetFacing points each keyframe toward the next position the unit moves to,

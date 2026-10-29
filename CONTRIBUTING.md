@@ -47,7 +47,7 @@ Tests that need them say so in their skip message. Golden files (`viewer/src/tes
 | `internal/engine`, `cmd/ghostreel-engine` | The engine-tier exporter |
 | `internal/mapfile`, `internal/mapcache` | Map decoding and lookup |
 | `internal/casc`, `internal/m3`, `internal/dds`, `internal/assets` | Game data, models and textures from the local install |
-| `internal/analysis` | Analysis plugins (build orders, battles) |
+| `internal/analysis` | Analysis plugins (build orders, battles, economy, APM, production, army, supply blocks…) |
 | `internal/app`, `internal/server` | The service and HTTP API every frontend uses |
 | `cmd/ghostreel-wasm` | The same API compiled to WebAssembly for the browser build |
 | `viewer/` | TypeScript + three.js viewer |

@@ -9,8 +9,8 @@
 //
 // Plugins register themselves with Register, usually from an init function,
 // and a binary includes a plugin by importing its package. The built-in ones
-// are build orders, battles, expansions, supply blocks and the economy
-// charts.
+// are build orders, battles, expansions, supply blocks, the economy charts,
+// APM, production idle time, army composition, upgrades and hotspots.
 package analysis
 
 import (
@@ -138,6 +138,17 @@ func runOne(p Plugin, tl *pb.Timeline) (rep Report) {
 		return Report{Plugin: p.ID(), Title: p.ID()}
 	}
 	r.Plugin = p.ID()
+	// Empty tables and series are [] in JSON, not null, for the viewer.
+	for i := range r.Tables {
+		if r.Tables[i].Rows == nil {
+			r.Tables[i].Rows = []Row{}
+		}
+	}
+	for i := range r.Series {
+		if r.Series[i].Points == nil {
+			r.Series[i].Points = []Point{}
+		}
+	}
 	return *r
 }
 

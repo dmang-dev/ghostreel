@@ -48,6 +48,8 @@ export class ReportsView {
   /** -1 is the events feed; otherwise an index into reports. */
   current = -1;
   private table = 0;
+  /** Which chart (series title) is shown. */
+  private chartPick = 0;
   private rowEls: { loop: number; el: HTMLElement }[] = [];
   private chart?: { canvas: HTMLCanvasElement; series: Series[] };
   private loop = 0;
@@ -69,6 +71,7 @@ export class ReportsView {
     for (const r of reports) if (r.error) console.warn(`analysis plugin ${r.plugin}: ${r.error}`);
     if (this.current >= this.reports.length) this.current = -1;
     this.table = 0;
+    this.chartPick = 0;
     this.render();
   }
 
@@ -76,6 +79,7 @@ export class ReportsView {
   cycle(): void {
     this.current = this.current + 1 >= this.reports.length ? -1 : this.current + 1;
     this.table = 0;
+    this.chartPick = 0;
     this.render();
   }
 
@@ -103,11 +107,11 @@ export class ReportsView {
       this.body.append(p);
       return;
     }
-    if (report.series?.length) {
-      this.renderChart(report.series);
-      return;
-    }
+    // A report can have charts and tables (APM over time and the averages):
+    // the chart comes first.
+    if (report.series?.length) this.renderChart(report.series);
     const tables = report.tables ?? [];
+    if (report.series?.length && !tables.length) return;
     if (tables.length > 1) {
       // One table per player (build orders): pick one.
       const pick = document.createElement("div");
@@ -156,6 +160,7 @@ export class ReportsView {
     b.onclick = () => {
       this.current = i;
       this.table = 0;
+      this.chartPick = 0;
       this.render();
     };
     return b;
@@ -176,9 +181,9 @@ export class ReportsView {
     titles.forEach((title, i) => {
       const b = document.createElement("button");
       b.textContent = title;
-      b.className = i === this.table ? "on" : "";
+      b.className = i === this.chartPick ? "on" : "";
       b.onclick = () => {
-        this.table = i;
+        this.chartPick = i;
         this.render();
       };
       pick.append(b);
@@ -192,7 +197,7 @@ export class ReportsView {
     const legend = document.createElement("div");
     legend.className = "report-legend";
     this.body.append(pick, canvas, legend);
-    this.chart = { canvas, series: series.filter((s) => s.title === titles[this.table]) };
+    this.chart = { canvas, series: series.filter((s) => s.title === titles[this.chartPick]) };
     this.drawChart();
   }
 
