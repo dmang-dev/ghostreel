@@ -42,10 +42,10 @@ func (b *builder) route(a *agent, from, to pt) []pt {
 	if a.typ.Air || b.opts.Grid == nil {
 		return []pt{to}
 	}
-	if !b.opts.Grid.ReachableFor(from, to, big(a.typ)) {
+	if !b.opts.Grid.ReachableFor(from, to, sizeOf(a.typ)) {
 		return nil
 	}
-	return b.opts.Grid.PathFor(from, to, big(a.typ))
+	return b.opts.Grid.PathFor(from, to, sizeOf(a.typ))
 }
 
 // extendAttack steps an attack-move until its plan reaches past t.
