@@ -723,7 +723,7 @@ async function loadGroundLayers(id: string): Promise<void> {
     const [planes, ...textures] = await Promise.all([
       api.fetchMasks(id),
       ...names.slice(0, 8).map((n) =>
-        n ? loader.loadAsync(`/api/assets/terrain/${encodeURIComponent(n)}`).catch(() => undefined) : Promise.resolve(undefined),
+        n ? loader.loadAsync(`/api/assets/terrain/${encodeURIComponent(n)}?height=1`).catch(() => undefined) : Promise.resolve(undefined),
       ),
     ]);
     const layers = planes && planes.length === info.width * info.height * 8

@@ -163,6 +163,13 @@ export const grain: THREE.DataTexture = (() => {
 })();
 const GRAIN_CELLS = 3; // cells per repeat of the grain
 const GRAIN = 0.22; // grain strength: brightness varies by about this much
+// Height blending: how much a layer's surface height counts against its
+// painted weight (both 0-1), and how close to the top a layer must be to
+// show at all (smaller is crisper).
+const HEIGHT_WEIGHT = 0.5;
+const BLEND_DEPTH = 0.3;
+const MASK_WOBBLE = 1.6; // how far mask reads wander, in mask texels (peak to peak)
+const MASK_WOBBLE_CELLS = 6; // cells per repeat of the wobble's noise
 
 /**
  * How much grain the layers need: all of it for the 64-pixel copies, none
@@ -189,6 +196,7 @@ export function splat(shader: THREE.WebGLProgramParametersWithUniforms, l: Groun
   while (have.length < 8) have.push(0);
   shader.uniforms.gMask0 = { value: l.masks[0] };
   shader.uniforms.gMask1 = { value: l.masks[1] };
+  shader.uniforms.gMaskSize = { value: new THREE.Vector2(l.masks[0].image.width, l.masks[0].image.height) };
   shader.uniforms.gLayer = { value: Array.from({ length: 8 }, (_, i) => l.textures[i] ?? blank) };
   shader.uniforms.gHave0 = { value: new THREE.Vector4(...have.slice(0, 4)) };
   shader.uniforms.gHave1 = { value: new THREE.Vector4(...have.slice(4, 8)) };
@@ -207,6 +215,7 @@ export function splat(shader: THREE.WebGLProgramParametersWithUniforms, l: Groun
       `#include <common>
 uniform sampler2D gMask0;
 uniform sampler2D gMask1;
+uniform vec2 gMaskSize;
 uniform sampler2D gLayer[8];
 uniform vec4 gHave0;
 uniform vec4 gHave1;
@@ -214,29 +223,69 @@ uniform vec4 gTiling;
 uniform vec2 gWorld;
 uniform sampler2D gGrain;
 uniform float gGrainAmount;
+// A mask at uv through a cubic B-spline, from four bilinear reads: edges
+// between layers come out curved instead of stepping along the texel grid.
+vec4 gCubic( sampler2D t, vec2 uv ) {
+  vec2 st = uv * gMaskSize - 0.5;
+  vec2 i = floor( st );
+  vec2 f = st - i;
+  vec2 f2 = f * f, f3 = f2 * f;
+  vec2 w0 = ( -f3 + 3.0 * f2 - 3.0 * f + 1.0 ) / 6.0;
+  vec2 w1 = ( 3.0 * f3 - 6.0 * f2 + 4.0 ) / 6.0;
+  vec2 w2 = ( -3.0 * f3 + 3.0 * f2 + 3.0 * f + 1.0 ) / 6.0;
+  vec2 w3 = f3 / 6.0;
+  vec2 g0 = w0 + w1, g1 = w2 + w3;
+  vec2 p0 = ( i - 0.5 + w1 / g0 ) / gMaskSize;
+  vec2 p1 = ( i + 1.5 + w3 / g1 ) / gMaskSize;
+  return g0.y * ( g0.x * texture2D( t, vec2( p0.x, p0.y ) ) + g1.x * texture2D( t, vec2( p1.x, p0.y ) ) )
+    + g1.y * ( g0.x * texture2D( t, vec2( p0.x, p1.y ) ) + g1.x * texture2D( t, vec2( p1.x, p1.y ) ) );
+}
 ${sides ? "#define G_SIDES\nvarying vec3 vGPos;\nvarying vec3 vGNormal;\nvarying float vGCliff;" : ""}
-// The blend at uv. Most points have one to three layers, so the others are
-// skipped; the UV derivatives come from the caller, outside any branch, so
-// mipmapping stays right.
+// The blend at uv, by height: each layer's texture carries its surface
+// height in alpha (128-255), and where layers overlap the one standing
+// highest for its weight wins, within a small depth. So edges follow the
+// textures (grass tufts over paving) instead of fading. Most points have
+// one to three layers, so the others are skipped; the UV derivatives come
+// from the caller, outside any branch, so mipmapping stays right.
 vec3 gSplat( vec2 uv, vec2 dx, vec2 dy, vec4 w0, vec4 w1 ) {
+  float w[8] = float[8]( w0.x, w0.y, w0.z, w0.w, w1.x, w1.y, w1.z, w1.w );
+  vec4 s[8];
+  for ( int i = 0; i < 8; i++ ) s[i] = vec4( 0.0 );
+  if ( w[0] > 0.0 ) s[0] = textureGrad( gLayer[0], uv, dx, dy );
+  if ( w[1] > 0.0 ) s[1] = textureGrad( gLayer[1], uv, dx, dy );
+  if ( w[2] > 0.0 ) s[2] = textureGrad( gLayer[2], uv, dx, dy );
+  if ( w[3] > 0.0 ) s[3] = textureGrad( gLayer[3], uv, dx, dy );
+  if ( w[4] > 0.0 ) s[4] = textureGrad( gLayer[4], uv, dx, dy );
+  if ( w[5] > 0.0 ) s[5] = textureGrad( gLayer[5], uv, dx, dy );
+  if ( w[6] > 0.0 ) s[6] = textureGrad( gLayer[6], uv, dx, dy );
+  if ( w[7] > 0.0 ) s[7] = textureGrad( gLayer[7], uv, dx, dy );
+  float score[8];
+  float top = -1.0;
+  for ( int i = 0; i < 8; i++ ) {
+    score[i] = w[i] + ${HEIGHT_WEIGHT.toFixed(2)} * clamp( s[i].a * 2.0 - 1.0, 0.0, 1.0 );
+    if ( w[i] > 0.0 ) top = max( top, score[i] );
+  }
   vec3 c = vec3( 0.0 );
-  if ( w0.x > 0.0 ) c += textureGrad( gLayer[0], uv, dx, dy ).rgb * w0.x;
-  if ( w0.y > 0.0 ) c += textureGrad( gLayer[1], uv, dx, dy ).rgb * w0.y;
-  if ( w0.z > 0.0 ) c += textureGrad( gLayer[2], uv, dx, dy ).rgb * w0.z;
-  if ( w0.w > 0.0 ) c += textureGrad( gLayer[3], uv, dx, dy ).rgb * w0.w;
-  if ( w1.x > 0.0 ) c += textureGrad( gLayer[4], uv, dx, dy ).rgb * w1.x;
-  if ( w1.y > 0.0 ) c += textureGrad( gLayer[5], uv, dx, dy ).rgb * w1.y;
-  if ( w1.z > 0.0 ) c += textureGrad( gLayer[6], uv, dx, dy ).rgb * w1.z;
-  if ( w1.w > 0.0 ) c += textureGrad( gLayer[7], uv, dx, dy ).rgb * w1.w;
-  return c;
+  float total = 0.0;
+  for ( int i = 0; i < 8; i++ ) {
+    float b = w[i] > 0.0 ? max( score[i] - ( top - ${BLEND_DEPTH.toFixed(2)} ), 0.0 ) : 0.0;
+    c += s[i].rgb * b;
+    total += b;
+  }
+  return c / max( total, 1e-5 );
 }`,
     )
     .replace(
       "#include <map_fragment>",
       `#include <map_fragment>
   // Layer weights here, without the layers the game data lacks.
-  vec4 gw0 = texture2D( gMask0, vMapUv ) * gHave0;
-  vec4 gw1 = texture2D( gMask1, vMapUv ) * gHave1;
+  // Read a little off the exact point, by noise of about a texel, so what
+  // is left of the grid wobbles like a painted edge.
+  vec2 gN = vMapUv * gWorld / ${MASK_WOBBLE_CELLS.toFixed(1)};
+  vec2 gWobble = vec2( texture2D( gGrain, gN ).r, texture2D( gGrain, gN.yx + vec2( 0.37, 0.71 ) ).r ) - 0.5;
+  vec2 gMaskUv = vMapUv + gWobble * ${MASK_WOBBLE.toFixed(2)} / gMaskSize;
+  vec4 gw0 = gCubic( gMask0, gMaskUv ) * gHave0;
+  vec4 gw1 = gCubic( gMask1, gMaskUv ) * gHave1;
   float gSum = dot( gw0, vec4( 1.0 ) ) + dot( gw1, vec4( 1.0 ) );
   if ( gSum < 0.004 ) { gw0 = gHave0; gw1 = gHave1; gSum = dot( gw0, vec4( 1.0 ) ) + dot( gw1, vec4( 1.0 ) ); }
   gw0 /= gSum;
