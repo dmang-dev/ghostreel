@@ -22,7 +22,7 @@ permissions:
 jobs:
   cli:
     name: CLI (${{ matrix.goos }}/${{ matrix.goarch }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         include:
@@ -32,11 +32,11 @@ jobs:
           - { goos: linux, goarch: amd64 }
           - { goos: linux, goarch: arm64 }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: lts/*
           cache: npm
@@ -63,7 +63,7 @@ jobs:
           env -u GOOS -u GOARCH -u CGO_ENABLED go run ./cmd/releasetool notices \
             -out "$out/THIRD_PARTY_NOTICES.txt" -go . -npm viewer -third-party third_party
           if [ "$GOOS" = windows ]; then zip -qr "$out.zip" "$out"; else tar czf "$out.tar.gz" "$out"; fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: cli-${{ matrix.goos }}-${{ matrix.goarch }}
           # The archives only: the staging folder's name has dots too (v1.0.0).
@@ -73,13 +73,13 @@ jobs:
 
   web:
     name: Browser build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: lts/*
           cache: npm
@@ -92,7 +92,7 @@ jobs:
           cp LICENSE viewer/dist-web/
           go run ./cmd/releasetool notices -out viewer/dist-web/THIRD_PARTY_NOTICES.txt -go . -npm viewer -third-party third_party
           cd viewer/dist-web && zip -qr "../../ghostreel_${GITHUB_REF_NAME}_web.zip" .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: web
           path: ghostreel_*_web.zip
@@ -112,12 +112,12 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: desktop/go.mod
           cache-dependency-path: desktop/go.sum
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: lts/*
       - name: Linux build dependencies
@@ -162,13 +162,13 @@ jobs:
             Linux)
               tar czf "../../../${base}_linux_amd64.tar.gz" ghostreel-desktop LICENSE THIRD_PARTY_NOTICES.txt ;;
           esac
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: desktop-${{ runner.os }}
           path: ghostreel-desktop_*
       # One copy of the notices for the release page, for the installer's
       # users; the other downloads carry their own.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: runner.os == 'Windows'
         with:
           name: notices
@@ -176,16 +176,16 @@ jobs:
 
   release:
     needs: [cli, web, desktop]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: artifacts
           merge-multiple: true
@@ -205,7 +205,7 @@ jobs:
             -url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}" \
             -notes "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
       # Third-party, with write access: pinned to a commit, not a movable tag.
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

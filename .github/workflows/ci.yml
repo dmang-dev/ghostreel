@@ -12,10 +12,10 @@ permissions:
 
 jobs:
   go:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: gofmt
@@ -27,9 +27,9 @@ jobs:
       - run: CGO_ENABLED=0 GOOS=js GOARCH=wasm go build ./internal/... ./cmd/ghostreel-wasm
 
   proto:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Third-party actions are pinned to a commit, not a movable tag.
       - uses: bufbuild/buf-action@8c6a16e16f12ba20b6470afa9c2ba9b5ba8c97c3 # v1.5.0
         with:
@@ -37,10 +37,10 @@ jobs:
       - run: buf lint
 
   viewer:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: lts/*
           cache: npm
@@ -55,7 +55,7 @@ jobs:
       - run: npm run build
         working-directory: viewer
       # The browser-only build compiles the Go core too.
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - run: npm run build:web
