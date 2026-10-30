@@ -21,7 +21,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file timeline/v1/timeline.proto.
  */
 export const file_timeline_v1_timeline: GenFile = /*@__PURE__*/
-  fileDesc("Chp0aW1lbGluZS92MS90aW1lbGluZS5wcm90bxILdGltZWxpbmUudjEiygIKCFRpbWVsaW5lEjIKDnNjaGVtYV92ZXJzaW9uGAEgASgOMhoudGltZWxpbmUudjEuU2NoZW1hVmVyc2lvbhIfCgRtZXRhGAIgASgLMhEudGltZWxpbmUudjEuTWV0YRIpCgp1bml0X3R5cGVzGAMgAygLMhUudGltZWxpbmUudjEuVW5pdFR5cGUSIAoFdW5pdHMYBCADKAsyES50aW1lbGluZS52MS5Vbml0EiIKBnRyYWNrcxgFIAMoCzISLnRpbWVsaW5lLnYxLlRyYWNrEigKCXNuYXBzaG90cxgGIAMoCzIVLnRpbWVsaW5lLnYxLlNuYXBzaG90EiIKBmV2ZW50cxgHIAMoCzISLnRpbWVsaW5lLnYxLkV2ZW50EioKB2FjdGlvbnMYCCABKAsyGS50aW1lbGluZS52MS5BY3Rpb25Db3VudHMiywIKBE1ldGESEwoLcmVwbGF5X2hhc2gYASABKAkSDwoHdmVyc2lvbhgCIAEoCRISCgpiYXNlX2J1aWxkGAMgASgNEhwKFHByb3RvY29sX2FwcHJveF9mcm9tGAQgASgNEg0KBWxvb3BzGAUgASgNEhEKCW1hcF90aXRsZRgGIAEoCRIQCghtYXBfaGFzaBgHIAEoCRIVCg1tYXBfZmlsZV9uYW1lGAggASgJEhEKCW1hcF93aWR0aBgJIAEoDRISCgptYXBfaGVpZ2h0GAogASgNEiQKB3BsYXllcnMYCyADKAsyEy50aW1lbGluZS52MS5QbGF5ZXISJQoIZmlkZWxpdHkYDCABKA4yEy50aW1lbGluZS52MS5Tb3VyY2USGQoRc25hcHNob3RfaW50ZXJ2YWwYDSABKA0SEQoJZ2VuZXJhdG9yGA4gASgJInEKBlBsYXllchIKCgJpZBgBIAEoDRIMCgRuYW1lGAIgASgJEgwKBHJhY2UYAyABKAkSDgoGcmVzdWx0GAQgASgJEg0KBWNvbG9yGAUgASgNEg8KB3N0YXJ0X3gYBiABKAISDwoHc3RhcnRfeRgHIAEoAiLEAQoIVW5pdFR5cGUSDAoEbmFtZRgBIAEoCRIlCgVjbGFzcxgCIAEoDjIWLnRpbWVsaW5lLnYxLlVuaXRDbGFzcxIOCgZyYWRpdXMYAyABKAISEwoLZm9vdHByaW50X3cYBCABKA0SEwoLZm9vdHByaW50X2gYBSABKA0SCwoDYWlyGAYgASgIEg8KB21vdmFibGUYByABKAgSDQoFa25vd24YCCABKAgSDQoFc3BlZWQYCSABKAISDQoFc2lnaHQYCiABKAIivgIKBFVuaXQSCgoCaWQYASABKA0SCwoDdGFnGAIgASgNEg0KBW93bmVyGAMgASgNEgwKBHR5cGUYBCABKA0SEQoJYm9ybl9sb29wGAUgASgNEhYKCWRvbmVfbG9vcBgGIAEoDUgAiAEBEhMKC2NvbnN0cnVjdGVkGAcgASgIEhYKCWRpZWRfbG9vcBgIIAEoDUgBiAEBEhUKDWtpbGxlcl9wbGF5ZXIYCSABKA0SIgoGbW9ycGhzGAogAygLMhIudGltZWxpbmUudjEuTW9ycGgSLwoNb3duZXJfY2hhbmdlcxgLIAMoCzIYLnRpbWVsaW5lLnYxLk93bmVyQ2hhbmdlEhQKB2NyZWF0b3IYDCABKA1IAogBAUIMCgpfZG9uZV9sb29wQgwKCl9kaWVkX2xvb3BCCgoIX2NyZWF0b3IiIwoFTW9ycGgSDAoEbG9vcBgBIAEoDRIMCgR0eXBlGAIgASgNIioKC093bmVyQ2hhbmdlEgwKBGxvb3AYASABKA0SDQoFb3duZXIYAiABKA0iigEKCEtleWZyYW1lEgwKBGxvb3AYASABKA0SCQoBeBgCIAEoAhIJCgF5GAMgASgCEg4KBmZhY2luZxgEIAEoAhIlCgVzdGF0ZRgFIAEoDjIWLnRpbWVsaW5lLnYxLlVuaXRTdGF0ZRIjCgZzb3VyY2UYBiABKA4yEy50aW1lbGluZS52MS5Tb3VyY2UiZwoFVHJhY2sSDwoHdW5pdF9pZBgBIAEoDRIoCglrZXlmcmFtZXMYAiADKAsyFS50aW1lbGluZS52MS5LZXlmcmFtZRIjCgZ2aXRhbHMYAyADKAsyEy50aW1lbGluZS52MS5WaXRhbHMiggEKBlZpdGFscxIMCgRsb29wGAEgASgNEg4KBmhlYWx0aBgCIAEoAhISCgpoZWFsdGhfbWF4GAMgASgCEg4KBnNoaWVsZBgEIAEoAhISCgpzaGllbGRfbWF4GAUgASgCEg4KBmVuZXJneRgGIAEoAhISCgplbmVyZ3lfbWF4GAcgASgCIlAKCFNuYXBzaG90EgwKBGxvb3AYASABKA0SDQoFYWxpdmUYAiADKA0SJwoFc3RhdHMYAyADKAsyGC50aW1lbGluZS52MS5QbGF5ZXJTdGF0cyLxAgoFRXZlbnQSDAoEbG9vcBgBIAEoDRIqCgl1bml0X2Jvcm4YAiABKAsyFS50aW1lbGluZS52MS5Vbml0Qm9ybkgAEioKCXVuaXRfZGllZBgDIAEoCzIVLnRpbWVsaW5lLnYxLlVuaXREaWVkSAASJwoFbW9ycGgYBCABKAsyFi50aW1lbGluZS52MS5Vbml0TW9ycGhIABInCgd1cGdyYWRlGAUgASgLMhQudGltZWxpbmUudjEuVXBncmFkZUgAEjAKDHBsYXllcl9zdGF0cxgGIAEoCzIYLnRpbWVsaW5lLnYxLlBsYXllclN0YXRzSAASIQoEY2hhdBgHIAEoCzIRLnRpbWVsaW5lLnYxLkNoYXRIABInCgdjb21tYW5kGAggASgLMhQudGltZWxpbmUudjEuQ29tbWFuZEgAEioKCXVuaXRfZG9uZRgJIAEoCzIVLnRpbWVsaW5lLnYxLlVuaXREb25lSABCBgoEa2luZCIbCghVbml0Qm9ybhIPCgd1bml0X2lkGAEgASgNIhsKCFVuaXREb25lEg8KB3VuaXRfaWQYASABKA0iMgoIVW5pdERpZWQSDwoHdW5pdF9pZBgBIAEoDRIVCg1raWxsZXJfcGxheWVyGAIgASgNIioKCVVuaXRNb3JwaBIPCgd1bml0X2lkGAEgASgNEgwKBHR5cGUYAiABKA0iNgoHVXBncmFkZRIOCgZwbGF5ZXIYASABKA0SDAoEbmFtZRgCIAEoCRINCgVjb3VudBgDIAEoBSKyAgoLUGxheWVyU3RhdHMSDgoGcGxheWVyGAEgASgNEhMKC3N1cHBseV91c2VkGAIgASgCEhMKC3N1cHBseV9tYWRlGAMgASgCEhAKCG1pbmVyYWxzGAQgASgNEg8KB3Zlc3BlbmUYBSABKA0SFAoMbWluZXJhbF9yYXRlGAYgASgNEhQKDHZlc3BlbmVfcmF0ZRgHIAEoDRIPCgd3b3JrZXJzGAggASgNEhUKDWFybXlfbWluZXJhbHMYCSABKA0SFAoMYXJteV92ZXNwZW5lGAogASgNEhUKDWxvc3RfbWluZXJhbHMYCyABKA0SFAoMbG9zdF92ZXNwZW5lGAwgASgNEhcKD2tpbGxlZF9taW5lcmFscxgNIAEoDRIWCg5raWxsZWRfdmVzcGVuZRgOIAEoDSJOCgxBY3Rpb25Db3VudHMSEQoJYmluX2xvb3BzGAEgASgNEisKB3BsYXllcnMYAiADKAsyGi50aW1lbGluZS52MS5QbGF5ZXJBY3Rpb25zIkIKDVBsYXllckFjdGlvbnMSDgoGcGxheWVyGAEgASgNEg8KB2FjdGlvbnMYAiADKA0SEAoIY29tbWFuZHMYAyADKA0iJAoEQ2hhdBIOCgZwbGF5ZXIYASABKA0SDAoEdGV4dBgCIAEoCSKgAQoHQ29tbWFuZBIOCgZwbGF5ZXIYASABKA0SDwoHYWJpbGl0eRgCIAEoBRIZChFhYmlsaXR5X2NtZF9pbmRleBgDIAEoDRISCgpoYXNfdGFyZ2V0GAQgASgIEgkKAXgYBSABKAISCQoBeRgGIAEoAhIWCg50YXJnZXRfdW5pdF9pZBgHIAEoDRIXCg9oYXNfdGFyZ2V0X3VuaXQYCCABKAgqRQoNU2NoZW1hVmVyc2lvbhIeChpTQ0hFTUFfVkVSU0lPTl9VTlNQRUNJRklFRBAAEhQKEFNDSEVNQV9WRVJTSU9OXzEQASpbCgZTb3VyY2USFgoSU09VUkNFX1VOU1BFQ0lGSUVEEAASEgoOU09VUkNFX1RSQUNLRVIQARISCg5TT1VSQ0VfQ09NTUFORBACEhEKDVNPVVJDRV9FTkdJTkUQAyq0AQoJVW5pdENsYXNzEhoKFlVOSVRfQ0xBU1NfVU5TUEVDSUZJRUQQABITCg9VTklUX0NMQVNTX0FSTVkQARIVChFVTklUX0NMQVNTX1dPUktFUhACEhcKE1VOSVRfQ0xBU1NfQlVJTERJTkcQAxIXChNVTklUX0NMQVNTX1JFU09VUkNFEAQSFgoSVU5JVF9DTEFTU19ORVVUUkFMEAUSFQoRVU5JVF9DTEFTU19ISURERU4QBiqfAQoJVW5pdFN0YXRlEhoKFlVOSVRfU1RBVEVfVU5TUEVDSUZJRUQQABITCg9VTklUX1NUQVRFX0lETEUQARIVChFVTklUX1NUQVRFX01PVklORxACEhgKFFVOSVRfU1RBVEVfQVRUQUNLSU5HEAMSGwoXVU5JVF9TVEFURV9DT05TVFJVQ1RJTkcQBBITCg9VTklUX1NUQVRFX0RFQUQQBUI7WjlnaXRodWIuY29tL2RtYW5nLWRldi9naG9zdHJlZWwvZ2VuL3RpbWVsaW5lL3YxO3RpbWVsaW5ldjFiBnByb3RvMw");
+  fileDesc("Chp0aW1lbGluZS92MS90aW1lbGluZS5wcm90bxILdGltZWxpbmUudjEi9gIKCFRpbWVsaW5lEjIKDnNjaGVtYV92ZXJzaW9uGAEgASgOMhoudGltZWxpbmUudjEuU2NoZW1hVmVyc2lvbhIfCgRtZXRhGAIgASgLMhEudGltZWxpbmUudjEuTWV0YRIpCgp1bml0X3R5cGVzGAMgAygLMhUudGltZWxpbmUudjEuVW5pdFR5cGUSIAoFdW5pdHMYBCADKAsyES50aW1lbGluZS52MS5Vbml0EiIKBnRyYWNrcxgFIAMoCzISLnRpbWVsaW5lLnYxLlRyYWNrEigKCXNuYXBzaG90cxgGIAMoCzIVLnRpbWVsaW5lLnYxLlNuYXBzaG90EiIKBmV2ZW50cxgHIAMoCzISLnRpbWVsaW5lLnYxLkV2ZW50EioKB2FjdGlvbnMYCCABKAsyGS50aW1lbGluZS52MS5BY3Rpb25Db3VudHMSKgoHY2FtZXJhcxgJIAMoCzIZLnRpbWVsaW5lLnYxLlBsYXllckNhbWVyYSK7AwoETWV0YRITCgtyZXBsYXlfaGFzaBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJEhIKCmJhc2VfYnVpbGQYAyABKA0SHAoUcHJvdG9jb2xfYXBwcm94X2Zyb20YBCABKA0SDQoFbG9vcHMYBSABKA0SEQoJbWFwX3RpdGxlGAYgASgJEhAKCG1hcF9oYXNoGAcgASgJEhUKDW1hcF9maWxlX25hbWUYCCABKAkSEQoJbWFwX3dpZHRoGAkgASgNEhIKCm1hcF9oZWlnaHQYCiABKA0SJAoHcGxheWVycxgLIAMoCzITLnRpbWVsaW5lLnYxLlBsYXllchIlCghmaWRlbGl0eRgMIAEoDjITLnRpbWVsaW5lLnYxLlNvdXJjZRIZChFzbmFwc2hvdF9pbnRlcnZhbBgNIAEoDRIRCglnZW5lcmF0b3IYDiABKAkSEgoKc3RhcnRfdGltZRgPIAEoAxISCgptYXBfYXV0aG9yGBAgASgJEg4KBnJlZ2lvbhgRIAEoCRIOCgZsYWRkZXIYEiABKAgSEwoLY29tcGV0aXRpdmUYEyABKAgSEQoJb2JzZXJ2ZXJzGBQgAygJIoUCCgZQbGF5ZXISCgoCaWQYASABKA0SDAoEbmFtZRgCIAEoCRIMCgRyYWNlGAMgASgJEg4KBnJlc3VsdBgEIAEoCRINCgVjb2xvchgFIAEoDRIPCgdzdGFydF94GAYgASgCEg8KB3N0YXJ0X3kYByABKAISFQoNc2VsZWN0ZWRfcmFjZRgIIAEoCRIQCghoYW5kaWNhcBgJIAEoDRIMCgRjbGFuGAogASgJEgwKBHRvb24YCyABKAkSCwoDbW1yGAwgASgNEgsKA2FwbRgNIAEoDRISCgpkaWZmaWN1bHR5GA4gASgJEhAKCGFpX2J1aWxkGA8gASgJEg0KBWh1bWFuGBAgASgIIsQBCghVbml0VHlwZRIMCgRuYW1lGAEgASgJEiUKBWNsYXNzGAIgASgOMhYudGltZWxpbmUudjEuVW5pdENsYXNzEg4KBnJhZGl1cxgDIAEoAhITCgtmb290cHJpbnRfdxgEIAEoDRITCgtmb290cHJpbnRfaBgFIAEoDRILCgNhaXIYBiABKAgSDwoHbW92YWJsZRgHIAEoCBINCgVrbm93bhgIIAEoCBINCgVzcGVlZBgJIAEoAhINCgVzaWdodBgKIAEoAiL3AgoEVW5pdBIKCgJpZBgBIAEoDRILCgN0YWcYAiABKA0SDQoFb3duZXIYAyABKA0SDAoEdHlwZRgEIAEoDRIRCglib3JuX2xvb3AYBSABKA0SFgoJZG9uZV9sb29wGAYgASgNSACIAQESEwoLY29uc3RydWN0ZWQYByABKAgSFgoJZGllZF9sb29wGAggASgNSAGIAQESFQoNa2lsbGVyX3BsYXllchgJIAEoDRIiCgZtb3JwaHMYCiADKAsyEi50aW1lbGluZS52MS5Nb3JwaBIvCg1vd25lcl9jaGFuZ2VzGAsgAygLMhgudGltZWxpbmUudjEuT3duZXJDaGFuZ2USFAoHY3JlYXRvchgMIAEoDUgCiAEBEhMKBmtpbGxlchgNIAEoDUgDiAEBEhcKD2NyZWF0b3JfYWJpbGl0eRgOIAEoCUIMCgpfZG9uZV9sb29wQgwKCl9kaWVkX2xvb3BCCgoIX2NyZWF0b3JCCQoHX2tpbGxlciIjCgVNb3JwaBIMCgRsb29wGAEgASgNEgwKBHR5cGUYAiABKA0iKgoLT3duZXJDaGFuZ2USDAoEbG9vcBgBIAEoDRINCgVvd25lchgCIAEoDSKKAQoIS2V5ZnJhbWUSDAoEbG9vcBgBIAEoDRIJCgF4GAIgASgCEgkKAXkYAyABKAISDgoGZmFjaW5nGAQgASgCEiUKBXN0YXRlGAUgASgOMhYudGltZWxpbmUudjEuVW5pdFN0YXRlEiMKBnNvdXJjZRgGIAEoDjITLnRpbWVsaW5lLnYxLlNvdXJjZSJnCgVUcmFjaxIPCgd1bml0X2lkGAEgASgNEigKCWtleWZyYW1lcxgCIAMoCzIVLnRpbWVsaW5lLnYxLktleWZyYW1lEiMKBnZpdGFscxgDIAMoCzITLnRpbWVsaW5lLnYxLlZpdGFscyKCAQoGVml0YWxzEgwKBGxvb3AYASABKA0SDgoGaGVhbHRoGAIgASgCEhIKCmhlYWx0aF9tYXgYAyABKAISDgoGc2hpZWxkGAQgASgCEhIKCnNoaWVsZF9tYXgYBSABKAISDgoGZW5lcmd5GAYgASgCEhIKCmVuZXJneV9tYXgYByABKAIiUAoIU25hcHNob3QSDAoEbG9vcBgBIAEoDRINCgVhbGl2ZRgCIAMoDRInCgVzdGF0cxgDIAMoCzIYLnRpbWVsaW5lLnYxLlBsYXllclN0YXRzIpQDCgVFdmVudBIMCgRsb29wGAEgASgNEioKCXVuaXRfYm9ybhgCIAEoCzIVLnRpbWVsaW5lLnYxLlVuaXRCb3JuSAASKgoJdW5pdF9kaWVkGAMgASgLMhUudGltZWxpbmUudjEuVW5pdERpZWRIABInCgVtb3JwaBgEIAEoCzIWLnRpbWVsaW5lLnYxLlVuaXRNb3JwaEgAEicKB3VwZ3JhZGUYBSABKAsyFC50aW1lbGluZS52MS5VcGdyYWRlSAASMAoMcGxheWVyX3N0YXRzGAYgASgLMhgudGltZWxpbmUudjEuUGxheWVyU3RhdHNIABIhCgRjaGF0GAcgASgLMhEudGltZWxpbmUudjEuQ2hhdEgAEicKB2NvbW1hbmQYCCABKAsyFC50aW1lbGluZS52MS5Db21tYW5kSAASKgoJdW5pdF9kb25lGAkgASgLMhUudGltZWxpbmUudjEuVW5pdERvbmVIABIhCgRwaW5nGAogASgLMhEudGltZWxpbmUudjEuUGluZ0gAQgYKBGtpbmQiGwoIVW5pdEJvcm4SDwoHdW5pdF9pZBgBIAEoDSIbCghVbml0RG9uZRIPCgd1bml0X2lkGAEgASgNIlIKCFVuaXREaWVkEg8KB3VuaXRfaWQYASABKA0SFQoNa2lsbGVyX3BsYXllchgCIAEoDRITCgZraWxsZXIYAyABKA1IAIgBAUIJCgdfa2lsbGVyIioKCVVuaXRNb3JwaBIPCgd1bml0X2lkGAEgASgNEgwKBHR5cGUYAiABKA0iNgoHVXBncmFkZRIOCgZwbGF5ZXIYASABKA0SDAoEbmFtZRgCIAEoCRINCgVjb3VudBgDIAEoBSLoAwoLUGxheWVyU3RhdHMSDgoGcGxheWVyGAEgASgNEhMKC3N1cHBseV91c2VkGAIgASgCEhMKC3N1cHBseV9tYWRlGAMgASgCEhAKCG1pbmVyYWxzGAQgASgNEg8KB3Zlc3BlbmUYBSABKA0SFAoMbWluZXJhbF9yYXRlGAYgASgNEhQKDHZlc3BlbmVfcmF0ZRgHIAEoDRIPCgd3b3JrZXJzGAggASgNEhUKDWFybXlfbWluZXJhbHMYCSABKA0SFAoMYXJteV92ZXNwZW5lGAogASgNEhUKDWxvc3RfbWluZXJhbHMYCyABKA0SFAoMbG9zdF92ZXNwZW5lGAwgASgNEhcKD2tpbGxlZF9taW5lcmFscxgNIAEoDRIWCg5raWxsZWRfdmVzcGVuZRgOIAEoDRIRCglsb3N0X2FybXkYDyABKA0SFAoMbG9zdF9lY29ub215GBAgASgNEhcKD2xvc3RfdGVjaG5vbG9neRgRIAEoDRITCgtraWxsZWRfYXJteRgSIAEoDRIWCg5raWxsZWRfZWNvbm9teRgTIAEoDRIZChFraWxsZWRfdGVjaG5vbG9neRgUIAEoDRIVCg1mcmllbmRseV9maXJlGBUgASgNEhMKC2luX3Byb2dyZXNzGBYgASgNIk4KDEFjdGlvbkNvdW50cxIRCgliaW5fbG9vcHMYASABKA0SKwoHcGxheWVycxgCIAMoCzIaLnRpbWVsaW5lLnYxLlBsYXllckFjdGlvbnMiQgoNUGxheWVyQWN0aW9ucxIOCgZwbGF5ZXIYASABKA0SDwoHYWN0aW9ucxgCIAMoDRIQCghjb21tYW5kcxgDIAMoDSIkCgRDaGF0Eg4KBnBsYXllchgBIAEoDRIMCgR0ZXh0GAIgASgJIiwKBFBpbmcSDgoGcGxheWVyGAEgASgNEgkKAXgYAiABKAISCQoBeRgDIAEoAiJECgxQbGF5ZXJDYW1lcmESDgoGcGxheWVyGAEgASgNEiQKBGtleXMYAiADKAsyFi50aW1lbGluZS52MS5DYW1lcmFLZXkiLwoJQ2FtZXJhS2V5EgwKBGxvb3AYASABKA0SCQoBeBgCIAEoAhIJCgF5GAMgASgCIqABCgdDb21tYW5kEg4KBnBsYXllchgBIAEoDRIPCgdhYmlsaXR5GAIgASgFEhkKEWFiaWxpdHlfY21kX2luZGV4GAMgASgNEhIKCmhhc190YXJnZXQYBCABKAgSCQoBeBgFIAEoAhIJCgF5GAYgASgCEhYKDnRhcmdldF91bml0X2lkGAcgASgNEhcKD2hhc190YXJnZXRfdW5pdBgIIAEoCCpFCg1TY2hlbWFWZXJzaW9uEh4KGlNDSEVNQV9WRVJTSU9OX1VOU1BFQ0lGSUVEEAASFAoQU0NIRU1BX1ZFUlNJT05fMRABKlsKBlNvdXJjZRIWChJTT1VSQ0VfVU5TUEVDSUZJRUQQABISCg5TT1VSQ0VfVFJBQ0tFUhABEhIKDlNPVVJDRV9DT01NQU5EEAISEQoNU09VUkNFX0VOR0lORRADKrQBCglVbml0Q2xhc3MSGgoWVU5JVF9DTEFTU19VTlNQRUNJRklFRBAAEhMKD1VOSVRfQ0xBU1NfQVJNWRABEhUKEVVOSVRfQ0xBU1NfV09SS0VSEAISFwoTVU5JVF9DTEFTU19CVUlMRElORxADEhcKE1VOSVRfQ0xBU1NfUkVTT1VSQ0UQBBIWChJVTklUX0NMQVNTX05FVVRSQUwQBRIVChFVTklUX0NMQVNTX0hJRERFThAGKp8BCglVbml0U3RhdGUSGgoWVU5JVF9TVEFURV9VTlNQRUNJRklFRBAAEhMKD1VOSVRfU1RBVEVfSURMRRABEhUKEVVOSVRfU1RBVEVfTU9WSU5HEAISGAoUVU5JVF9TVEFURV9BVFRBQ0tJTkcQAxIbChdVTklUX1NUQVRFX0NPTlNUUlVDVElORxAEEhMKD1VOSVRfU1RBVEVfREVBRBAFQjtaOWdpdGh1Yi5jb20vZG1hbmctZGV2L2dob3N0cmVlbC9nZW4vdGltZWxpbmUvdjE7dGltZWxpbmV2MWIGcHJvdG8z");
 
 /**
  * @generated from message timeline.v1.Timeline
@@ -79,6 +79,15 @@ export type Timeline = Message<"timeline.v1.Timeline"> & {
    * @generated from field: timeline.v1.ActionCounts actions = 8;
    */
   actions?: ActionCounts | undefined;
+
+  /**
+   * Where each player's camera looked, one entry per player with any camera
+   * moves (computer players have none); empty when game events weren't
+   * decoded.
+   *
+   * @generated from field: repeated timeline.v1.PlayerCamera cameras = 9;
+   */
+  cameras: PlayerCamera[];
 };
 
 /**
@@ -176,6 +185,46 @@ export type Meta = Message<"timeline.v1.Meta"> & {
    * @generated from field: string generator = 14;
    */
   generator: string;
+
+  /**
+   * About the game, when the replay records it.
+   *
+   * Unix seconds, UTC; 0 when unknown
+   *
+   * @generated from field: int64 start_time = 15;
+   */
+  startTime: bigint;
+
+  /**
+   * @generated from field: string map_author = 16;
+   */
+  mapAuthor: string;
+
+  /**
+   * Battle.net region code ("EU"); empty for local games
+   *
+   * @generated from field: string region = 17;
+   */
+  region: string;
+
+  /**
+   * automatic matchmaking
+   *
+   * @generated from field: bool ladder = 18;
+   */
+  ladder: boolean;
+
+  /**
+   * ranked
+   *
+   * @generated from field: bool competitive = 19;
+   */
+  competitive: boolean;
+
+  /**
+   * @generated from field: repeated string observers = 20;
+   */
+  observers: string[];
 };
 
 /**
@@ -227,6 +276,65 @@ export type Player = Message<"timeline.v1.Player"> & {
    * @generated from field: float start_y = 7;
    */
   startY: number;
+
+  /**
+   * Optional details; zero values when the replay doesn't record them.
+   *
+   * lobby pick: "Random" when the race was random
+   *
+   * @generated from field: string selected_race = 8;
+   */
+  selectedRace: string;
+
+  /**
+   * percent; 100 is none
+   *
+   * @generated from field: uint32 handicap = 9;
+   */
+  handicap: number;
+
+  /**
+   * @generated from field: string clan = 10;
+   */
+  clan: string;
+
+  /**
+   * Battle.net profile, "region-S2-realm-id"
+   *
+   * @generated from field: string toon = 11;
+   */
+  toon: string;
+
+  /**
+   * @generated from field: uint32 mmr = 12;
+   */
+  mmr: number;
+
+  /**
+   * as the game counts it
+   *
+   * @generated from field: uint32 apm = 13;
+   */
+  apm: number;
+
+  /**
+   * computer players: "Elite", …
+   *
+   * @generated from field: string difficulty = 14;
+   */
+  difficulty: string;
+
+  /**
+   * computer players: "Macro", …
+   *
+   * @generated from field: string ai_build = 15;
+   */
+  aiBuild: string;
+
+  /**
+   * @generated from field: bool human = 16;
+   */
+  human: boolean;
 };
 
 /**
@@ -383,6 +491,22 @@ export type Unit = Message<"timeline.v1.Unit"> & {
    * @generated from field: optional uint32 creator = 12;
    */
   creator?: number | undefined;
+
+  /**
+   * The unit that dealt the killing blow, when the replay says and that unit
+   * is in the timeline.
+   *
+   * @generated from field: optional uint32 killer = 13;
+   */
+  killer?: number | undefined;
+
+  /**
+   * The ability that made this unit ("BarracksTrain", "WarpGateTrain",
+   * "CalldownMULE"); empty when the replay doesn't say.
+   *
+   * @generated from field: string creator_ability = 14;
+   */
+  creatorAbility: string;
 };
 
 /**
@@ -654,6 +778,12 @@ export type Event = Message<"timeline.v1.Event"> & {
      */
     value: UnitDone;
     case: "unitDone";
+  } | {
+    /**
+     * @generated from field: timeline.v1.Ping ping = 10;
+     */
+    value: Ping;
+    case: "ping";
   } | { case: undefined; value?: undefined };
 };
 
@@ -711,6 +841,13 @@ export type UnitDied = Message<"timeline.v1.UnitDied"> & {
    * @generated from field: uint32 killer_player = 2;
    */
   killerPlayer: number;
+
+  /**
+   * as Unit.killer
+   *
+   * @generated from field: optional uint32 killer = 3;
+   */
+  killer?: number | undefined;
 };
 
 /**
@@ -844,6 +981,53 @@ export type PlayerStats = Message<"timeline.v1.PlayerStats"> & {
    * @generated from field: uint32 killed_vespene = 14;
    */
   killedVespene: number;
+
+  /**
+   * Resources lost and killed by kind, minerals and gas together. Economy is
+   * workers and town halls, technology other buildings and research.
+   *
+   * @generated from field: uint32 lost_army = 15;
+   */
+  lostArmy: number;
+
+  /**
+   * @generated from field: uint32 lost_economy = 16;
+   */
+  lostEconomy: number;
+
+  /**
+   * @generated from field: uint32 lost_technology = 17;
+   */
+  lostTechnology: number;
+
+  /**
+   * @generated from field: uint32 killed_army = 18;
+   */
+  killedArmy: number;
+
+  /**
+   * @generated from field: uint32 killed_economy = 19;
+   */
+  killedEconomy: number;
+
+  /**
+   * @generated from field: uint32 killed_technology = 20;
+   */
+  killedTechnology: number;
+
+  /**
+   * value of the player's own units they killed
+   *
+   * @generated from field: uint32 friendly_fire = 21;
+   */
+  friendlyFire: number;
+
+  /**
+   * value being built or researched right now
+   *
+   * @generated from field: uint32 in_progress = 22;
+   */
+  inProgress: number;
 };
 
 /**
@@ -935,6 +1119,87 @@ export const ChatSchema: GenMessage<Chat> = /*@__PURE__*/
   messageDesc(file_timeline_v1_timeline, 20);
 
 /**
+ * A minimap ping.
+ *
+ * @generated from message timeline.v1.Ping
+ */
+export type Ping = Message<"timeline.v1.Ping"> & {
+  /**
+   * @generated from field: uint32 player = 1;
+   */
+  player: number;
+
+  /**
+   * @generated from field: float x = 2;
+   */
+  x: number;
+
+  /**
+   * @generated from field: float y = 3;
+   */
+  y: number;
+};
+
+/**
+ * Describes the message timeline.v1.Ping.
+ * Use `create(PingSchema)` to create a new message.
+ */
+export const PingSchema: GenMessage<Ping> = /*@__PURE__*/
+  messageDesc(file_timeline_v1_timeline, 21);
+
+/**
+ * A player's camera: where it was centered from each key's loop until the
+ * next. Keys are kept when the view jumps or has scrolled at least a cell.
+ *
+ * @generated from message timeline.v1.PlayerCamera
+ */
+export type PlayerCamera = Message<"timeline.v1.PlayerCamera"> & {
+  /**
+   * @generated from field: uint32 player = 1;
+   */
+  player: number;
+
+  /**
+   * @generated from field: repeated timeline.v1.CameraKey keys = 2;
+   */
+  keys: CameraKey[];
+};
+
+/**
+ * Describes the message timeline.v1.PlayerCamera.
+ * Use `create(PlayerCameraSchema)` to create a new message.
+ */
+export const PlayerCameraSchema: GenMessage<PlayerCamera> = /*@__PURE__*/
+  messageDesc(file_timeline_v1_timeline, 22);
+
+/**
+ * @generated from message timeline.v1.CameraKey
+ */
+export type CameraKey = Message<"timeline.v1.CameraKey"> & {
+  /**
+   * @generated from field: uint32 loop = 1;
+   */
+  loop: number;
+
+  /**
+   * @generated from field: float x = 2;
+   */
+  x: number;
+
+  /**
+   * @generated from field: float y = 3;
+   */
+  y: number;
+};
+
+/**
+ * Describes the message timeline.v1.CameraKey.
+ * Use `create(CameraKeySchema)` to create a new message.
+ */
+export const CameraKeySchema: GenMessage<CameraKey> = /*@__PURE__*/
+  messageDesc(file_timeline_v1_timeline, 23);
+
+/**
  * @generated from message timeline.v1.Command
  */
 export type Command = Message<"timeline.v1.Command"> & {
@@ -988,7 +1253,7 @@ export type Command = Message<"timeline.v1.Command"> & {
  * Use `create(CommandSchema)` to create a new message.
  */
 export const CommandSchema: GenMessage<Command> = /*@__PURE__*/
-  messageDesc(file_timeline_v1_timeline, 21);
+  messageDesc(file_timeline_v1_timeline, 24);
 
 /**
  * Bumped on any incompatible change. Readers refuse versions they don't know.

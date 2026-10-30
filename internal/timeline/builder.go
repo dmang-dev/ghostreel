@@ -49,6 +49,7 @@ type builder struct {
 	bySlot    map[uint32]*unitBuild
 	all       []*unitBuild
 	actions   map[uint32]*pb.PlayerActions // nil until a game event is seen
+	cameras   map[uint32]*pb.PlayerCamera
 }
 
 // Build reconstructs a tracker-tier timeline. Events must be loop-ordered,
@@ -98,6 +99,14 @@ func meta(info *replay.Info, opts Options) *pb.Meta {
 		Fidelity:           pb.Source_SOURCE_TRACKER,
 		SnapshotInterval:   opts.SnapshotInterval,
 		Generator:          opts.Generator,
+		MapAuthor:          info.MapAuthor,
+		Region:             info.Region,
+		Ladder:             info.Ladder,
+		Competitive:        info.Competitive,
+		Observers:          info.Observers,
+	}
+	if !info.StartTime.IsZero() {
+		m.StartTime = info.StartTime.Unix()
 	}
 	if info.MapHandle != nil {
 		m.MapHash = info.MapHandle.Digest
@@ -108,6 +117,9 @@ func meta(info *replay.Info, opts Options) *pb.Meta {
 			Id: uint32(p.ID), Name: p.Name, Race: p.Race, Result: p.Result,
 			Color:  uint32(p.Color[0])<<16 | uint32(p.Color[1])<<8 | uint32(p.Color[2]),
 			StartX: float32(p.StartX), StartY: float32(p.StartY),
+			SelectedRace: p.SelectedRace, Handicap: uint32(max(p.Handicap, 0)), Clan: p.Clan, Toon: p.Toon,
+			Mmr: uint32(max(p.MMR, 0)), Apm: uint32(max(p.APM, 0)), Difficulty: p.Difficulty, AiBuild: p.AIBuild,
+			Human: p.Human,
 		})
 	}
 	return m
@@ -188,7 +200,7 @@ func (b *builder) apply(e *replay.Event) {
 		u := &unitBuild{
 			pb: &pb.Unit{
 				Tag: uint32(e.Tag), Owner: uint32(e.Player), Type: typ, BornLoop: uint32(e.Loop),
-				Constructed: e.Kind == replay.KindUnitInit,
+				Constructed: e.Kind == replay.KindUnitInit, CreatorAbility: e.CreatorAbility,
 			},
 			cur:    data,
 			hidden: data.Class == gamedata.ClassHidden,
@@ -222,6 +234,10 @@ func (b *builder) apply(e *replay.Event) {
 
 	case replay.KindUnitDied:
 		if u := b.byTag[e.Tag]; u != nil && u.pb.DiedLoop == nil {
+			if k := b.byTag[e.Killer]; e.Killer != 0 && k != nil && !k.hidden {
+				id := k.emitted
+				u.pb.Killer = &id
+			}
 			b.kill(u, e.Loop, e.KillerPlayer, e)
 		}
 
@@ -258,6 +274,9 @@ func (b *builder) apply(e *replay.Event) {
 			ArmyMinerals: u32(s.ArmyMinerals), ArmyVespene: u32(s.ArmyGas),
 			LostMinerals: u32(s.LostMinerals), LostVespene: u32(s.LostGas),
 			KilledMinerals: u32(s.KilledMinerals), KilledVespene: u32(s.KilledGas),
+			LostArmy: u32(s.Lost.Army), LostEconomy: u32(s.Lost.Economy), LostTechnology: u32(s.Lost.Technology),
+			KilledArmy: u32(s.Killed.Army), KilledEconomy: u32(s.Killed.Economy), KilledTechnology: u32(s.Killed.Technology),
+			FriendlyFire: u32(s.FriendlyFire), InProgress: u32(s.InProgress),
 		}}})
 
 	case replay.KindUpgrade:
@@ -268,6 +287,12 @@ func (b *builder) apply(e *replay.Event) {
 
 	case replay.KindChat:
 		b.event(e.Loop, &pb.Event{Kind: &pb.Event_Chat{Chat: &pb.Chat{Player: uint32(e.Player), Text: e.Text}}})
+
+	case replay.KindPing:
+		b.event(e.Loop, &pb.Event{Kind: &pb.Event_Ping{Ping: &pb.Ping{Player: uint32(e.Player), X: float32(e.X), Y: float32(e.Y)}}})
+
+	case replay.KindCamera:
+		b.camera(e)
 
 	case replay.KindSelection, replay.KindControlGroup:
 		b.countAction(e, false)
@@ -323,8 +348,37 @@ func (b *builder) kill(u *unitBuild, loop int64, killer int, e *replay.Event) {
 		b.addKey(u, loop, e.X, e.Y, pb.UnitState_UNIT_STATE_DEAD)
 	}
 	if !u.hidden {
-		b.event(loop, &pb.Event{Kind: &pb.Event_UnitDied{UnitDied: &pb.UnitDied{UnitId: u.emitted, KillerPlayer: uint32(killer)}}})
+		b.event(loop, &pb.Event{Kind: &pb.Event_UnitDied{UnitDied: &pb.UnitDied{UnitId: u.emitted, KillerPlayer: uint32(killer), Killer: u.pb.Killer}}})
 	}
+}
+
+// cameraStep is how far a camera must scroll before another key is kept:
+// scrolling sends an update every few loops, most of them a fraction of a
+// cell apart.
+const cameraStep = 1.0
+
+// camera records a player's camera move.
+func (b *builder) camera(e *replay.Event) {
+	if b.cameras == nil {
+		b.cameras = map[uint32]*pb.PlayerCamera{}
+	}
+	c := b.cameras[uint32(e.Player)]
+	if c == nil {
+		c = &pb.PlayerCamera{Player: uint32(e.Player)}
+		b.cameras[c.Player] = c
+	}
+	k := &pb.CameraKey{Loop: uint32(e.Loop), X: float32(e.X), Y: float32(e.Y)}
+	if n := len(c.Keys); n > 0 {
+		last := c.Keys[n-1]
+		if last.Loop == k.Loop {
+			c.Keys[n-1] = k
+			return
+		}
+		if math.Hypot(float64(k.X-last.X), float64(k.Y-last.Y)) < cameraStep {
+			return
+		}
+	}
+	c.Keys = append(c.Keys, k)
 }
 
 func cosmeticUpgrade(name string) bool {
@@ -365,6 +419,11 @@ func (b *builder) finish() {
 			}
 		}
 		b.tl.Actions = ac
+	}
+	for _, p := range b.tl.Meta.Players {
+		if c := b.cameras[p.Id]; c != nil {
+			b.tl.Cameras = append(b.tl.Cameras, c)
+		}
 	}
 }
 

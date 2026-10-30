@@ -52,6 +52,14 @@ type Info struct {
 	Players    []Player
 	HasTracker bool
 
+	// About the game, when the replay says.
+	StartTime   time.Time // when the game started, UTC; zero when unknown
+	MapAuthor   string
+	Region      string   // Battle.net region code ("EU"); empty for local games
+	Ladder      bool     // a ranked or unranked ladder game (automatic matchmaking)
+	Competitive bool     // ranked
+	Observers   []string // names of observers and casters
+
 	EventCounts  map[string]int // by stream and s2prot event name, e.g. "tracker/UnitBorn"
 	DecodeErrors []string       // streams that failed to decode completely
 }
@@ -79,6 +87,16 @@ type Player struct {
 	Human  bool
 	StartX int // start location in cells, 0 when unknown
 	StartY int
+
+	// Optional details; zero when the replay doesn't record them.
+	SelectedRace string // the race picked in the lobby, "Random" when random
+	Handicap     int    // percent; 100 is none
+	Clan         string // clan tag without brackets
+	Toon         string // Battle.net profile, "region-S2-realm-id"
+	MMR          int    // ladder matchmaking rating
+	APM          int    // as the game counts it
+	Difficulty   string // computer players: "Elite", "Cheater 2 (Money)", …
+	AIBuild      string // computer players: "Macro", "Rush", …
 }
 
 // Replay is an opened, fully decoded replay.
@@ -195,6 +213,7 @@ func convert(r *rep.Rep, approx int) *Replay {
 	}
 	info.HasTracker = len(tracker) > 0
 	info.Players = players(r, tracker)
+	about(r, &info)
 
 	for _, e := range tracker {
 		info.EventCounts["tracker/"+e.Name]++
@@ -227,15 +246,26 @@ func convert(r *rep.Rep, approx int) *Replay {
 	}
 	for i := range r.MessageEvts {
 		me := &r.MessageEvts[i]
-		if me.Name != "Chat" {
-			continue
+		switch me.Name {
+		case "Chat":
+			evts = append(evts, Event{
+				Loop:   me.Loop(),
+				Kind:   KindChat,
+				Player: userToPlayer[me.UserID()],
+				Text:   me.Stringv("string"),
+			})
+		case "Ping":
+			if me.Value("point") == nil {
+				continue
+			}
+			evts = append(evts, Event{
+				Loop:   me.Loop(),
+				Kind:   KindPing,
+				Player: userToPlayer[me.UserID()],
+				X:      float64(me.Int("point", "x")) / cmdCoordScale,
+				Y:      float64(me.Int("point", "y")) / cmdCoordScale,
+			})
 		}
-		evts = append(evts, Event{
-			Loop:   me.Loop(),
-			Kind:   KindChat,
-			Player: userToPlayer[me.UserID()],
-			Text:   me.Stringv("string"),
-		})
 	}
 	// Stable: events at the same loop keep stream order (tracker first), which
 	// the builder relies on (a unit dies before its slot is reborn).
@@ -336,6 +366,9 @@ func convertTracker(e *s2prot.Event) (Event, bool) {
 		out.Kind, out.Tag = KindUnitDied, tag()
 		out.X, out.Y = float64(e.Int("x")), float64(e.Int("y"))
 		out.KillerPlayer = int(e.Int("killerPlayerId"))
+		if e.Value("killerUnitTagIndex") != nil {
+			out.Killer = MakeTag(uint32(e.Int("killerUnitTagIndex")), uint32(e.Int("killerUnitTagRecycle")))
+		}
 		return out, true
 	case "UnitTypeChange":
 		out.Kind, out.Tag, out.UnitType = KindUnitTypeChange, tag(), e.Stringv("unitTypeName")
@@ -357,6 +390,12 @@ func convertTracker(e *s2prot.Event) (Event, bool) {
 	case "PlayerStats":
 		out.Kind, out.Player = KindPlayerStats, int(e.Int("playerId"))
 		s := e.Structv("stats")
+		split := func(kind string) Split {
+			v := func(part string) int64 {
+				return s.Int("scoreValueMinerals"+kind+part) + s.Int("scoreValueVespene"+kind+part)
+			}
+			return Split{v("Army"), v("Economy"), v("Technology")}
+		}
 		out.Stats = &PlayerStats{
 			SupplyUsed:   float64(s.Int("scoreValueFoodUsed")) / 4096,
 			SupplyMade:   float64(s.Int("scoreValueFoodMade")) / 4096,
@@ -375,6 +414,14 @@ func convertTracker(e *s2prot.Event) (Event, bool) {
 				s.Int("scoreValueMineralsKilledTechnology"),
 			KilledGas: s.Int("scoreValueVespeneKilledArmy") + s.Int("scoreValueVespeneKilledEconomy") +
 				s.Int("scoreValueVespeneKilledTechnology"),
+			Lost:   split("Lost"),
+			Killed: split("Killed"),
+			FriendlyFire: s.Int("scoreValueMineralsFriendlyFireArmy") + s.Int("scoreValueMineralsFriendlyFireEconomy") +
+				s.Int("scoreValueMineralsFriendlyFireTechnology") + s.Int("scoreValueVespeneFriendlyFireArmy") +
+				s.Int("scoreValueVespeneFriendlyFireEconomy") + s.Int("scoreValueVespeneFriendlyFireTechnology"),
+			InProgress: s.Int("scoreValueMineralsUsedInProgressArmy") + s.Int("scoreValueMineralsUsedInProgressEconomy") +
+				s.Int("scoreValueMineralsUsedInProgressTechnology") + s.Int("scoreValueVespeneUsedInProgressArmy") +
+				s.Int("scoreValueVespeneUsedInProgressEconomy") + s.Int("scoreValueVespeneUsedInProgressTechnology"),
 		}
 		return out, true
 	case "Upgrade":
@@ -389,6 +436,9 @@ func convertTracker(e *s2prot.Event) (Event, bool) {
 	if e.Value("creatorUnitTagIndex") != nil {
 		out.Creator = MakeTag(uint32(e.Int("creatorUnitTagIndex")), uint32(e.Int("creatorUnitTagRecycle")))
 	}
+	if e.Value("creatorAbilityName") != nil {
+		out.CreatorAbility = e.Stringv("creatorAbilityName")
+	}
 	out.UnitType = e.Stringv("unitTypeName")
 	out.Player = int(e.Int("controlPlayerId"))
 	out.X, out.Y = float64(e.Int("x")), float64(e.Int("y"))
@@ -398,12 +448,16 @@ func convertTracker(e *s2prot.Event) (Event, bool) {
 // Command target coordinates are fixed point with 12 fractional bits.
 const cmdCoordScale = 4096
 
+// Camera targets are fixed point with 8 fractional bits.
+const cameraCoordScale = 256
+
 // cmdFlagQueued is the shift-queue bit of a command's flags.
 const cmdFlagQueued = 0x2
 
 // convertGame converts the game events the timeline uses: commands (including
-// target updates, which reuse the user's previous command) and the selection
-// and control-group changes needed to know which units a command applies to.
+// target updates, which reuse the user's previous command), the selection
+// and control-group changes needed to know which units a command applies to,
+// and the players' camera moves.
 func convertGame(e *s2prot.Event, userToPlayer map[int64]int, lastCmd map[int64]*Event) (Event, bool) {
 	user := e.UserID()
 	out := Event{Loop: e.Loop(), Player: userToPlayer[user]}
@@ -466,6 +520,17 @@ func convertGame(e *s2prot.Event, userToPlayer map[int64]int, lastCmd map[int64]
 			Index: int(e.Int("controlGroupIndex")), Update: int(e.Int("controlGroupUpdate")),
 			Mask: mask(e.Structv("mask")),
 		}
+		return out, true
+
+	case "CameraUpdate":
+		// Observers move cameras too; only players' views are kept. Updates
+		// that only zoom or turn the camera have no target.
+		if out.Player == 0 || e.Value("target") == nil {
+			return Event{}, false
+		}
+		out.Kind = KindCamera
+		out.X = float64(e.Int("target", "x")) / cameraCoordScale
+		out.Y = float64(e.Int("target", "y")) / cameraCoordScale
 		return out, true
 	}
 	return Event{}, false

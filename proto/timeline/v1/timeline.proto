@@ -36,6 +36,10 @@ message Timeline {
   // Player actions counted over the game, for APM. Kept when the command
   // feed is left out; unset when the replay's game events weren't decoded.
   ActionCounts actions = 8;
+  // Where each player's camera looked, one entry per player with any camera
+  // moves (computer players have none); empty when game events weren't
+  // decoded.
+  repeated PlayerCamera cameras = 9;
 }
 
 // Which reconstruction produced a keyframe or a whole timeline.
@@ -63,6 +67,13 @@ message Meta {
   Source fidelity = 12; // best source used anywhere in this timeline
   uint32 snapshot_interval = 13;
   string generator = 14; // tool and version that wrote the file
+  // About the game, when the replay records it.
+  int64 start_time = 15;  // Unix seconds, UTC; 0 when unknown
+  string map_author = 16;
+  string region = 17;     // Battle.net region code ("EU"); empty for local games
+  bool ladder = 18;       // automatic matchmaking
+  bool competitive = 19;  // ranked
+  repeated string observers = 20;
 }
 
 message Player {
@@ -73,6 +84,16 @@ message Player {
   uint32 color = 5; // 0xRRGGBB
   float start_x = 6;
   float start_y = 7;
+  // Optional details; zero values when the replay doesn't record them.
+  string selected_race = 8; // lobby pick: "Random" when the race was random
+  uint32 handicap = 9;      // percent; 100 is none
+  string clan = 10;
+  string toon = 11;         // Battle.net profile, "region-S2-realm-id"
+  uint32 mmr = 12;
+  uint32 apm = 13;          // as the game counts it
+  string difficulty = 14;   // computer players: "Elite", …
+  string ai_build = 15;     // computer players: "Macro", …
+  bool human = 16;
 }
 
 enum UnitClass {
@@ -115,6 +136,12 @@ message Unit {
   // The unit this one came out of (the building that trained it, the egg it
   // hatched from), when the replay says and that unit is in the timeline.
   optional uint32 creator = 12;
+  // The unit that dealt the killing blow, when the replay says and that unit
+  // is in the timeline.
+  optional uint32 killer = 13;
+  // The ability that made this unit ("BarracksTrain", "WarpGateTrain",
+  // "CalldownMULE"); empty when the replay doesn't say.
+  string creator_ability = 14;
 }
 
 message Morph {
@@ -185,6 +212,7 @@ message Event {
     Chat chat = 7;
     Command command = 8;
     UnitDone unit_done = 9;
+    Ping ping = 10;
   }
 }
 
@@ -199,6 +227,7 @@ message UnitDone {
 message UnitDied {
   uint32 unit_id = 1;
   uint32 killer_player = 2;
+  optional uint32 killer = 3; // as Unit.killer
 }
 
 message UnitMorph {
@@ -227,6 +256,16 @@ message PlayerStats {
   uint32 lost_vespene = 12;
   uint32 killed_minerals = 13;
   uint32 killed_vespene = 14;
+  // Resources lost and killed by kind, minerals and gas together. Economy is
+  // workers and town halls, technology other buildings and research.
+  uint32 lost_army = 15;
+  uint32 lost_economy = 16;
+  uint32 lost_technology = 17;
+  uint32 killed_army = 18;
+  uint32 killed_economy = 19;
+  uint32 killed_technology = 20;
+  uint32 friendly_fire = 21; // value of the player's own units they killed
+  uint32 in_progress = 22;   // value being built or researched right now
 }
 
 // Actions per player in fixed bins of game loops.
@@ -248,6 +287,26 @@ message PlayerActions {
 message Chat {
   uint32 player = 1;
   string text = 2;
+}
+
+// A minimap ping.
+message Ping {
+  uint32 player = 1;
+  float x = 2;
+  float y = 3;
+}
+
+// A player's camera: where it was centered from each key's loop until the
+// next. Keys are kept when the view jumps or has scrolled at least a cell.
+message PlayerCamera {
+  uint32 player = 1;
+  repeated CameraKey keys = 2;
+}
+
+message CameraKey {
+  uint32 loop = 1;
+  float x = 2;
+  float y = 3;
 }
 
 message Command {

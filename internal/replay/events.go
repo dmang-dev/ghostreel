@@ -9,7 +9,7 @@ const (
 	KindUnitBorn        Kind = iota + 1 // unit appears complete: Tag, UnitType, Player, X, Y
 	KindUnitInit                        // building placed, under construction: Tag, UnitType, Player, X, Y
 	KindUnitDone                        // construction finished: Tag
-	KindUnitDied                        // Tag, X, Y, KillerPlayer
+	KindUnitDied                        // Tag, X, Y, KillerPlayer, Killer
 	KindUnitTypeChange                  // morph: Tag, UnitType
 	KindUnitOwnerChange                 // Tag, Player
 	KindUnitPositions                   // Positions (by unit index; see PositionSample)
@@ -19,10 +19,12 @@ const (
 	KindCommand                         // Player, AbilityLink, AbilityCmdIndex, HasTarget/X/Y, TargetTag
 	KindSelection                       // Player, Selection: a change to the active selection
 	KindControlGroup                    // Player, ControlGroup: set / add / recall / clear a group
+	KindPing                            // Player, X, Y: a minimap ping
+	KindCamera                          // Player, X, Y: where the player's camera now looks
 )
 
 var kindNames = [...]string{"", "unit_born", "unit_init", "unit_done", "unit_died", "unit_type_change",
-	"unit_owner_change", "unit_positions", "player_stats", "upgrade", "chat", "command", "selection", "control_group"}
+	"unit_owner_change", "unit_positions", "player_stats", "upgrade", "chat", "command", "selection", "control_group", "ping", "camera"}
 
 func (k Kind) String() string {
 	if int(k) < len(kindNames) {
@@ -45,10 +47,14 @@ type Event struct {
 	X, Y     float64
 
 	KillerPlayer int // 0 when unknown
+	Killer       Tag // the unit that dealt the killing blow; 0 when unknown
 
 	// Creator is the unit that produced a UnitBorn unit (0 when unknown):
 	// the building or larva it came out of.
 	Creator Tag
+	// CreatorAbility is the ability that made it ("BarracksTrain",
+	// "WarpGateTrain", "CalldownMULE"); empty when the replay doesn't say.
+	CreatorAbility string
 
 	Positions []PositionSample
 	Stats     *PlayerStats
@@ -90,7 +96,16 @@ type PlayerStats struct {
 	ArmyMinerals, ArmyGas     int64 // value of the active army
 	LostMinerals, LostGas     int64 // total resources lost (army + economy + tech)
 	KilledMinerals, KilledGas int64
+	// Lost and Killed split by kind (minerals + gas): army, economy
+	// (workers and town halls), technology (other buildings and upgrades).
+	Lost, Killed Split
+	// FriendlyFire is the value of a player's own units they killed;
+	// InProgress the value of what is being built or researched right now.
+	FriendlyFire, InProgress int64
 }
+
+// Split is a resource value by kind, minerals and gas together.
+type Split struct{ Army, Economy, Technology int64 }
 
 // MaskKind says how a selection mask names the units to remove.
 type MaskKind uint8

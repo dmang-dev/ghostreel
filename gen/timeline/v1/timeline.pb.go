@@ -267,7 +267,11 @@ type Timeline struct {
 	Events []*Event `protobuf:"bytes,7,rep,name=events,proto3" json:"events,omitempty"`
 	// Player actions counted over the game, for APM. Kept when the command
 	// feed is left out; unset when the replay's game events weren't decoded.
-	Actions       *ActionCounts `protobuf:"bytes,8,opt,name=actions,proto3" json:"actions,omitempty"`
+	Actions *ActionCounts `protobuf:"bytes,8,opt,name=actions,proto3" json:"actions,omitempty"`
+	// Where each player's camera looked, one entry per player with any camera
+	// moves (computer players have none); empty when game events weren't
+	// decoded.
+	Cameras       []*PlayerCamera `protobuf:"bytes,9,rep,name=cameras,proto3" json:"cameras,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -358,6 +362,13 @@ func (x *Timeline) GetActions() *ActionCounts {
 	return nil
 }
 
+func (x *Timeline) GetCameras() []*PlayerCamera {
+	if x != nil {
+		return x.Cameras
+	}
+	return nil
+}
+
 type Meta struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	ReplayHash string                 `protobuf:"bytes,1,opt,name=replay_hash,json=replayHash,proto3" json:"replay_hash,omitempty"` // hex SHA-256 of the replay file
@@ -376,8 +387,15 @@ type Meta struct {
 	Fidelity           Source    `protobuf:"varint,12,opt,name=fidelity,proto3,enum=timeline.v1.Source" json:"fidelity,omitempty"` // best source used anywhere in this timeline
 	SnapshotInterval   uint32    `protobuf:"varint,13,opt,name=snapshot_interval,json=snapshotInterval,proto3" json:"snapshot_interval,omitempty"`
 	Generator          string    `protobuf:"bytes,14,opt,name=generator,proto3" json:"generator,omitempty"` // tool and version that wrote the file
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// About the game, when the replay records it.
+	StartTime     int64    `protobuf:"varint,15,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"` // Unix seconds, UTC; 0 when unknown
+	MapAuthor     string   `protobuf:"bytes,16,opt,name=map_author,json=mapAuthor,proto3" json:"map_author,omitempty"`
+	Region        string   `protobuf:"bytes,17,opt,name=region,proto3" json:"region,omitempty"`            // Battle.net region code ("EU"); empty for local games
+	Ladder        bool     `protobuf:"varint,18,opt,name=ladder,proto3" json:"ladder,omitempty"`           // automatic matchmaking
+	Competitive   bool     `protobuf:"varint,19,opt,name=competitive,proto3" json:"competitive,omitempty"` // ranked
+	Observers     []string `protobuf:"bytes,20,rep,name=observers,proto3" json:"observers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Meta) Reset() {
@@ -508,15 +526,67 @@ func (x *Meta) GetGenerator() string {
 	return ""
 }
 
+func (x *Meta) GetStartTime() int64 {
+	if x != nil {
+		return x.StartTime
+	}
+	return 0
+}
+
+func (x *Meta) GetMapAuthor() string {
+	if x != nil {
+		return x.MapAuthor
+	}
+	return ""
+}
+
+func (x *Meta) GetRegion() string {
+	if x != nil {
+		return x.Region
+	}
+	return ""
+}
+
+func (x *Meta) GetLadder() bool {
+	if x != nil {
+		return x.Ladder
+	}
+	return false
+}
+
+func (x *Meta) GetCompetitive() bool {
+	if x != nil {
+		return x.Competitive
+	}
+	return false
+}
+
+func (x *Meta) GetObservers() []string {
+	if x != nil {
+		return x.Observers
+	}
+	return nil
+}
+
 type Player struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            uint32                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"` // 1-based; 0 is neutral
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Race          string                 `protobuf:"bytes,3,opt,name=race,proto3" json:"race,omitempty"`
-	Result        string                 `protobuf:"bytes,4,opt,name=result,proto3" json:"result,omitempty"`
-	Color         uint32                 `protobuf:"varint,5,opt,name=color,proto3" json:"color,omitempty"` // 0xRRGGBB
-	StartX        float32                `protobuf:"fixed32,6,opt,name=start_x,json=startX,proto3" json:"start_x,omitempty"`
-	StartY        float32                `protobuf:"fixed32,7,opt,name=start_y,json=startY,proto3" json:"start_y,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Id     uint32                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"` // 1-based; 0 is neutral
+	Name   string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Race   string                 `protobuf:"bytes,3,opt,name=race,proto3" json:"race,omitempty"`
+	Result string                 `protobuf:"bytes,4,opt,name=result,proto3" json:"result,omitempty"`
+	Color  uint32                 `protobuf:"varint,5,opt,name=color,proto3" json:"color,omitempty"` // 0xRRGGBB
+	StartX float32                `protobuf:"fixed32,6,opt,name=start_x,json=startX,proto3" json:"start_x,omitempty"`
+	StartY float32                `protobuf:"fixed32,7,opt,name=start_y,json=startY,proto3" json:"start_y,omitempty"`
+	// Optional details; zero values when the replay doesn't record them.
+	SelectedRace  string `protobuf:"bytes,8,opt,name=selected_race,json=selectedRace,proto3" json:"selected_race,omitempty"` // lobby pick: "Random" when the race was random
+	Handicap      uint32 `protobuf:"varint,9,opt,name=handicap,proto3" json:"handicap,omitempty"`                            // percent; 100 is none
+	Clan          string `protobuf:"bytes,10,opt,name=clan,proto3" json:"clan,omitempty"`
+	Toon          string `protobuf:"bytes,11,opt,name=toon,proto3" json:"toon,omitempty"` // Battle.net profile, "region-S2-realm-id"
+	Mmr           uint32 `protobuf:"varint,12,opt,name=mmr,proto3" json:"mmr,omitempty"`
+	Apm           uint32 `protobuf:"varint,13,opt,name=apm,proto3" json:"apm,omitempty"`                       // as the game counts it
+	Difficulty    string `protobuf:"bytes,14,opt,name=difficulty,proto3" json:"difficulty,omitempty"`          // computer players: "Elite", …
+	AiBuild       string `protobuf:"bytes,15,opt,name=ai_build,json=aiBuild,proto3" json:"ai_build,omitempty"` // computer players: "Macro", …
+	Human         bool   `protobuf:"varint,16,opt,name=human,proto3" json:"human,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -598,6 +668,69 @@ func (x *Player) GetStartY() float32 {
 		return x.StartY
 	}
 	return 0
+}
+
+func (x *Player) GetSelectedRace() string {
+	if x != nil {
+		return x.SelectedRace
+	}
+	return ""
+}
+
+func (x *Player) GetHandicap() uint32 {
+	if x != nil {
+		return x.Handicap
+	}
+	return 0
+}
+
+func (x *Player) GetClan() string {
+	if x != nil {
+		return x.Clan
+	}
+	return ""
+}
+
+func (x *Player) GetToon() string {
+	if x != nil {
+		return x.Toon
+	}
+	return ""
+}
+
+func (x *Player) GetMmr() uint32 {
+	if x != nil {
+		return x.Mmr
+	}
+	return 0
+}
+
+func (x *Player) GetApm() uint32 {
+	if x != nil {
+		return x.Apm
+	}
+	return 0
+}
+
+func (x *Player) GetDifficulty() string {
+	if x != nil {
+		return x.Difficulty
+	}
+	return ""
+}
+
+func (x *Player) GetAiBuild() string {
+	if x != nil {
+		return x.AiBuild
+	}
+	return ""
+}
+
+func (x *Player) GetHuman() bool {
+	if x != nil {
+		return x.Human
+	}
+	return false
 }
 
 type UnitType struct {
@@ -733,9 +866,15 @@ type Unit struct {
 	OwnerChanges []*OwnerChange `protobuf:"bytes,11,rep,name=owner_changes,json=ownerChanges,proto3" json:"owner_changes,omitempty"`
 	// The unit this one came out of (the building that trained it, the egg it
 	// hatched from), when the replay says and that unit is in the timeline.
-	Creator       *uint32 `protobuf:"varint,12,opt,name=creator,proto3,oneof" json:"creator,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Creator *uint32 `protobuf:"varint,12,opt,name=creator,proto3,oneof" json:"creator,omitempty"`
+	// The unit that dealt the killing blow, when the replay says and that unit
+	// is in the timeline.
+	Killer *uint32 `protobuf:"varint,13,opt,name=killer,proto3,oneof" json:"killer,omitempty"`
+	// The ability that made this unit ("BarracksTrain", "WarpGateTrain",
+	// "CalldownMULE"); empty when the replay doesn't say.
+	CreatorAbility string `protobuf:"bytes,14,opt,name=creator_ability,json=creatorAbility,proto3" json:"creator_ability,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Unit) Reset() {
@@ -850,6 +989,20 @@ func (x *Unit) GetCreator() uint32 {
 		return *x.Creator
 	}
 	return 0
+}
+
+func (x *Unit) GetKiller() uint32 {
+	if x != nil && x.Killer != nil {
+		return *x.Killer
+	}
+	return 0
+}
+
+func (x *Unit) GetCreatorAbility() string {
+	if x != nil {
+		return x.CreatorAbility
+	}
+	return ""
 }
 
 type Morph struct {
@@ -1272,6 +1425,7 @@ type Event struct {
 	//	*Event_Chat
 	//	*Event_Command
 	//	*Event_UnitDone
+	//	*Event_Ping
 	Kind          isEvent_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1393,6 +1547,15 @@ func (x *Event) GetUnitDone() *UnitDone {
 	return nil
 }
 
+func (x *Event) GetPing() *Ping {
+	if x != nil {
+		if x, ok := x.Kind.(*Event_Ping); ok {
+			return x.Ping
+		}
+	}
+	return nil
+}
+
 type isEvent_Kind interface {
 	isEvent_Kind()
 }
@@ -1429,6 +1592,10 @@ type Event_UnitDone struct {
 	UnitDone *UnitDone `protobuf:"bytes,9,opt,name=unit_done,json=unitDone,proto3,oneof"`
 }
 
+type Event_Ping struct {
+	Ping *Ping `protobuf:"bytes,10,opt,name=ping,proto3,oneof"`
+}
+
 func (*Event_UnitBorn) isEvent_Kind() {}
 
 func (*Event_UnitDied) isEvent_Kind() {}
@@ -1444,6 +1611,8 @@ func (*Event_Chat) isEvent_Kind() {}
 func (*Event_Command) isEvent_Kind() {}
 
 func (*Event_UnitDone) isEvent_Kind() {}
+
+func (*Event_Ping) isEvent_Kind() {}
 
 type UnitBorn struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1537,6 +1706,7 @@ type UnitDied struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UnitId        uint32                 `protobuf:"varint,1,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
 	KillerPlayer  uint32                 `protobuf:"varint,2,opt,name=killer_player,json=killerPlayer,proto3" json:"killer_player,omitempty"`
+	Killer        *uint32                `protobuf:"varint,3,opt,name=killer,proto3,oneof" json:"killer,omitempty"` // as Unit.killer
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1581,6 +1751,13 @@ func (x *UnitDied) GetUnitId() uint32 {
 func (x *UnitDied) GetKillerPlayer() uint32 {
 	if x != nil {
 		return x.KillerPlayer
+	}
+	return 0
+}
+
+func (x *UnitDied) GetKiller() uint32 {
+	if x != nil && x.Killer != nil {
+		return *x.Killer
 	}
 	return 0
 }
@@ -1713,8 +1890,18 @@ type PlayerStats struct {
 	LostVespene    uint32                 `protobuf:"varint,12,opt,name=lost_vespene,json=lostVespene,proto3" json:"lost_vespene,omitempty"`
 	KilledMinerals uint32                 `protobuf:"varint,13,opt,name=killed_minerals,json=killedMinerals,proto3" json:"killed_minerals,omitempty"`
 	KilledVespene  uint32                 `protobuf:"varint,14,opt,name=killed_vespene,json=killedVespene,proto3" json:"killed_vespene,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Resources lost and killed by kind, minerals and gas together. Economy is
+	// workers and town halls, technology other buildings and research.
+	LostArmy         uint32 `protobuf:"varint,15,opt,name=lost_army,json=lostArmy,proto3" json:"lost_army,omitempty"`
+	LostEconomy      uint32 `protobuf:"varint,16,opt,name=lost_economy,json=lostEconomy,proto3" json:"lost_economy,omitempty"`
+	LostTechnology   uint32 `protobuf:"varint,17,opt,name=lost_technology,json=lostTechnology,proto3" json:"lost_technology,omitempty"`
+	KilledArmy       uint32 `protobuf:"varint,18,opt,name=killed_army,json=killedArmy,proto3" json:"killed_army,omitempty"`
+	KilledEconomy    uint32 `protobuf:"varint,19,opt,name=killed_economy,json=killedEconomy,proto3" json:"killed_economy,omitempty"`
+	KilledTechnology uint32 `protobuf:"varint,20,opt,name=killed_technology,json=killedTechnology,proto3" json:"killed_technology,omitempty"`
+	FriendlyFire     uint32 `protobuf:"varint,21,opt,name=friendly_fire,json=friendlyFire,proto3" json:"friendly_fire,omitempty"` // value of the player's own units they killed
+	InProgress       uint32 `protobuf:"varint,22,opt,name=in_progress,json=inProgress,proto3" json:"in_progress,omitempty"`       // value being built or researched right now
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *PlayerStats) Reset() {
@@ -1841,6 +2028,62 @@ func (x *PlayerStats) GetKilledMinerals() uint32 {
 func (x *PlayerStats) GetKilledVespene() uint32 {
 	if x != nil {
 		return x.KilledVespene
+	}
+	return 0
+}
+
+func (x *PlayerStats) GetLostArmy() uint32 {
+	if x != nil {
+		return x.LostArmy
+	}
+	return 0
+}
+
+func (x *PlayerStats) GetLostEconomy() uint32 {
+	if x != nil {
+		return x.LostEconomy
+	}
+	return 0
+}
+
+func (x *PlayerStats) GetLostTechnology() uint32 {
+	if x != nil {
+		return x.LostTechnology
+	}
+	return 0
+}
+
+func (x *PlayerStats) GetKilledArmy() uint32 {
+	if x != nil {
+		return x.KilledArmy
+	}
+	return 0
+}
+
+func (x *PlayerStats) GetKilledEconomy() uint32 {
+	if x != nil {
+		return x.KilledEconomy
+	}
+	return 0
+}
+
+func (x *PlayerStats) GetKilledTechnology() uint32 {
+	if x != nil {
+		return x.KilledTechnology
+	}
+	return 0
+}
+
+func (x *PlayerStats) GetFriendlyFire() uint32 {
+	if x != nil {
+		return x.FriendlyFire
+	}
+	return 0
+}
+
+func (x *PlayerStats) GetInProgress() uint32 {
+	if x != nil {
+		return x.InProgress
 	}
 	return 0
 }
@@ -2014,6 +2257,181 @@ func (x *Chat) GetText() string {
 	return ""
 }
 
+// A minimap ping.
+type Ping struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Player        uint32                 `protobuf:"varint,1,opt,name=player,proto3" json:"player,omitempty"`
+	X             float32                `protobuf:"fixed32,2,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float32                `protobuf:"fixed32,3,opt,name=y,proto3" json:"y,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Ping) Reset() {
+	*x = Ping{}
+	mi := &file_timeline_v1_timeline_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Ping) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Ping) ProtoMessage() {}
+
+func (x *Ping) ProtoReflect() protoreflect.Message {
+	mi := &file_timeline_v1_timeline_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Ping.ProtoReflect.Descriptor instead.
+func (*Ping) Descriptor() ([]byte, []int) {
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *Ping) GetPlayer() uint32 {
+	if x != nil {
+		return x.Player
+	}
+	return 0
+}
+
+func (x *Ping) GetX() float32 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *Ping) GetY() float32 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+// A player's camera: where it was centered from each key's loop until the
+// next. Keys are kept when the view jumps or has scrolled at least a cell.
+type PlayerCamera struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Player        uint32                 `protobuf:"varint,1,opt,name=player,proto3" json:"player,omitempty"`
+	Keys          []*CameraKey           `protobuf:"bytes,2,rep,name=keys,proto3" json:"keys,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PlayerCamera) Reset() {
+	*x = PlayerCamera{}
+	mi := &file_timeline_v1_timeline_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlayerCamera) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlayerCamera) ProtoMessage() {}
+
+func (x *PlayerCamera) ProtoReflect() protoreflect.Message {
+	mi := &file_timeline_v1_timeline_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlayerCamera.ProtoReflect.Descriptor instead.
+func (*PlayerCamera) Descriptor() ([]byte, []int) {
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *PlayerCamera) GetPlayer() uint32 {
+	if x != nil {
+		return x.Player
+	}
+	return 0
+}
+
+func (x *PlayerCamera) GetKeys() []*CameraKey {
+	if x != nil {
+		return x.Keys
+	}
+	return nil
+}
+
+type CameraKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Loop          uint32                 `protobuf:"varint,1,opt,name=loop,proto3" json:"loop,omitempty"`
+	X             float32                `protobuf:"fixed32,2,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float32                `protobuf:"fixed32,3,opt,name=y,proto3" json:"y,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CameraKey) Reset() {
+	*x = CameraKey{}
+	mi := &file_timeline_v1_timeline_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CameraKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CameraKey) ProtoMessage() {}
+
+func (x *CameraKey) ProtoReflect() protoreflect.Message {
+	mi := &file_timeline_v1_timeline_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CameraKey.ProtoReflect.Descriptor instead.
+func (*CameraKey) Descriptor() ([]byte, []int) {
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *CameraKey) GetLoop() uint32 {
+	if x != nil {
+		return x.Loop
+	}
+	return 0
+}
+
+func (x *CameraKey) GetX() float32 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *CameraKey) GetY() float32 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
 type Command struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Player uint32                 `protobuf:"varint,1,opt,name=player,proto3" json:"player,omitempty"`
@@ -2032,7 +2450,7 @@ type Command struct {
 
 func (x *Command) Reset() {
 	*x = Command{}
-	mi := &file_timeline_v1_timeline_proto_msgTypes[21]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2044,7 +2462,7 @@ func (x *Command) String() string {
 func (*Command) ProtoMessage() {}
 
 func (x *Command) ProtoReflect() protoreflect.Message {
-	mi := &file_timeline_v1_timeline_proto_msgTypes[21]
+	mi := &file_timeline_v1_timeline_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2057,7 +2475,7 @@ func (x *Command) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Command.ProtoReflect.Descriptor instead.
 func (*Command) Descriptor() ([]byte, []int) {
-	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{21}
+	return file_timeline_v1_timeline_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Command) GetPlayer() uint32 {
@@ -2120,7 +2538,7 @@ var File_timeline_v1_timeline_proto protoreflect.FileDescriptor
 
 const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\n" +
-	"\x1atimeline/v1/timeline.proto\x12\vtimeline.v1\"\x95\x03\n" +
+	"\x1atimeline/v1/timeline.proto\x12\vtimeline.v1\"\xca\x03\n" +
 	"\bTimeline\x12A\n" +
 	"\x0eschema_version\x18\x01 \x01(\x0e2\x1a.timeline.v1.SchemaVersionR\rschemaVersion\x12%\n" +
 	"\x04meta\x18\x02 \x01(\v2\x11.timeline.v1.MetaR\x04meta\x124\n" +
@@ -2130,7 +2548,8 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\x06tracks\x18\x05 \x03(\v2\x12.timeline.v1.TrackR\x06tracks\x123\n" +
 	"\tsnapshots\x18\x06 \x03(\v2\x15.timeline.v1.SnapshotR\tsnapshots\x12*\n" +
 	"\x06events\x18\a \x03(\v2\x12.timeline.v1.EventR\x06events\x123\n" +
-	"\aactions\x18\b \x01(\v2\x19.timeline.v1.ActionCountsR\aactions\"\xeb\x03\n" +
+	"\aactions\x18\b \x01(\v2\x19.timeline.v1.ActionCountsR\aactions\x123\n" +
+	"\acameras\x18\t \x03(\v2\x19.timeline.v1.PlayerCameraR\acameras\"\x99\x05\n" +
 	"\x04Meta\x12\x1f\n" +
 	"\vreplay_hash\x18\x01 \x01(\tR\n" +
 	"replayHash\x12\x18\n" +
@@ -2149,7 +2568,15 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\aplayers\x18\v \x03(\v2\x13.timeline.v1.PlayerR\aplayers\x12/\n" +
 	"\bfidelity\x18\f \x01(\x0e2\x13.timeline.v1.SourceR\bfidelity\x12+\n" +
 	"\x11snapshot_interval\x18\r \x01(\rR\x10snapshotInterval\x12\x1c\n" +
-	"\tgenerator\x18\x0e \x01(\tR\tgenerator\"\xa0\x01\n" +
+	"\tgenerator\x18\x0e \x01(\tR\tgenerator\x12\x1d\n" +
+	"\n" +
+	"start_time\x18\x0f \x01(\x03R\tstartTime\x12\x1d\n" +
+	"\n" +
+	"map_author\x18\x10 \x01(\tR\tmapAuthor\x12\x16\n" +
+	"\x06region\x18\x11 \x01(\tR\x06region\x12\x16\n" +
+	"\x06ladder\x18\x12 \x01(\bR\x06ladder\x12 \n" +
+	"\vcompetitive\x18\x13 \x01(\bR\vcompetitive\x12\x1c\n" +
+	"\tobservers\x18\x14 \x03(\tR\tobservers\"\xfe\x02\n" +
 	"\x06Player\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -2157,7 +2584,19 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\x06result\x18\x04 \x01(\tR\x06result\x12\x14\n" +
 	"\x05color\x18\x05 \x01(\rR\x05color\x12\x17\n" +
 	"\astart_x\x18\x06 \x01(\x02R\x06startX\x12\x17\n" +
-	"\astart_y\x18\a \x01(\x02R\x06startY\"\x94\x02\n" +
+	"\astart_y\x18\a \x01(\x02R\x06startY\x12#\n" +
+	"\rselected_race\x18\b \x01(\tR\fselectedRace\x12\x1a\n" +
+	"\bhandicap\x18\t \x01(\rR\bhandicap\x12\x12\n" +
+	"\x04clan\x18\n" +
+	" \x01(\tR\x04clan\x12\x12\n" +
+	"\x04toon\x18\v \x01(\tR\x04toon\x12\x10\n" +
+	"\x03mmr\x18\f \x01(\rR\x03mmr\x12\x10\n" +
+	"\x03apm\x18\r \x01(\rR\x03apm\x12\x1e\n" +
+	"\n" +
+	"difficulty\x18\x0e \x01(\tR\n" +
+	"difficulty\x12\x19\n" +
+	"\bai_build\x18\x0f \x01(\tR\aaiBuild\x12\x14\n" +
+	"\x05human\x18\x10 \x01(\bR\x05human\"\x94\x02\n" +
 	"\bUnitType\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12,\n" +
 	"\x05class\x18\x02 \x01(\x0e2\x16.timeline.v1.UnitClassR\x05class\x12\x16\n" +
@@ -2171,7 +2610,7 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\x05known\x18\b \x01(\bR\x05known\x12\x14\n" +
 	"\x05speed\x18\t \x01(\x02R\x05speed\x12\x14\n" +
 	"\x05sight\x18\n" +
-	" \x01(\x02R\x05sight\"\xac\x03\n" +
+	" \x01(\x02R\x05sight\"\xfd\x03\n" +
 	"\x04Unit\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x10\n" +
 	"\x03tag\x18\x02 \x01(\rR\x03tag\x12\x14\n" +
@@ -2185,13 +2624,16 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\x06morphs\x18\n" +
 	" \x03(\v2\x12.timeline.v1.MorphR\x06morphs\x12=\n" +
 	"\rowner_changes\x18\v \x03(\v2\x18.timeline.v1.OwnerChangeR\fownerChanges\x12\x1d\n" +
-	"\acreator\x18\f \x01(\rH\x02R\acreator\x88\x01\x01B\f\n" +
+	"\acreator\x18\f \x01(\rH\x02R\acreator\x88\x01\x01\x12\x1b\n" +
+	"\x06killer\x18\r \x01(\rH\x03R\x06killer\x88\x01\x01\x12'\n" +
+	"\x0fcreator_ability\x18\x0e \x01(\tR\x0ecreatorAbilityB\f\n" +
 	"\n" +
 	"_done_loopB\f\n" +
 	"\n" +
 	"_died_loopB\n" +
 	"\n" +
-	"\b_creator\"/\n" +
+	"\b_creatorB\t\n" +
+	"\a_killer\"/\n" +
 	"\x05Morph\x12\x12\n" +
 	"\x04loop\x18\x01 \x01(\rR\x04loop\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\rR\x04type\"7\n" +
@@ -2223,7 +2665,7 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\bSnapshot\x12\x12\n" +
 	"\x04loop\x18\x01 \x01(\rR\x04loop\x12\x14\n" +
 	"\x05alive\x18\x02 \x03(\rR\x05alive\x12.\n" +
-	"\x05stats\x18\x03 \x03(\v2\x18.timeline.v1.PlayerStatsR\x05stats\"\xc1\x03\n" +
+	"\x05stats\x18\x03 \x03(\v2\x18.timeline.v1.PlayerStatsR\x05stats\"\xea\x03\n" +
 	"\x05Event\x12\x12\n" +
 	"\x04loop\x18\x01 \x01(\rR\x04loop\x124\n" +
 	"\tunit_born\x18\x02 \x01(\v2\x15.timeline.v1.UnitBornH\x00R\bunitBorn\x124\n" +
@@ -2233,22 +2675,26 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\fplayer_stats\x18\x06 \x01(\v2\x18.timeline.v1.PlayerStatsH\x00R\vplayerStats\x12'\n" +
 	"\x04chat\x18\a \x01(\v2\x11.timeline.v1.ChatH\x00R\x04chat\x120\n" +
 	"\acommand\x18\b \x01(\v2\x14.timeline.v1.CommandH\x00R\acommand\x124\n" +
-	"\tunit_done\x18\t \x01(\v2\x15.timeline.v1.UnitDoneH\x00R\bunitDoneB\x06\n" +
+	"\tunit_done\x18\t \x01(\v2\x15.timeline.v1.UnitDoneH\x00R\bunitDone\x12'\n" +
+	"\x04ping\x18\n" +
+	" \x01(\v2\x11.timeline.v1.PingH\x00R\x04pingB\x06\n" +
 	"\x04kind\"#\n" +
 	"\bUnitBorn\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\rR\x06unitId\"#\n" +
 	"\bUnitDone\x12\x17\n" +
-	"\aunit_id\x18\x01 \x01(\rR\x06unitId\"H\n" +
+	"\aunit_id\x18\x01 \x01(\rR\x06unitId\"p\n" +
 	"\bUnitDied\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\rR\x06unitId\x12#\n" +
-	"\rkiller_player\x18\x02 \x01(\rR\fkillerPlayer\"8\n" +
+	"\rkiller_player\x18\x02 \x01(\rR\fkillerPlayer\x12\x1b\n" +
+	"\x06killer\x18\x03 \x01(\rH\x00R\x06killer\x88\x01\x01B\t\n" +
+	"\a_killer\"8\n" +
 	"\tUnitMorph\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\rR\x06unitId\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\rR\x04type\"K\n" +
 	"\aUpgrade\x12\x16\n" +
 	"\x06player\x18\x01 \x01(\rR\x06player\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
-	"\x05count\x18\x03 \x01(\x05R\x05count\"\xdd\x03\n" +
+	"\x05count\x18\x03 \x01(\x05R\x05count\"\x81\x06\n" +
 	"\vPlayerStats\x12\x16\n" +
 	"\x06player\x18\x01 \x01(\rR\x06player\x12\x1f\n" +
 	"\vsupply_used\x18\x02 \x01(\x02R\n" +
@@ -2266,7 +2712,17 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\rlost_minerals\x18\v \x01(\rR\flostMinerals\x12!\n" +
 	"\flost_vespene\x18\f \x01(\rR\vlostVespene\x12'\n" +
 	"\x0fkilled_minerals\x18\r \x01(\rR\x0ekilledMinerals\x12%\n" +
-	"\x0ekilled_vespene\x18\x0e \x01(\rR\rkilledVespene\"a\n" +
+	"\x0ekilled_vespene\x18\x0e \x01(\rR\rkilledVespene\x12\x1b\n" +
+	"\tlost_army\x18\x0f \x01(\rR\blostArmy\x12!\n" +
+	"\flost_economy\x18\x10 \x01(\rR\vlostEconomy\x12'\n" +
+	"\x0flost_technology\x18\x11 \x01(\rR\x0elostTechnology\x12\x1f\n" +
+	"\vkilled_army\x18\x12 \x01(\rR\n" +
+	"killedArmy\x12%\n" +
+	"\x0ekilled_economy\x18\x13 \x01(\rR\rkilledEconomy\x12+\n" +
+	"\x11killed_technology\x18\x14 \x01(\rR\x10killedTechnology\x12#\n" +
+	"\rfriendly_fire\x18\x15 \x01(\rR\ffriendlyFire\x12\x1f\n" +
+	"\vin_progress\x18\x16 \x01(\rR\n" +
+	"inProgress\"a\n" +
 	"\fActionCounts\x12\x1b\n" +
 	"\tbin_loops\x18\x01 \x01(\rR\bbinLoops\x124\n" +
 	"\aplayers\x18\x02 \x03(\v2\x1a.timeline.v1.PlayerActionsR\aplayers\"]\n" +
@@ -2276,7 +2732,18 @@ const file_timeline_v1_timeline_proto_rawDesc = "" +
 	"\bcommands\x18\x03 \x03(\rR\bcommands\"2\n" +
 	"\x04Chat\x12\x16\n" +
 	"\x06player\x18\x01 \x01(\rR\x06player\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\"\xf0\x01\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\":\n" +
+	"\x04Ping\x12\x16\n" +
+	"\x06player\x18\x01 \x01(\rR\x06player\x12\f\n" +
+	"\x01x\x18\x02 \x01(\x02R\x01x\x12\f\n" +
+	"\x01y\x18\x03 \x01(\x02R\x01y\"R\n" +
+	"\fPlayerCamera\x12\x16\n" +
+	"\x06player\x18\x01 \x01(\rR\x06player\x12*\n" +
+	"\x04keys\x18\x02 \x03(\v2\x16.timeline.v1.CameraKeyR\x04keys\";\n" +
+	"\tCameraKey\x12\x12\n" +
+	"\x04loop\x18\x01 \x01(\rR\x04loop\x12\f\n" +
+	"\x01x\x18\x02 \x01(\x02R\x01x\x12\f\n" +
+	"\x01y\x18\x03 \x01(\x02R\x01y\"\xf0\x01\n" +
 	"\aCommand\x12\x16\n" +
 	"\x06player\x18\x01 \x01(\rR\x06player\x12\x18\n" +
 	"\aability\x18\x02 \x01(\x05R\aability\x12*\n" +
@@ -2324,7 +2791,7 @@ func file_timeline_v1_timeline_proto_rawDescGZIP() []byte {
 }
 
 var file_timeline_v1_timeline_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_timeline_v1_timeline_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_timeline_v1_timeline_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_timeline_v1_timeline_proto_goTypes = []any{
 	(SchemaVersion)(0),    // 0: timeline.v1.SchemaVersion
 	(Source)(0),           // 1: timeline.v1.Source
@@ -2351,7 +2818,10 @@ var file_timeline_v1_timeline_proto_goTypes = []any{
 	(*ActionCounts)(nil),  // 22: timeline.v1.ActionCounts
 	(*PlayerActions)(nil), // 23: timeline.v1.PlayerActions
 	(*Chat)(nil),          // 24: timeline.v1.Chat
-	(*Command)(nil),       // 25: timeline.v1.Command
+	(*Ping)(nil),          // 25: timeline.v1.Ping
+	(*PlayerCamera)(nil),  // 26: timeline.v1.PlayerCamera
+	(*CameraKey)(nil),     // 27: timeline.v1.CameraKey
+	(*Command)(nil),       // 28: timeline.v1.Command
 }
 var file_timeline_v1_timeline_proto_depIdxs = []int32{
 	0,  // 0: timeline.v1.Timeline.schema_version:type_name -> timeline.v1.SchemaVersion
@@ -2362,30 +2832,33 @@ var file_timeline_v1_timeline_proto_depIdxs = []int32{
 	14, // 5: timeline.v1.Timeline.snapshots:type_name -> timeline.v1.Snapshot
 	15, // 6: timeline.v1.Timeline.events:type_name -> timeline.v1.Event
 	22, // 7: timeline.v1.Timeline.actions:type_name -> timeline.v1.ActionCounts
-	6,  // 8: timeline.v1.Meta.players:type_name -> timeline.v1.Player
-	1,  // 9: timeline.v1.Meta.fidelity:type_name -> timeline.v1.Source
-	2,  // 10: timeline.v1.UnitType.class:type_name -> timeline.v1.UnitClass
-	9,  // 11: timeline.v1.Unit.morphs:type_name -> timeline.v1.Morph
-	10, // 12: timeline.v1.Unit.owner_changes:type_name -> timeline.v1.OwnerChange
-	3,  // 13: timeline.v1.Keyframe.state:type_name -> timeline.v1.UnitState
-	1,  // 14: timeline.v1.Keyframe.source:type_name -> timeline.v1.Source
-	11, // 15: timeline.v1.Track.keyframes:type_name -> timeline.v1.Keyframe
-	13, // 16: timeline.v1.Track.vitals:type_name -> timeline.v1.Vitals
-	21, // 17: timeline.v1.Snapshot.stats:type_name -> timeline.v1.PlayerStats
-	16, // 18: timeline.v1.Event.unit_born:type_name -> timeline.v1.UnitBorn
-	18, // 19: timeline.v1.Event.unit_died:type_name -> timeline.v1.UnitDied
-	19, // 20: timeline.v1.Event.morph:type_name -> timeline.v1.UnitMorph
-	20, // 21: timeline.v1.Event.upgrade:type_name -> timeline.v1.Upgrade
-	21, // 22: timeline.v1.Event.player_stats:type_name -> timeline.v1.PlayerStats
-	24, // 23: timeline.v1.Event.chat:type_name -> timeline.v1.Chat
-	25, // 24: timeline.v1.Event.command:type_name -> timeline.v1.Command
-	17, // 25: timeline.v1.Event.unit_done:type_name -> timeline.v1.UnitDone
-	23, // 26: timeline.v1.ActionCounts.players:type_name -> timeline.v1.PlayerActions
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	26, // 8: timeline.v1.Timeline.cameras:type_name -> timeline.v1.PlayerCamera
+	6,  // 9: timeline.v1.Meta.players:type_name -> timeline.v1.Player
+	1,  // 10: timeline.v1.Meta.fidelity:type_name -> timeline.v1.Source
+	2,  // 11: timeline.v1.UnitType.class:type_name -> timeline.v1.UnitClass
+	9,  // 12: timeline.v1.Unit.morphs:type_name -> timeline.v1.Morph
+	10, // 13: timeline.v1.Unit.owner_changes:type_name -> timeline.v1.OwnerChange
+	3,  // 14: timeline.v1.Keyframe.state:type_name -> timeline.v1.UnitState
+	1,  // 15: timeline.v1.Keyframe.source:type_name -> timeline.v1.Source
+	11, // 16: timeline.v1.Track.keyframes:type_name -> timeline.v1.Keyframe
+	13, // 17: timeline.v1.Track.vitals:type_name -> timeline.v1.Vitals
+	21, // 18: timeline.v1.Snapshot.stats:type_name -> timeline.v1.PlayerStats
+	16, // 19: timeline.v1.Event.unit_born:type_name -> timeline.v1.UnitBorn
+	18, // 20: timeline.v1.Event.unit_died:type_name -> timeline.v1.UnitDied
+	19, // 21: timeline.v1.Event.morph:type_name -> timeline.v1.UnitMorph
+	20, // 22: timeline.v1.Event.upgrade:type_name -> timeline.v1.Upgrade
+	21, // 23: timeline.v1.Event.player_stats:type_name -> timeline.v1.PlayerStats
+	24, // 24: timeline.v1.Event.chat:type_name -> timeline.v1.Chat
+	28, // 25: timeline.v1.Event.command:type_name -> timeline.v1.Command
+	17, // 26: timeline.v1.Event.unit_done:type_name -> timeline.v1.UnitDone
+	25, // 27: timeline.v1.Event.ping:type_name -> timeline.v1.Ping
+	23, // 28: timeline.v1.ActionCounts.players:type_name -> timeline.v1.PlayerActions
+	27, // 29: timeline.v1.PlayerCamera.keys:type_name -> timeline.v1.CameraKey
+	30, // [30:30] is the sub-list for method output_type
+	30, // [30:30] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_timeline_v1_timeline_proto_init() }
@@ -2403,14 +2876,16 @@ func file_timeline_v1_timeline_proto_init() {
 		(*Event_Chat)(nil),
 		(*Event_Command)(nil),
 		(*Event_UnitDone)(nil),
+		(*Event_Ping)(nil),
 	}
+	file_timeline_v1_timeline_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_timeline_v1_timeline_proto_rawDesc), len(file_timeline_v1_timeline_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   22,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

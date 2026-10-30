@@ -17,7 +17,9 @@ Files are binary protobuf (`.pb`). `dump-timeline --json` writes the protobuf JS
 
 `type` is the type at birth, an index into `unit_types`. `morphs` lists later type changes (larva → egg → drone, Barracks → BarracksFlying, …). Owner changes work the same way. Use the last morph or owner change at or before the loop.
 
-`creator` is the unit this one came out of: the building that trained it, the egg a Zerg unit hatched from, the hatchery that spawned a larva. The replay names it only for units born complete, so it is unset for construction sites and warp-ins (and in timelines written before it was added).
+`creator` is the unit this one came out of: the building that trained it, the egg a Zerg unit hatched from, the hatchery that spawned a larva. The replay names it only for units born complete, so it is unset for construction sites and warp-ins (and in timelines written before it was added). `creator_ability` is the ability that made the unit (`BarracksTrain`, `WarpGateTrain`, `CalldownMULE`), when the replay says.
+
+`killer` is the unit that dealt the killing blow, when the replay says and that unit is in the timeline; `killer_player` is its owner. Counting the units that name a unit as their killer gives its kill count.
 
 `unit_types[].class` says how to draw a type. `UNIT_CLASS_HIDDEN` types are UI-only and never appear in `units`. `known = false` means the sizes are defaults for a type the game-data table doesn't list. `speed` is cells per game second, 0 for things that never move.
 
@@ -43,7 +45,17 @@ The reference implementation is `timeline.PositionAt`. Frontends must match it s
 
 ## Events
 
-`events` is loop-ordered and holds one of: `unit_born`, `unit_done`, `unit_died`, `morph`, `upgrade`, `player_stats` (every 160 loops per player), `chat`, `command`. Commands carry the raw, build-specific ability link (-1 for a right-click "smart" command) and the target point or unit. Ability names need per-build game data and aren't resolved yet. Commands are left out when the timeline was built with `--no-commands`.
+`events` is loop-ordered and holds one of: `unit_born`, `unit_done`, `unit_died` (with `killer` as on the unit), `morph`, `upgrade`, `player_stats` (every 160 loops per player), `chat`, `ping` (a minimap ping: player and point), `command`. Commands carry the raw, build-specific ability link (-1 for a right-click "smart" command) and the target point or unit. Ability names need per-build game data and aren't resolved yet. Commands are left out when the timeline was built with `--no-commands`.
+
+`player_stats` carries the resources lost and killed both as minerals and gas (`lost_minerals`, …) and by kind, minerals and gas together: `lost_army`, `lost_economy` (workers and town halls), `lost_technology` (other buildings and research), and the same for `killed_*`. `friendly_fire` is the value of a player's own units they killed, `in_progress` the value of what they are building or researching.
+
+## Cameras
+
+`cameras` has one entry per player whose camera moved (computer and API players have none): `keys` of loop and the point the camera was centered on, holding until the next key. Scrolling sends an update every few loops; a key is kept when the view jumps or has moved at least a cell since the last. Observers' cameras are left out. Empty when the replay's game events weren't decoded.
+
+## About the game
+
+`meta` says, when the replay records it: `start_time` (Unix seconds, UTC), `map_author` (only a name; Blizzard's maps give a profile handle, which is dropped), `region` (Battle.net games), `ladder` and `competitive` (ranked), and `observers`. Each player may have `selected_race` (the lobby pick, `Random` when random), `handicap`, `clan`, `toon` (Battle.net profile, `region-S2-realm-id`), `mmr`, `apm` (the game's own count), `human`, and for computer players `difficulty` in the lobby's words (`Elite` is the API's `VeryHard`) and `ai_build`.
 
 ## Actions
 
