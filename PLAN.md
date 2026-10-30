@@ -187,7 +187,7 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 1. A performance pass on a real GPU: so far it was measured only on a software renderer, 55 ms per frame with 96 models (Phase 3).
 2. ~~Cliff meshes from the tile set's cliff models in place of the heightfield's walls (Phase 3/5).~~ Done 2026-10-27 (see DECISIONS).
 3. Water, and creep that recedes after its source dies rather than vanishing (Phase 3/5).
-4. Weapon and attachment models, per-actor scale, and lighting per tile set (Phase 3).
+4. Weapon and attachment models, and per-actor scale (Phase 3). Lighting per map: done 2026-10-30 (see DECISIONS).
 5. The minimap's handling of fog-hidden units: it may lag a frame; unverified (Phase 3).
 
 **E. Analysis** — exit: the common questions about a game are answered in the panel.

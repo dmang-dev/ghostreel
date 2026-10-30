@@ -1,6 +1,6 @@
 # ghostreel
 
-An open-source StarCraft II replay viewer. It plays a `.SC2Replay` back on the map's terrain without running the game: buildings, units, deaths, supply and income, scrubbable to any moment.
+An open-source StarCraft II replay viewer. It plays a `.SC2Replay` back on the map's terrain without running the game: buildings, units, deaths, supply and income, scrubbable to any moment. It also shows who killed what, each unit's stats, where each player was looking, and the game's details: when and where it was played, players' APM and MMR, and the map's own description and picture.
 
 ghostreel is a working name. The project is not affiliated with or endorsed by Blizzard Entertainment.
 
@@ -14,7 +14,7 @@ ghostreel is a working name. The project is not affiliated with or endorsed by B
 
 ## Demo
 
-A 30-minute Terran vs Zerg game on Ley Lines, recorded with StarCraft II installed: ghostreel draws the game's own models, doodads, cliffs and painted ground from the install. Without one it uses shaded terrain and plain shapes.
+A 30-minute Terran vs Zerg game on Ley Lines, recorded with StarCraft II installed: ghostreel draws the game's own models, doodads, cliffs and painted ground from the install, lit with the map's own lighting. Without one it uses shaded terrain and plain shapes.
 
 **3D:** the Zerg army hits the Terran natural at 9:14, camera orbiting.
 
@@ -36,9 +36,21 @@ A 30-minute Terran vs Zerg game on Ley Lines, recorded with StarCraft II install
 
 ![Economy charts, build order and battles](docs/media/analysis.gif)
 
+**Unit stats and kill credit:** a selected Ghost at 22:36, with its stats from the game data, its weapon range drawn as rings, and its kill count going up. The feed says who killed what.
+
+![A selected Ghost with its stats, weapon range and kills](docs/media/inspect.webp)
+
+**Players' cameras:** a tournament game (Dream vs Spirit) following Spirit's camera, then Dream's. The minimap shows where each player was looking.
+
+![Following each player's camera](docs/media/camera.webp)
+
+**Game details:** the map's title, description and picture, when the game was played, and each player's APM. For the built-in AI, its difficulty and build.
+
+![The game details panel](docs/media/gameinfo.webp)
+
 ## Getting it
 
-Releases have a Windows installer (it opens `.SC2Replay` files on double-click), a macOS app, a Linux build, command-line archives, and a browser build that runs entirely in the page. See the **[user guide](docs/USER_GUIDE.md)** for installing, controls, maps and the 3D view.
+**[Download the latest release](https://github.com/dmang-dev/ghostreel/releases/latest).** Releases have a Windows installer (it opens `.SC2Replay` files on double-click), a macOS app, a Linux build, command-line archives, and a browser build that runs entirely in the page. The desktop app can check for new releases and update itself (it asks first; see [Updates](docs/USER_GUIDE.md#updates)). See the **[user guide](docs/USER_GUIDE.md)** for installing, controls, maps and the 3D view.
 
 ## Running from source
 
@@ -70,13 +82,19 @@ cd viewer && npm ci && npm run build:web
 
 ### Build orders, hotspots and video
 
-Press **B** to switch the events panel to the build order, battles, hotspots, economy charts, expansions or supply blocks. Press **D** for the **director**, a camera that pans to each hotspot (major and minor fights, raids, bases lost...) and follows the action in between. **Export video** saves the game, or a highlight reel of the top hotspots, as an MP4, made in the app with WebCodecs (no FFmpeg). Rows jump to their moment. Both come from analysis plugins (`internal/analysis`); [CONTRIBUTING.md](CONTRIBUTING.md) shows how to add one.
+Press **B** to switch the events panel to the build order, battles, hotspots, economy charts, APM, army composition, production idle time, expansions or supply blocks. Press **D** for the **director**, a camera that pans to each hotspot (major and minor fights, raids, bases lost...) and follows the action in between. **Export video** saves the game, or a highlight reel of the top hotspots, as an MP4, made in the app with WebCodecs (no FFmpeg). Rows jump to their moment. Both come from analysis plugins (`internal/analysis`); [CONTRIBUTING.md](CONTRIBUTING.md) shows how to add one.
+
+### Game details, unit stats and cameras
+
+**Info** (or **I**) shows the map's title, description and picture, when and where the game was played, observers, and each player's APM, MMR, Battle.net profile, Random pick, handicap, and for the built-in AI its difficulty and build. The event feed and the inspect panel say who killed what, how many kills a unit has so far, and what made it. With StarCraft II installed, units get the game's own names and the inspect panel shows their stats (health, shields, armor, cost, build time, and each weapon's damage, bonuses, range and cooldown), with the selected unit's weapon ranges drawn on the map. The minimap shows each player's camera as a dashed box and pings as rings; **C** follows a player's camera. Xel'Naga towers show their vision ring in the holder's color.
+
+Replays don't record hit points. Health, shield and energy bars appear only on replays with an engine recording (see `ghostreel-engine` below); **H** switches them between damaged units, all units and none.
 
 ### 3D view
 
 Press **3** (or the 3D button) to switch views. **V** cycles fog of war through each player's vision. In 3D, drag to pan, right-drag (or Shift-drag) to rotate and tilt, and scroll to zoom.
 
-With a StarCraft II installation on the same machine (the desktop app's **Settings** can point to it if it's somewhere unusual), the 3D view uses the game's own unit models, animations, doodads and ground textures. They are converted from your install on first use and cached locally. The server looks in the default install folder; point it elsewhere with `--gamedata <folder with .build.info>` or `GHOSTREEL_GAMEDATA`. Without an install, units are drawn as plain shapes.
+With a StarCraft II installation on the same machine (the desktop app's **Settings** can point to it if it's somewhere unusual), the 3D view uses the game's own unit models, animations, doodads, cliffs and ground textures, lit with the map's own lighting. They are converted from your install on first use and cached locally. The server looks in the default install folder; point it elsewhere with `--gamedata <folder with .build.info>` or `GHOSTREEL_GAMEDATA`. Without an install, units are drawn as plain shapes.
 
 ```bash
 go run ./cmd/ghostreel assets            # convert every ladder unit's model now and report gaps
@@ -169,7 +187,7 @@ The code is Apache-2.0. StarCraft II's art, data and maps belong to Blizzard and
 ## Roadmap
 
 - **Phase 2, accuracy (done):** the `ghostreel-engine` exporter for exact positions and ground truth, and the command tier. Next for the command tier: units blocking each other (sieged tanks on ramps), fights themselves (kiting, chasing), and ground truth for current game versions and for Zerg players (needs a Windows or macOS client, and recorded games where the Zerg side is a player rather than the AI).
-- **Phase 3, 3D (done):** the 3D view with the game's own models and animations, doodads, ground texture and fog of war. Next: blending the terrain's texture layers (the mask format isn't decoded yet), cliff meshes, and checking a current Windows install.
-- **Phase 6, hardening (next):** everything earlier phases left open, in five tracks: release and distribution, checks against a current full game install, command-tier round 4, 3D fidelity, and analysis gaps. See [PLAN.md](PLAN.md#phase-6-open-items-from-earlier-phases).
+- **Phase 3, 3D (done):** the 3D view with the game's own models and animations, doodads, ground texture and fog of war.
+- **Phase 6, hardening (in progress):** everything earlier phases left open. Done so far: releases built and published by CI with signed self-updates, the game's cliff models and blended ground textures, the map's lighting, APM, production and army reports, health bars for engine recordings, and kill credit, unit stats, cameras and game details. Left: macOS file opening, Linux packages, code signing, a hosted browser build, ground truth for current game versions, more command-tier accuracy, water, and a 3D performance pass on a real GPU. See [PLAN.md](PLAN.md#phase-6-open-items-from-earlier-phases).
 - **Phase 5 (done):** economy charts, expansions and supply blocks; the map's painted ground textures and creep; a measured third round on the command tier (nothing beat the current model; see DECISIONS).
 - **Phase 4, 1.0 (done):** the browser-only build, installers and the release workflow, analysis plugins (build orders, battles), and the [user guide](docs/USER_GUIDE.md) and [contributor guide](CONTRIBUTING.md). Next: code signing, opening replays from Finder on macOS, and more plugins.
