@@ -137,6 +137,12 @@ func TestOpenReplayAndFetch(t *testing.T) {
 	if code, _ := get(t, ts.URL+"/api/assets/cliff/CliffNatural0Ex1/aabb"); code != 404 {
 		t.Errorf("cliff piece without game data: %d", code)
 	}
+	// So do lighting, the loading screen and unit stats.
+	for _, p := range []string{"/api/r/" + s.ID + "/lighting", "/api/r/" + s.ID + "/loading", "/api/assets/info?units=Marine"} {
+		if code, _ := get(t, ts.URL+p); code != 404 {
+			t.Errorf("%s without game data: %d", p, code)
+		}
+	}
 
 	// A wrong map is rejected.
 	other, err := os.ReadFile(filepath.Join(testdata, "maps", "DefeatMarines.SC2Map"))

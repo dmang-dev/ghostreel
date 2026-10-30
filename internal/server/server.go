@@ -21,6 +21,7 @@
 //	GET  /api/r/{id}/minimap       PNG (404 when none)
 //	GET  /api/r/{id}/doodads       JSON list of the map's doodads (404 when no map)
 //	GET  /api/r/{id}/analysis      JSON reports of the analysis plugins (build orders, battles, ...)
+//	GET  /api/r/{id}/preview       JPEG screenshot the map carries (404 when none)
 //	POST /api/r/{id}/map           body = map bytes, X-Filename header → Summary
 //	POST /api/r/{id}/download-map  fetch the map from Blizzard's depot (user-initiated) → Summary
 //	POST /api/r/{id}/find-map      look for a missing map again (after the settings change) → Summary
@@ -36,6 +37,9 @@
 //	GET  /api/r/{id}/cliffs        JSON of the map's cliff pieces (assets.CliffLayout)
 //	GET  /api/assets/cliff/{mesh}/{piece}  binary glTF of a cliff piece, ?v= variation
 //	GET  /api/assets/cliffmaterial/{set}   binary glTF of a cliff set's material model
+//	GET  /api/r/{id}/lighting      JSON of the map's lighting (assets.Lighting)
+//	GET  /api/r/{id}/loading       PNG of the map's loading screen
+//	GET  /api/assets/info          JSON stats and display names (assets.Info) for ?units=, ?upgrades=, ?abilities= (comma-separated)
 package server
 
 import (
@@ -266,6 +270,7 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(b)
 	})
+	mux.HandleFunc("GET /api/r/{id}/preview", s.preview)
 	mux.HandleFunc("POST /api/r/{id}/map", s.setMap)
 	mux.HandleFunc("POST /api/r/{id}/download-map", func(w http.ResponseWriter, r *http.Request) {
 		l, err := s.App.DownloadMap(r.Context(), r.PathValue("id"))
@@ -329,6 +334,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/r/{id}/ground", s.groundImage)
 	mux.HandleFunc("GET /api/r/{id}/masks", s.masks)
 	mux.HandleFunc("GET /api/r/{id}/cliffs", s.cliffs)
+	mux.HandleFunc("GET /api/r/{id}/lighting", s.lighting)
+	mux.HandleFunc("GET /api/r/{id}/loading", s.loadingScreen)
+	mux.HandleFunc("GET /api/assets/info", s.info)
 	mux.HandleFunc("GET /api/assets/cliff/{mesh}/{piece}", func(w http.ResponseWriter, r *http.Request) {
 		v, _ := strconv.Atoi(r.URL.Query().Get("v"))
 		mesh := r.PathValue("mesh")

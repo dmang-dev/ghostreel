@@ -26,9 +26,11 @@ type entry struct {
 	tokens            map[string]string
 	// Fields of child elements: "Model" for <Model value=.../>, and
 	// "DeathArray[Normal].ModelLink" for attributes of indexed elements.
+	// Grandchildren add a level: "InfoArray[Train1].Unit" for
+	// <InfoArray index="Train1"><Unit value="Marine"/></InfoArray>.
 	fields map[string]string
 	// Every value of fields that repeat without an index, in order
-	// (<RequiredAnims value=.../> twice).
+	// (<RequiredAnims value=.../> twice, <WeaponArray Link=.../> twice).
 	lists map[string][]string
 	// Terms of <On ... Send="Create"/> events: the events that create the
 	// actor itself.
@@ -47,6 +49,7 @@ func (c *catalog) add(data []byte, keep func(class string) bool) error {
 	d.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
 	var cur *entry
 	depth := 0
+	parent := "" // the depth-3 element's field name, for its children
 	for {
 		tok, err := d.Token()
 		if err == io.EOF {
@@ -100,6 +103,7 @@ func (c *catalog) add(data []byte, keep func(class string) bool) error {
 				if index != "" {
 					name += "[" + index + "]"
 				}
+				parent = name
 				if name == "On" {
 					var terms, send string
 					for _, a := range t.Attr {
@@ -125,12 +129,29 @@ func (c *catalog) add(data []byte, keep func(class string) bool) error {
 						}
 					default:
 						cur.fields[name+"."+a.Name.Local] = a.Value
+						if index == "" {
+							cur.lists[name+"."+a.Name.Local] = append(cur.lists[name+"."+a.Name.Local], a.Value)
+						}
+					}
+				}
+			case depth == 4 && cur != nil && parent != "":
+				name := parent + "." + t.Name.Local
+				for _, a := range t.Attr {
+					switch a.Name.Local {
+					case "index":
+					case "value":
+						cur.fields[name] = a.Value
+					default:
+						cur.fields[name+"."+a.Name.Local] = a.Value
 					}
 				}
 			}
 		case xml.EndElement:
 			if depth == 2 {
 				cur = nil
+			}
+			if depth == 3 {
+				parent = ""
 			}
 			depth--
 		case xml.ProcInst:
@@ -187,6 +208,17 @@ func (c *catalog) field(class, id, name string) (string, bool) {
 		return "", false
 	}
 	return subst(ch, id, val), true
+}
+
+// rawField is field without token substitution: the value as the nearest
+// entry in the chain wrote it.
+func (c *catalog) rawField(class, id, name string) (string, bool) {
+	for _, e := range c.chain(class, id) {
+		if v, ok := e.fields[name]; ok {
+			return v, true
+		}
+	}
+	return "", false
 }
 
 // list resolves a repeated field: the values the nearest entry in the chain

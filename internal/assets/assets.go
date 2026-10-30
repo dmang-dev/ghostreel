@@ -48,6 +48,7 @@ type Library struct {
 	terrain  *catalog          // CTerrainTex: terrain texture layers
 	cliffs   *catalog          // CCliff and CCliffMesh: cliff sets and their pieces
 	actorOf  map[string]string // unit type → actor id
+	data     data              // stats, names and lighting, loaded on first use
 
 	mu      sync.Mutex
 	pending map[string]*result
@@ -437,6 +438,16 @@ func (l *Library) encodePNG(path string) ([]byte, error) {
 		return nil, err
 	}
 	return out.Bytes(), nil
+}
+
+// LoadingScreenPNG returns a map's loading screen image (a game-data texture
+// path from mapfile.Map.LoadingScreen) as PNG.
+func (l *Library) LoadingScreenPNG(path string) ([]byte, error) {
+	low := strings.ToLower(strings.ReplaceAll(path, "/", `\`))
+	if !strings.HasPrefix(low, `assets\textures\`) || !strings.HasSuffix(low, ".dds") || strings.Contains(low, "..") {
+		return nil, ErrNoModel
+	}
+	return l.encodePNG(path)
 }
 
 // IconPNG returns a unit type's command-card icon as PNG.
