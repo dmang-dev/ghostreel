@@ -31,7 +31,7 @@ import (
 
 // CacheVersion is part of every cached timeline's file name. Bump it whenever
 // the builders' output changes so stale timelines are rebuilt.
-const CacheVersion = "tl9"
+const CacheVersion = "tl10"
 
 // browser is true in the browser build (GOOS=js, cmd/ghostreel-wasm). It
 // has no file system to look maps up in and can't reach Blizzard's depot,

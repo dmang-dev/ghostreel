@@ -19,7 +19,7 @@ Files are binary protobuf (`.pb`). `dump-timeline --json` writes the protobuf JS
 
 `creator` is the unit this one came out of: the building that trained it, the egg a Zerg unit hatched from, the hatchery that spawned a larva. The replay names it only for units born complete, so it is unset for construction sites and warp-ins (and in timelines written before it was added). `creator_ability` is the ability that made the unit (`BarracksTrain`, `WarpGateTrain`, `CalldownMULE`), when the replay says.
 
-`killer` is the unit that dealt the killing blow, when the replay says and that unit is in the timeline; `killer_player` is its owner. Counting the units that name a unit as their killer gives its kill count.
+`killer` is the unit that dealt the killing blow, when the replay says and that unit is in the timeline; `killer_player` is its owner. A cancelled building, which the replay says killed itself, has no `killer`. Counting the units that name a unit as their killer gives its kill count.
 
 `unit_types[].class` says how to draw a type. `UNIT_CLASS_HIDDEN` types are UI-only and never appear in `units`. `known = false` means the sizes are defaults for a type the game-data table doesn't list. `speed` is cells per game second, 0 for things that never move.
 

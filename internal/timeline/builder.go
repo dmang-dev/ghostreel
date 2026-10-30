@@ -234,7 +234,8 @@ func (b *builder) apply(e *replay.Event) {
 
 	case replay.KindUnitDied:
 		if u := b.byTag[e.Tag]; u != nil && u.pb.DiedLoop == nil {
-			if k := b.byTag[e.Killer]; e.Killer != 0 && k != nil && !k.hidden {
+			// A cancelled building names itself as its killer; that isn't a kill.
+			if k := b.byTag[e.Killer]; e.Killer != 0 && k != nil && k != u && !k.hidden {
 				id := k.emitted
 				u.pb.Killer = &id
 			}

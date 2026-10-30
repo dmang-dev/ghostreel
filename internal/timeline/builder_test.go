@@ -318,3 +318,28 @@ func TestCreatorAndActionCounts(t *testing.T) {
 		t.Errorf("actions without game events = %v", tl.Actions)
 	}
 }
+
+// TestBuildKiller checks kill credit: a unit's killer is kept, but a
+// cancelled building, which the replay says killed itself, has none.
+func TestBuildKiller(t *testing.T) {
+	info, _ := fixture()
+	tag := replay.MakeTag
+	ev := []replay.Event{
+		{Loop: 0, Kind: replay.KindUnitBorn, Tag: tag(1, 1), UnitType: "Marine", Player: 1, X: 10, Y: 10},
+		{Loop: 0, Kind: replay.KindUnitBorn, Tag: tag(2, 1), UnitType: "Zergling", Player: 2, X: 11, Y: 10},
+		{Loop: 10, Kind: replay.KindUnitInit, Tag: tag(3, 1), UnitType: "Barracks", Player: 1, X: 20, Y: 20},
+		{Loop: 100, Kind: replay.KindUnitDied, Tag: tag(2, 1), X: 11, Y: 10, KillerPlayer: 1, Killer: tag(1, 1)},
+		{Loop: 200, Kind: replay.KindUnitDied, Tag: tag(3, 1), X: 20, Y: 20, KillerPlayer: 1, Killer: tag(3, 1)},
+	}
+	tl, err := Build(info, ev, Options{Generator: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	marine, ling, rax := unitByName(t, tl, "Marine"), unitByName(t, tl, "Zergling"), unitByName(t, tl, "Barracks")
+	if ling.Killer == nil || *ling.Killer != marine.Id {
+		t.Errorf("zergling killer %v, want the marine (%d)", ling.Killer, marine.Id)
+	}
+	if rax.Killer != nil {
+		t.Errorf("cancelled barracks killed by unit %d, want no killer", *rax.Killer)
+	}
+}
