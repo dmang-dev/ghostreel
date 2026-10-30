@@ -51,6 +51,8 @@ export interface MapObject {
   Z: number;
   Rotation?: number;
   Player?: number;
+  /** Units: the starting minerals or gas when the map sets them (else the type's default). */
+  Resources?: number;
 }
 
 /** mapfile.Export */
@@ -59,7 +61,15 @@ export interface MapData {
   width: number;
   height: number;
   playable: MapRect;
+  /** The map's lighting (a CLight id). */
   tileset: string;
+  /** What the map says about itself (English when it has it). */
+  title?: string;
+  description?: string;
+  /** What the map is for: "1v1", "2". */
+  players?: string;
+  /** The map carries a screenshot (fetchPreview). */
+  hasPreview?: boolean;
   /** Terrain texture layers (ids for /api/assets/terrain), base first. */
   terrainTextures?: string[];
   /** The painted texture masks (served by fetchMasks): size in texels, and texture repeats across the map (x, y) then offsets in cells. */
@@ -259,6 +269,89 @@ export async function fetchMap(id: string): Promise<MapData | null> {
   const resp = await apiFetch(`/api/r/${id}/map`);
   if (resp.status === 404) return null;
   return (await check(resp)).json();
+}
+
+/** A map screenshot or loading screen as an object URL, or null. */
+async function imageURL(path: string): Promise<string | null> {
+  const resp = await apiFetch(path);
+  if (!resp.ok) return null;
+  return URL.createObjectURL(await resp.blob());
+}
+
+/** The screenshot a replay's map carries, as an object URL, or null. */
+export const fetchPreview = (id: string) => imageURL(`/api/r/${id}/preview`);
+
+/** The map's loading screen from the game data, as an object URL, or null. */
+export const fetchLoadingScreen = (id: string) => imageURL(`/api/r/${id}/loading`);
+
+/** A directional light: color, intensity multiplier, and the direction it shines (game axes, z up). */
+export interface Light {
+  color: number[];
+  multiplier: number;
+  direction: number[];
+}
+
+/** A map's lighting from the game data (internal/assets/lights.go). */
+export interface Lighting {
+  id: string;
+  ambient: number[];
+  key: Light;
+  fill: Light;
+  back: Light;
+}
+
+/** The map's lighting, or null without game data. */
+export async function fetchLighting(id: string): Promise<Lighting | null> {
+  const resp = await apiFetch(`/api/r/${id}/lighting`);
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
+/** One of a unit's weapons (internal/assets/info.go); times in clock seconds. */
+export interface WeaponInfo {
+  name?: string;
+  range?: number;
+  damage?: number;
+  /** Hits per attack, when more than one. */
+  attacks?: number;
+  bonus?: Record<string, number>;
+  cooldown?: number;
+  air?: boolean;
+  ground?: boolean;
+}
+
+/** What the game data says about a unit type. */
+export interface UnitInfo {
+  name?: string;
+  life?: number;
+  lifeArmor?: number;
+  shields?: number;
+  shieldArmor?: number;
+  energy?: number;
+  minerals?: number;
+  vespene?: number;
+  /** Supply used; negative for supply provided. */
+  supply?: number;
+  attributes?: string[];
+  sight?: number;
+  buildTime?: number;
+  /** Starting minerals or gas of a resource. */
+  resources?: number;
+  weapons?: WeaponInfo[];
+}
+
+export interface GameInfo {
+  units: Record<string, UnitInfo>;
+  upgrades: Record<string, string>;
+  abilities: Record<string, string>;
+}
+
+/** Stats and display names from the game data, or null without it. */
+export async function fetchInfo(units: string[], upgrades: string[], abilities: string[]): Promise<GameInfo | null> {
+  const q = new URLSearchParams({ units: units.join(","), upgrades: upgrades.join(","), abilities: abilities.join(",") });
+  const resp = await apiFetch(`/api/assets/info?${q}`);
+  if (!resp.ok) return null;
+  return resp.json();
 }
 
 /** The map's texture-mask planes (see MapData.terrainMasks), or null. */

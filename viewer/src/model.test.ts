@@ -91,3 +91,46 @@ describe("vitalsAt", () => {
     expect(new Model(create(TimelineSchema, { meta: { loops: 10 } })).hasVitals).toBe(false);
   });
 });
+
+describe("kills, cameras and pings", () => {
+  const tl = create(TimelineSchema, {
+    meta: { loops: 1000, players: [{ id: 1 }, { id: 2 }] },
+    unitTypes: [{ name: "Marine" }],
+    units: [
+      { id: 0, owner: 1, bornLoop: 0 },
+      { id: 1, owner: 2, bornLoop: 0, diedLoop: 200, killer: 0 },
+      { id: 2, owner: 2, bornLoop: 0, diedLoop: 400, killer: 0 },
+    ],
+    events: [
+      { loop: 150, kind: { case: "ping", value: { player: 2, x: 10, y: 20 } } },
+      { loop: 200, kind: { case: "unitDied", value: { unitId: 1, killerPlayer: 1, killer: 0 } } },
+      { loop: 400, kind: { case: "unitDied", value: { unitId: 2, killerPlayer: 1, killer: 0 } } },
+    ],
+    cameras: [{ player: 1, keys: [{ loop: 0, x: 5, y: 5 }, { loop: 300, x: 50, y: 60 }] }],
+  });
+  const m = new Model(tl);
+
+  it("counts a unit's kills up to a loop", () => {
+    expect(m.killsAt(0, 199)).toBe(0);
+    expect(m.killsAt(0, 200)).toBe(1);
+    expect(m.killsAt(0, 999)).toBe(2);
+    expect(m.killsAt(1, 999)).toBe(0);
+  });
+
+  it("names the killer in the feed", () => {
+    const died = m.feed.filter((f) => f.kind === "died");
+    expect(died.map((f) => f.killerId)).toEqual([0, 0]);
+  });
+
+  it("holds each camera key until the next", () => {
+    expect(m.hasCameras).toBe(true);
+    expect(m.cameraAt(1, 100)).toMatchObject({ x: 5, y: 5 });
+    expect(m.cameraAt(1, 300)).toMatchObject({ x: 50, y: 60 });
+    expect(m.cameraAt(2, 300)).toBeUndefined();
+  });
+
+  it("keeps pings", () => {
+    expect(m.pings).toEqual([{ loop: 150, player: 2, x: 10, y: 20 }]);
+    expect(m.feed.find((f) => f.kind === "ping")).toMatchObject({ x: 10, y: 20, player: 2 });
+  });
+});

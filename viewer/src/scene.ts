@@ -73,6 +73,7 @@ export class Scene {
   private readonly ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
   private readonly persp = new THREE.PerspectiveCamera(45, 1, 0.5, 2000);
   private readonly sun = new THREE.DirectionalLight(0xffffff, 1.6);
+  private readonly fill = new THREE.DirectionalLight(0xffffff, 0);
   private readonly ambient = new THREE.AmbientLight(0xffffff, 0.9);
 
   private terrain2?: THREE.Mesh;
@@ -115,6 +116,10 @@ export class Scene {
   showLabels = true;
   /** Health, shield and energy bars (engine-tier replays): damaged and selected units, all, or none. */
   healthBars: "damaged" | "all" | "off" = "damaged";
+  /** Draws extra marks (pings, ranges) on the label layer after the units, in screen pixels. */
+  overlay?: (ctx: CanvasRenderingContext2D, loop: number) => void;
+  /** Unit type names as shown in labels (default: the type id). */
+  displayName: (id: string) => string = (id) => id;
   onViewChange?: () => void;
   /** The user moved the camera (drag, rotate, zoom). */
   onUserMove?: () => void;
@@ -155,7 +160,8 @@ export class Scene {
 
     this.persp.up.set(0, 0, 1);
     this.sun.position.set(-0.5, 0.6, 1);
-    this.scene.add(this.sun, this.ambient);
+    this.fill.position.set(0.5, -0.6, 0.6);
+    this.scene.add(this.sun, this.fill, this.ambient);
 
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true });
     this.selection2 = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), ringMat);
@@ -431,6 +437,36 @@ export class Scene {
       group.visible = this.mode === "3d";
       this.scene.add(group);
     }
+  }
+
+  /**
+   * Lights the scene like the map: the key light's direction and the key,
+   * fill and ambient colors, half-way toward white so models and textures
+   * keep their own colors. Intensities stay those of the default look.
+   * null restores the default.
+   */
+  setLighting(l: { ambient: number[]; key: { color: number[]; direction: number[] }; fill: { color: number[]; direction: number[] } } | null): void {
+    const tint = (rgb: number[] | undefined) => {
+      const c = new THREE.Color(1, 1, 1);
+      const m = Math.max(...(rgb ?? []), 0);
+      if (!rgb || m <= 0) return c;
+      return c.lerp(new THREE.Color(rgb[0] / m, rgb[1] / m, rgb[2] / m), 0.5);
+    };
+    const dir = (d: number[] | undefined, fallback: [number, number, number]) =>
+      d && Math.hypot(d[0], d[1], d[2]) > 0.1 && d[2] < 0 ? [-d[0], -d[1], -d[2]] : fallback;
+    if (!l) {
+      this.sun.color.set(0xffffff);
+      this.sun.position.set(-0.5, 0.6, 1);
+      this.fill.intensity = 0;
+      this.ambient.color.set(0xffffff);
+      return;
+    }
+    this.sun.color.copy(tint(l.key.color));
+    this.sun.position.set(...(dir(l.key.direction, [-0.5, 0.6, 1]) as [number, number, number]));
+    this.fill.color.copy(tint(l.fill.color));
+    this.fill.position.set(...(dir(l.fill.direction, [0.5, -0.6, 0.6]) as [number, number, number]));
+    this.fill.intensity = 0.25;
+    this.ambient.color.copy(tint(l.ambient));
   }
 
   setFogPlayer(p: number): void {
@@ -749,13 +785,14 @@ export class Scene {
       const lift = this.mode === "3d" && d.air ? AIR_HEIGHT : 0;
       const [sx, sy] = this.worldToScreen(d.x, d.y - (d.h ? d.h / 2 : d.r), lift);
       if (sx < -50 || sx > w + 50 || sy < -20 || sy > h + 20) continue;
-      const name = model.typeName(d.type);
+      const name = this.displayName(model.typeName(d.type));
       ctx.fillStyle = "rgba(0,0,0,0.65)";
       const tw = ctx.measureText(name).width;
       ctx.fillRect(sx - tw / 2 - 2, sy + 1, tw + 4, 13);
       ctx.fillStyle = d.id === selected ? "#ffffff" : "#d8dde3";
       ctx.fillText(name, sx, sy + 2);
     }
+    this.overlay?.(ctx, loop);
   }
 
   /**

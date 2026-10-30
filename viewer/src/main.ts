@@ -6,7 +6,7 @@
 import "./style.css";
 import * as THREE from "three";
 import * as api from "./api";
-import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, decodeTimeline, formatClock, isAlive, ownerAt, typeAt } from "./model";
+import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, decodeTimeline, formatClock, isAlive, ownerAt, typeAt, type FeedItem } from "./model";
 import { Director } from "./director";
 import { buildCliffs } from "./cliffs";
 import { buildDoodads } from "./doodads";
@@ -18,6 +18,9 @@ import { ReportsView } from "./reports";
 import { Scene } from "./scene";
 import { maskTextures } from "./ground";
 import { setupUpdates } from "./updates";
+import { abilityName, loadNames, unitName, unitStats, upgradeName } from "./names";
+import { drawOverlay, PING_LOOPS } from "./overlay";
+import { gameInfoHTML } from "./gameinfo";
 import { blankGrid, hillshade, minimapTerrain } from "./terrain";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -34,6 +37,8 @@ const reports = new ReportsView($("feed-tabs"), $("report"), $("feed-list"), (l)
 // opens the data in the background at startup, so ask again for a while.
 const unitModels = new UnitModels("");
 scene.models = unitModels;
+scene.displayName = unitName;
+scene.overlay = (ctx, at) => cur && drawOverlay(ctx, { scene, model: cur.model, loop: at, selected, color: playerColor });
 let assetsReady = (async () => {
   for (let i = 0; i < 10 && !(await unitModels.init()); i++) await new Promise((r) => setTimeout(r, 1500));
   return unitModels.available;
@@ -51,6 +56,8 @@ interface Loaded {
   art: HTMLCanvasElement | null;
   /** The painted ground from the game's textures, once the server has made it. */
   ground: HTMLCanvasElement | null;
+  /** Starting resources the map sets, by "type@x,y" of the placed unit. */
+  resources: Map<string, number>;
 }
 
 let cur: Loaded | undefined;
@@ -99,7 +106,13 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   const playable = map?.playable ?? { Left: 0, Bottom: 0, Right: width, Top: height };
   const shaded = map ? hillshade(map) : blankGrid(width, height);
   const art = map && minimap ? minimapTerrain(map, minimap) : null;
-  cur = { summary, model, map, minimap, width, height, playable, shaded, art, ground: null };
+  const resources = new Map<string, number>();
+  for (const o of map?.objects ?? []) if (o.Kind === "unit" && o.Resources) resources.set(placedKey(o.Type, o.X, o.Y), o.Resources);
+  cur = { summary, model, map, minimap, width, height, playable, shaded, art, ground: null, resources };
+  followCamera = 0;
+  $("gameinfo").hidden = true;
+  scene.setLighting(null);
+  void loadExtras(summary.id, model);
 
   scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded, map?.heights, map?.pathable);
   if (terrainMode === "ground") setTerrainMode("shade");
@@ -171,6 +184,31 @@ async function replaceMap(get: (id: string) => Promise<api.Summary>, label: stri
 
 const pickMap = (file: File) => replaceMap((id) => api.setMapFile(id, file), `Reading ${file.name}…`);
 
+/** Key for a placed unit's position: tracker positions are whole cells. */
+const placedKey = (type: string, x: number, y: number) => `${type}@${Math.floor(x)},${Math.floor(y)}`;
+
+/**
+ * Display names and stats from the game data for what the replay uses, and
+ * the map's lighting for the 3D view. Both need the game data, which the
+ * server may still be opening, so they wait for it.
+ */
+async function loadExtras(id: string, model: Model): Promise<void> {
+  const upgrades: string[] = [];
+  for (const it of model.feed) if (it.kind === "upgrade") upgrades.push(it.subject);
+  const abilities = model.units.map((u) => u.creatorAbility);
+  if (!(await assetsReady)) return;
+  const [named, lighting] = await Promise.all([
+    loadNames(model.types.map((t) => t.name), upgrades, abilities).catch(() => false),
+    api.fetchLighting(id).catch(() => null),
+  ]);
+  if (cur?.summary.id !== id) return;
+  scene.setLighting(lighting);
+  if (named) {
+    feedShownUpTo = -1;
+    updatePanels(true);
+  }
+}
+
 function showError(msg: string): void {
   $("error").textContent = msg;
   $("error").hidden = !msg;
@@ -219,6 +257,14 @@ function tick(now: number): void {
     return; // the exporter drives the scene
   }
   if (directorOn && director) frameShot();
+  else if (followCamera && cur) {
+    const c = cur.model.cameraAt(followCamera, loop);
+    if (c) {
+      scene.view.cx += (c.x - scene.view.cx) * Math.min(1, dt * 8);
+      scene.view.cy += (c.y - scene.view.cy) * Math.min(1, dt * 8);
+      scene.updateCamera();
+    }
+  }
   const t0 = performance.now();
   scene.render(loop, selected);
   frameMs = frameMs * 0.9 + (performance.now() - t0) * 0.1;
@@ -301,7 +347,8 @@ function updatePanels(force: boolean): void {
             <span>Income</span><span>${fmt(s.mineralRate)}</span>
             <span>Gas inc.</span><span>${fmt(s.vespeneRate)}</span>
             <span>Army</span><span>${fmt(s.armyMinerals + s.armyVespene)}</span>
-            <span>Lost</span><span>${fmt(s.lostMinerals + s.lostVespene)}</span>
+            <span>Lost</span><span title="Army ${fmt(s.lostArmy)} · economy ${fmt(s.lostEconomy)} · technology ${fmt(s.lostTechnology)}${s.friendlyFire ? ` · own units killed ${fmt(s.friendlyFire)}` : ""}">${fmt(s.lostMinerals + s.lostVespene)}</span>
+            <span>Killed</span><span title="Army ${fmt(s.killedArmy)} · economy ${fmt(s.killedEconomy)} · technology ${fmt(s.killedTechnology)}">${fmt(s.killedMinerals + s.killedVespene)}</span>
           </div>`
         : "");
   }
@@ -331,12 +378,38 @@ function updateFeed(force: boolean): void {
     const it = feed[i];
     const li = document.createElement("li");
     li.innerHTML = `<span class="t">${formatClock(it.loop)}</span><span class="dot" style="background:${playerColor(it.player)}"></span><span></span>`;
-    li.lastElementChild!.textContent = it.text;
+    li.lastElementChild!.textContent = feedText(it);
     li.onclick = () => {
       seek(it.loop);
       if (it.unitId !== undefined) select(it.unitId, true);
+      else if (it.x !== undefined && it.y !== undefined) {
+        scene.view.cx = it.x;
+        scene.view.cy = it.y;
+        scene.updateCamera();
+      }
     };
     list.append(li);
+  }
+}
+
+/** A feed entry in words, with the game's names when they're loaded. */
+function feedText(it: FeedItem): string {
+  const m = cur?.model;
+  switch (it.kind) {
+    case "died": {
+      const k = it.killerId !== undefined && m ? m.units[it.killerId] : undefined;
+      return k ? `${unitName(it.subject)} killed by ${unitName(m!.typeName(typeAt(k, it.loop)))}` : `${unitName(it.subject)} died`;
+    }
+    case "started":
+    case "trained":
+    case "finished":
+      return `${unitName(it.subject)} ${it.kind}`;
+    case "upgrade":
+      return `Upgrade: ${upgradeName(it.subject)}`;
+    case "chat":
+      return `“${it.subject}”`;
+    case "ping":
+      return "Pinged the map";
   }
 }
 
@@ -389,17 +462,71 @@ function updateInspect(): void {
   }
   box.hidden = false;
   box.innerHTML = `
-    <h3>${escapeHTML(model.typeName(t))}</h3>
+    <h3>${escapeHTML(unitName(model.typeName(t)))}</h3>
     <div class="row"><span>Owner</span><span style="color:${textColor(owner)}">${escapeHTML(playerName(owner))}</span></div>
     <div class="row"><span>Status</span><span>${status}</span></div>
     <div class="row"><span>Born</span><span>${formatClock(u.bornLoop)}</span></div>
-    ${u.diedLoop !== undefined && u.diedLoop <= loop ? `<div class="row"><span>Died</span><span>${formatClock(u.diedLoop)}${u.killerPlayer ? ` (by ${escapeHTML(playerName(u.killerPlayer))})` : ""}</span></div>` : ""}
+    ${madeByRow(u)}
+    ${u.diedLoop !== undefined && u.diedLoop <= loop ? `<div class="row"><span>Died</span><span>${formatClock(u.diedLoop)}${u.killerPlayer && u.killer === undefined ? ` (by ${escapeHTML(playerName(u.killerPlayer))})` : ""}</span></div>` : ""}
+    ${u.diedLoop !== undefined && u.diedLoop <= loop && u.killer !== undefined ? unitLinkRow("Killed by", u.killer, u.diedLoop) : ""}
+    ${model.killsAt(u.id, loop) ? `<div class="row"><span>Kills</span><span>${model.killsAt(u.id, loop)}</span></div>` : ""}
     ${d ? `<div class="row"><span>Position</span><span>${d.x.toFixed(1)}, ${d.y.toFixed(1)}</span></div>` : ""}
     ${alive && owner !== 0 ? vitalsRows(model.vitalsAt(selected, loop), model.hasVitals) : ""}
+    ${statsRows(model.typeName(t), u)}
     <div class="row"><span>Unit</span><span>#${u.id} · tag ${u.tag >>> 18}/${u.tag & 0x3ffff}</span></div>
     ${note ? `<div class="note">${note}</div>` : ""}
     <button id="center-sel">Center</button>`;
   $("center-sel").onclick = () => select(selected, true);
+  for (const a of box.querySelectorAll<HTMLElement>("[data-unit]")) a.onclick = () => select(Number(a.dataset.unit), true);
+}
+
+/** A row naming another unit (its type, in its owner's color), which selects it on click. */
+function unitLinkRow(label: string, id: number, at: number): string {
+  const m = cur!.model;
+  const o = m.units[id];
+  if (!o) return "";
+  return `<div class="row"><span>${label}</span><a data-unit="${id}" style="color:${textColor(ownerAt(o, at))}">${escapeHTML(unitName(m.typeName(typeAt(o, at))))}</a></div>`;
+}
+
+/** Where a unit came from: the unit that made it and how (Train, Calldown MULE, warp-in). */
+function madeByRow(u: Model["units"][number]): string {
+  const how = u.creatorAbility ? abilityName(u.creatorAbility) : "";
+  if (u.creator !== undefined) {
+    const row = unitLinkRow("Made by", u.creator, u.bornLoop);
+    return how ? row.replace("</a></div>", `</a>&nbsp;· ${escapeHTML(how)}</div>`) : row;
+  }
+  return how ? `<div class="row"><span>Made by</span><span>${escapeHTML(how)}</span></div>` : "";
+}
+
+/** The game data's stats for a unit type, when the server has the game data. */
+function statsRows(type: string, u: Model["units"][number]): string {
+  const st = unitStats(type);
+  if (!st) return "";
+  const n = (v: number | undefined) => (v ? Math.round(v * 100) / 100 : 0);
+  const row = (k: string, v: string) => (v ? `<div class="row"><span>${k}</span><span>${v}</span></div>` : "");
+  let html = "";
+  const keys = cur!.model.tracks[u.id];
+  const placed = keys?.length ? cur!.resources.get(placedKey(type, keys[0].x, keys[0].y)) : undefined;
+  const res = placed ?? st.resources;
+  if (res) html += row(/Geyser|Extractor|Assimilator|Refinery/.test(type) ? "Gas" : "Minerals", `${fmt(res)} at the start`);
+  if (u.owner === 0) return html;
+  const armor = (a: number | undefined) => (a ? ` (armor ${n(a)})` : "");
+  html += row("Max health", st.life ? `${n(st.life)}${armor(st.lifeArmor)}` : "");
+  html += row("Max shields", st.shields ? `${n(st.shields)}${armor(st.shieldArmor)}` : "");
+  html += row("Max energy", st.energy ? String(n(st.energy)) : "");
+  const cost = [st.minerals ? `${st.minerals} minerals` : "", st.vespene ? `${st.vespene} gas` : "",
+    st.supply && st.supply > 0 ? `${n(st.supply)} supply` : ""].filter(Boolean).join(", ");
+  html += row("Cost", cost);
+  html += row("Provides", st.supply && st.supply < 0 ? `${n(-st.supply)} supply` : "");
+  html += row("Build time", st.buildTime ? `${n(st.buildTime)} s` : "");
+  html += row("Type", (st.attributes ?? []).join(", "));
+  for (const w of st.weapons ?? []) {
+    const bonus = Object.entries(w.bonus ?? {}).map(([k, v]) => ` (+${n(v)} vs ${k})`).join("");
+    const targets = w.air && w.ground ? "air and ground" : w.air ? "air" : "ground";
+    html += `<div class="weapon"><span>${escapeHTML(w.name || "Weapon")}</span>` +
+      `<span>${n(w.damage)}${w.attacks ? ` ×${w.attacks}` : ""}${bonus} · range ${n(w.range)} · every ${n(w.cooldown)} s · ${targets}</span></div>`;
+  }
+  return html;
 }
 
 // Health bars: damaged (and selected) units, then all, then none.
@@ -448,8 +575,8 @@ function drawMarks(): void {
   }
   // Upgrades and expansions: ticks at the top in player color.
   for (const it of model.feed) {
-    const isUpgrade = it.text.startsWith("Upgrade:");
-    const isExpansion = /^(Hatchery|Nexus|CommandCenter) started$/.test(it.text);
+    const isUpgrade = it.kind === "upgrade";
+    const isExpansion = it.kind === "started" && /^(Hatchery|Nexus|CommandCenter)$/.test(it.subject);
     if (!isUpgrade && !isExpansion) continue;
     ctx.fillStyle = playerColor(it.player);
     const x = (it.loop / model.loops) * c.width;
@@ -459,6 +586,12 @@ function drawMarks(): void {
 new ResizeObserver(drawMarks).observe($("marks"));
 
 // ---------------------------------------------------------------- minimap
+
+/** A player's view at the game's default zoom, roughly, in cells. */
+const CAMERA_W = 26;
+const CAMERA_H = 15;
+/** The player whose camera the view follows (0: none). */
+let followCamera = 0;
 
 let minimapScale = 1;
 let minimapAt = 0;
@@ -506,6 +639,23 @@ function drawMinimap(): void {
     ctx.arc(toX(m.x ?? 0), toY(m.y ?? 0), Math.max(4, m.r * minimapScale), 0, Math.PI * 2);
     ctx.stroke();
   }
+  // Pings, and where each player was looking (their camera's rough view).
+  ctx.lineWidth = 1.5;
+  for (const pg of cur.model.pings) {
+    if (pg.loop > loop || loop - pg.loop > PING_LOOPS) continue;
+    ctx.strokeStyle = playerColor(pg.player);
+    ctx.beginPath();
+    ctx.arc(toX(pg.x), toY(pg.y), 3 + ((loop - pg.loop) / PING_LOOPS) * 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.setLineDash([3, 2]);
+  for (const pl of cur.model.tl.meta?.players ?? []) {
+    const c = cur.model.cameraAt(pl.id, loop);
+    if (!c) continue;
+    ctx.strokeStyle = playerColor(pl.id);
+    ctx.strokeRect(toX(c.x - CAMERA_W / 2) + 0.5, toY(c.y + CAMERA_H / 2) + 0.5, CAMERA_W * minimapScale, CAMERA_H * minimapScale);
+  }
+  ctx.setLineDash([]);
   const [x0, y0] = scene.screenToWorld(0, 0);
   const [x1, y1] = scene.screenToWorld(stage.clientWidth, stage.clientHeight);
   ctx.strokeStyle = "#ffffffcc";
@@ -802,6 +952,14 @@ window.addEventListener("keydown", (e) => {
     case "H":
       cycleHealthBars();
       break;
+    case "c":
+    case "C":
+      cycleFollowCamera();
+      break;
+    case "i":
+    case "I":
+      void toggleGameInfo();
+      break;
     case "?":
       $("help").hidden = !$("help").hidden;
       break;
@@ -1000,6 +1158,47 @@ function setFog(p: number): void {
 }
 $<HTMLSelectElement>("fog").onchange = (e) => setFog(Number((e.target as HTMLSelectElement).value));
 
+/** Follow each player's camera in turn, then none. */
+function cycleFollowCamera(): void {
+  if (!cur) return;
+  if (!cur.model.hasCameras) {
+    showError("This replay has no camera moves (computer players and API games have none).");
+    return;
+  }
+  const ids = [0, ...(cur.model.tl.meta?.players ?? []).filter((p) => cur!.model.cameraAt(p.id, 0)).map((p) => p.id)];
+  followCamera = ids[(ids.indexOf(followCamera) + 1) % ids.length];
+  if (followCamera) setDirector(false);
+  showError("");
+  $("caption").hidden = !followCamera;
+  if (followCamera) {
+    $("caption").querySelector("b")!.textContent = `${playerName(followCamera)}'s camera`;
+    $("caption").querySelector("span")!.textContent = " · C: next player";
+  }
+}
+
+let infoImage: string | null = null;
+
+/** Shows or hides the game info panel (map, date, players' details). */
+async function toggleGameInfo(): Promise<void> {
+  const box = $("gameinfo");
+  if (!box.hidden || !cur) {
+    box.hidden = true;
+    return;
+  }
+  const c = cur;
+  const render = () => {
+    box.innerHTML = gameInfoHTML(c.model.tl, c.map, infoImage, textColor) + `<button id="gameinfo-close">Close</button>`;
+    $("gameinfo-close").onclick = () => (box.hidden = true);
+  };
+  if (infoImage) URL.revokeObjectURL(infoImage);
+  infoImage = null;
+  render();
+  box.hidden = false;
+  infoImage = (c.map?.hasPreview ? await api.fetchPreview(c.summary.id) : null) ?? (await api.fetchLoadingScreen(c.summary.id));
+  if (infoImage && cur === c && !box.hidden) render();
+}
+$("info-btn").onclick = () => void toggleGameInfo();
+
 function cycleFog(): void {
   const ids = [0, ...(cur?.model.tl.meta?.players ?? []).map((p) => p.id)];
   setFog(ids[(ids.indexOf(scene.fogPlayer) + 1) % ids.length]);
@@ -1032,7 +1231,13 @@ function setDirector(on: boolean): void {
   director?.reset();
 }
 $("director").onclick = () => setDirector(!directorOn);
-scene.onUserMove = () => directorOn && setDirector(false);
+scene.onUserMove = () => {
+  if (directorOn) setDirector(false);
+  if (followCamera) {
+    followCamera = 0;
+    $("caption").hidden = true;
+  }
+};
 
 /** Points the camera where the director wants it and captions the hotspot. */
 function frameShot(): void {

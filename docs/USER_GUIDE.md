@@ -64,8 +64,22 @@ Click a unit to inspect it; the panel says when its position was last actually o
 | D | Director camera on or off |
 | L / M / F | Labels / map art / frame-rate counter |
 | H | Health bars: damaged units, all units, none |
+| C | Follow each player's camera in turn, then none |
+| I | About this game: the map, when it was played, the players |
 
 The minimap moves the camera when clicked. Bars under the scrubber show deaths; yellow bands are battles; ticks at the top are upgrades (short) and expansions (long).
+
+## Game details
+
+**Info** (or **I**) shows what the replay and map say about the game: the map's title, description and picture, when and where the game was played (ladder or custom, region), observers, and for each player their race (and whether they picked Random), result, APM, MMR, handicap, Battle.net profile, and for computer players their difficulty and build.
+
+The event feed says who killed what ("Marine killed by Siege Tank"). The inspect panel shows a unit's kills so far, what killed it, and what made it (the Barracks that trained it, a Calldown MULE); click a named unit to select it.
+
+The minimap shows where each player was looking, as a dashed box in their color, and pings as rings. **C** makes the view follow a player's camera; drag or zoom to take over again. Computer players and bots have no camera.
+
+On the map, Xel'Naga towers show their vision range, solid in a player's color while one of their units holds the tower. Inhibitor and acceleration zones show as tinted circles (their sizes are approximate).
+
+With StarCraft II installed, ghostreel also uses the game's own names ("Siege Tank", "Infantry Weapons Level 1") and shows each unit's stats in the inspect panel: health, shields, armor, cost, build time, attributes, and each weapon's damage, bonuses, range and cooldown. The selected unit's weapon ranges show as red dashed rings. Mineral fields and geysers show how much they held at the start. The stats are those of the installed game, which may differ from the version the replay was played on. Without the game, names are spaced-out ids ("Siege Tank Sieged") and there are no stats.
 
 ## Analysis: build orders, battles, economy, APM
 
@@ -123,7 +137,9 @@ Press **3**. With StarCraft II installed on the same computer, units are the gam
 
 Without the game (and in the browser build), units are plain shapes in team colors, which is also what you see while a model loads and when zoomed far out.
 
-Known gaps: cliffs are plain walls rather than the game's cliff models, and there is no water.
+The 3D view is lit like the map, with its sun direction and light colors (toned halfway toward white, so models keep their colors), when the game data has the map's lighting.
+
+Known gap: there is no water.
 
 ## Privacy
 

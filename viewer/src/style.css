@@ -108,6 +108,24 @@ button:disabled { opacity: 0.4; cursor: default; }
 #inspect .row .muted { color: var(--muted); }
 #inspect .note { color: var(--warn); font-size: 12px; margin-top: 6px; }
 #inspect button { margin-top: 8px; }
+#inspect .row > :last-child { text-align: right; }
+#inspect a[data-unit] { cursor: pointer; text-decoration: underline dotted; }
+#inspect .weapon { display: flex; flex-direction: column; margin-top: 2px; }
+#inspect .weapon span:first-child { color: var(--muted); }
+#inspect .weapon span:last-child { text-align: right; }
+#inspect { max-height: calc(100% - 20px); overflow-y: auto; }
+
+#gameinfo { top: 60px; left: 50%; transform: translateX(-50%); width: min(420px, calc(100% - 32px)); max-height: calc(100% - 80px); overflow-y: auto; padding: 12px 16px; z-index: 20; }
+#gameinfo h3 { margin: 0 0 6px; }
+#gameinfo h4 { margin: 12px 0 4px; color: var(--muted); font-weight: 600; }
+#gameinfo .row { display: flex; justify-content: space-between; gap: 12px; }
+#gameinfo .row span:first-child { color: var(--muted); }
+#gameinfo .row span:last-child { text-align: right; }
+#gameinfo .map-image { width: 100%; border-radius: 4px; margin: 4px 0 6px; }
+#gameinfo .note { color: var(--muted); font-size: 12px; margin: 0 0 8px; white-space: pre-line; }
+#gameinfo .player-info { display: flex; flex-direction: column; margin-bottom: 6px; }
+#gameinfo .player-info .muted { color: var(--muted); font-size: 12px; }
+#gameinfo button { margin-top: 10px; }
 
 #minimap {
   position: absolute;

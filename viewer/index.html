@@ -28,6 +28,7 @@
           <option value="minimap">Map art (minimap)</option>
           <option value="ground" id="terrain-mode-ground" hidden>Ground textures</option>
         </select>
+        <button id="info-btn" title="About this game: the map, when it was played, the players (I)">Info</button>
         <button id="director" title="Director: the camera follows the action and pans to hotspots (D)">Director</button>
         <button id="export-btn" title="Export the game or a highlight reel as an MP4 video">Export video</button>
         <button id="settings-btn" title="Game data and map folders" hidden>Settings</button>
@@ -51,6 +52,7 @@
           <div id="report" hidden></div>
         </aside>
         <div id="inspect" class="panel" hidden></div>
+        <div id="gameinfo" class="panel" hidden></div>
         <canvas id="minimap" hidden></canvas>
         <div id="fps" hidden></div>
         <div id="empty" class="center">
@@ -117,6 +119,8 @@
             <tr><td>V</td><td>Fog of war: cycle player views</td></tr>
             <tr><td>B</td><td>Events / build order / battles</td></tr>
             <tr><td>D</td><td>Director: the camera follows the action</td></tr>
+            <tr><td>C</td><td>Follow a player's camera (replays of human players)</td></tr>
+            <tr><td>I</td><td>About this game: map, date, players</td></tr>
             <tr><td>H</td><td>Health bars: damaged units, all, none (engine recordings only)</td></tr>
             <tr><td>L / M / F</td><td>Labels / map art / FPS counter</td></tr>
           </table>

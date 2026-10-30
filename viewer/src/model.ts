@@ -8,6 +8,7 @@
 
 import { fromBinary } from "@bufbuild/protobuf";
 import {
+  type CameraKey,
   type Keyframe,
   type PlayerStats,
   type Timeline,
@@ -142,12 +143,30 @@ export function isAlive(u: Unit, loop: number): boolean {
   return u.bornLoop <= loop && (u.diedLoop === undefined || u.diedLoop > loop);
 }
 
+/** What a feed entry reports; the viewer words it (with display names). */
+export type FeedKind = "died" | "started" | "trained" | "finished" | "upgrade" | "chat" | "ping";
+
 /** Feed entry derived from timeline events. */
 export interface FeedItem {
   loop: number;
   player: number;
-  text: string;
+  kind: FeedKind;
+  /** Unit type or upgrade id, or the chat text. */
+  subject: string;
   unitId?: number;
+  /** Deaths: the unit that dealt the killing blow, when known. */
+  killerId?: number;
+  /** Pings: where. */
+  x?: number;
+  y?: number;
+}
+
+/** A minimap ping. */
+export interface Ping {
+  loop: number;
+  player: number;
+  x: number;
+  y: number;
 }
 
 /** Units too common or transient to list in the event feed. */
@@ -155,7 +174,7 @@ const QUIET_TYPES = new Set([
   "Larva", "Egg", "Broodling", "LocustMP", "LocustMPFlying", "Interceptor", "AdeptPhaseShift",
   "CreepTumor", "CreepTumorBurrowed", "CreepTumorQueen", "MULE", "AutoTurret", "BanelingCocoon",
   "Changeling", "ChangelingMarine", "ChangelingMarineShield", "ChangelingZealot", "ChangelingZergling",
-  "ChangelingZerglingWings",
+  "ChangelingZerglingWings", "KD8Charge",
 ]);
 
 export class Model {
@@ -177,6 +196,12 @@ export class Model {
   readonly hasVitals: boolean;
   /** Typical construction time per type in loops, from buildings that finished. */
   private readonly buildLoops = new Map<number, number>();
+  /** Loops at which each unit got a kill (killing blows), sorted, by killer id. */
+  private readonly kills = new Map<number, number[]>();
+  /** Each player's camera keys, in loop order. */
+  private readonly cameras = new Map<number, CameraKey[]>();
+  /** Minimap pings, in loop order. */
+  readonly pings: Ping[] = [];
 
   /** opts.mining: false leaves workers where the timeline puts them (tests against Go). */
   constructor(tl: Timeline, opts: { mining?: boolean } = {}) {
@@ -205,6 +230,7 @@ export class Model {
       d.push(u.doneLoop - u.bornLoop);
     }
     for (const [t, d] of durations) this.buildLoops.set(t, d.sort((a, b) => a - b)[d.length >> 1]);
+    for (const c of tl.cameras) this.cameras.set(c.player, c.keys);
     for (const e of tl.events) {
       const k = e.kind;
       switch (k.case) {
@@ -219,9 +245,14 @@ export class Model {
           const u = this.units[k.value.unitId];
           const name = this.typeName(typeAt(u, e.loop));
           const cls = this.types[typeAt(u, e.loop)]?.class;
+          if (u.killer !== undefined && u.killer !== u.id) {
+            let k = this.kills.get(u.killer);
+            if (!k) this.kills.set(u.killer, (k = []));
+            k.push(e.loop);
+          }
           if (u.owner !== 0 && !QUIET_TYPES.has(name) && cls !== UnitClass.HIDDEN) {
             this.deathLoops.push(e.loop);
-            this.feed.push({ loop: e.loop, player: ownerAt(u, e.loop), text: `${name} died`, unitId: u.id });
+            this.feed.push({ loop: e.loop, player: ownerAt(u, e.loop), kind: "died", subject: name, unitId: u.id, killerId: u.killer });
           }
           break;
         }
@@ -229,22 +260,26 @@ export class Model {
           const u = this.units[k.value.unitId];
           const t = this.types[u.type];
           if (u.owner !== 0 && u.constructed && e.loop > 0) {
-            this.feed.push({ loop: e.loop, player: u.owner, text: `${t.name} started`, unitId: u.id });
+            this.feed.push({ loop: e.loop, player: u.owner, kind: "started", subject: t.name, unitId: u.id });
           } else if (u.owner !== 0 && e.loop > 0 && t.class === UnitClass.ARMY && !QUIET_TYPES.has(t.name)) {
-            this.feed.push({ loop: e.loop, player: u.owner, text: `${t.name} trained`, unitId: u.id });
+            this.feed.push({ loop: e.loop, player: u.owner, kind: "trained", subject: t.name, unitId: u.id });
           }
           break;
         }
         case "unitDone": {
           const u = this.units[k.value.unitId];
-          this.feed.push({ loop: e.loop, player: ownerAt(u, e.loop), text: `${this.typeName(typeAt(u, e.loop))} finished`, unitId: u.id });
+          this.feed.push({ loop: e.loop, player: ownerAt(u, e.loop), kind: "finished", subject: this.typeName(typeAt(u, e.loop)), unitId: u.id });
           break;
         }
         case "upgrade":
-          if (e.loop > 0) this.feed.push({ loop: e.loop, player: k.value.player, text: `Upgrade: ${k.value.name}` });
+          if (e.loop > 0) this.feed.push({ loop: e.loop, player: k.value.player, kind: "upgrade", subject: k.value.name });
           break;
         case "chat":
-          this.feed.push({ loop: e.loop, player: k.value.player, text: `“${k.value.text}”` });
+          this.feed.push({ loop: e.loop, player: k.value.player, kind: "chat", subject: k.value.text });
+          break;
+        case "ping":
+          this.pings.push({ loop: e.loop, player: k.value.player, x: k.value.x, y: k.value.y });
+          this.feed.push({ loop: e.loop, player: k.value.player, kind: "ping", subject: "", x: k.value.x, y: k.value.y });
           break;
       }
     }
@@ -290,6 +325,34 @@ export class Model {
     const speed = this.types[t]?.speed ?? 0;
     positionAt(this.tracks[u.id], speed, loop, out);
     this.mining.apply(u, t, out.owner, this.tracks[u.id], loop, speed || DEFAULT_SPEED, out);
+  }
+
+  /** How many units a unit had killed (killing blows) by loop. */
+  killsAt(id: number, loop: number): number {
+    const k = this.kills.get(id);
+    if (!k) return 0;
+    let n = 0;
+    while (n < k.length && k[n] <= loop) n++;
+    return n;
+  }
+
+  /** Whether the timeline has any player's camera. */
+  get hasCameras(): boolean {
+    return this.cameras.size > 0;
+  }
+
+  /** Where a player's camera was centered at loop, if the replay recorded it. */
+  cameraAt(player: number, loop: number): CameraKey | undefined {
+    const keys = this.cameras.get(player);
+    if (!keys) return undefined;
+    let lo = 0;
+    let hi = keys.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (keys[mid].loop > loop) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo > 0 ? keys[lo - 1] : keys[0];
   }
 
   /** A unit's health, shields and energy at loop (the last key at or before it), if recorded. */
