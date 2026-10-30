@@ -237,12 +237,13 @@ A light procedural grain (value noise, every 3 cells) keeps low-detail textures 
 
 ## Health, shields and energy (2026-10-29)
 
-PLAN.md Phase 6 track F, steps 1–4. Replays have no hit points, so these come only from the engine tier:
+PLAN.md Phase 6 track F, steps 1–5. Replays have no hit points, so these come only from the engine tier:
 
 - **Recorded:** `ghostreel-engine` now keeps each unit's health, shields and energy and their maxima (new `UnitSample` fields; older recordings read with none).
 - **Timeline:** `Track.vitals`, built by `timeline.ApplyEngine`, keyed when a value moves by more than 1% of its maximum or a maximum changes. A key holds until the next: damage is discrete, so no interpolation. Engine-tier timelines aren't cached, so no cache version change.
 - **Viewer:** bars above units on the labels layer (so exported video has them), drawn for damaged and selected units by default, **H** for all or none; none for units hidden by fog; numbers in the inspect panel. Checked with sample values injected in the browser.
-- **Not yet:** none of the five recordings has vitals; re-recording them needs a run on the sc2-headless VM, which waits for its owner's go-ahead (step 5).
+- **Recordings (2026-10-30):** the five test games re-exported on the sc2-headless VM, one at a time under `nice 10` and `--max-load 7`, each started only with more than 1.5 GB of memory free (the VM's bot runs A/B games alongside; its orphan guard was widened to let `ghostreel-engine` own an SC2 process). Every unit has vitals; files grew 6–24% (1.1–5.7 MB gzipped). Positions are unchanged: command-tier accuracy against old and new recordings is identical. Bars checked on a 14:19 fight in the g4 game, in 2D and 3D.
+- **Not yet:** current-version games, which need a Windows or macOS client of the same build.
 
 ## Getting ready to be public (2026-10-29)
 

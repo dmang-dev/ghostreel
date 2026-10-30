@@ -200,7 +200,7 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 
 Replays record no hit points: tracker events give births, deaths and position samples, and game events only commands. The only source is the game itself, through `ghostreel-engine`, which already observes every unit every 16 loops and drops these values. So bars exist only for replays with an engine recording; other tiers show none, and the inspect panel says why.
 
-Steps 1–4 done 2026-10-29 (see DECISIONS); no recording has vitals until step 5 runs.
+Steps 1–5 done 2026-10-29/30 (see DECISIONS). Left: recordings of current-version games (step 5's second half).
 
 1. **Record them.** Add `health`, `health_max`, `shield`, `shield_max`, `energy`, `energy_max` to `UnitSample` in `proto/engine/v1/engine.proto` (new fields, so older recordings still read, as "no vitals"), and fill them in `internal/engine/export.go` from the API's `Unit` (the 4.10 client has them). Measure the size: the five test recordings are 1–4.8 MB gzipped now; values that rarely change should compress well.
 2. **Carry them in the timeline.** A per-unit vitals track beside the keyframes in `proto/timeline/v1/timeline.proto`: keys of loop, health, shield, energy, stored only when a value changes by more than 1% of its maximum or a maximum changes (upgrades, morphs), with the maxima on the key. `timeline.ApplyEngine` builds it; other tiers leave it empty. Document in `docs/TIMELINE_FORMAT.md`, keep old timelines readable, and bump `CacheVersion`.
