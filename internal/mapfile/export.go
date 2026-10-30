@@ -12,6 +12,12 @@ type Export struct {
 	Height   int    `json:"height"`
 	Playable Rect   `json:"playable"`
 	Tileset  string `json:"tileset"`
+	// About the map: its title, description and what it is for ("1v1").
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	Players     string `json:"players,omitempty"`
+	// HasPreview: the API serves a screenshot of the map.
+	HasPreview bool `json:"hasPreview,omitempty"`
 	// TerrainTextures are the terrain's texture layers, base first.
 	TerrainTextures []string `json:"terrainTextures,omitempty"`
 	// TerrainMasks describes the painted texture layers, which the API
@@ -39,6 +45,7 @@ type MaskInfo struct {
 func (m *Map) Export(withDoodads bool) *Export {
 	e := &Export{
 		Name: m.Name, Width: m.Width, Height: m.Height, Playable: m.Playable, Tileset: m.Tileset,
+		Title: m.Title, Description: m.Description, Players: m.Players, HasPreview: len(m.Preview) > 0,
 		StartLocations: m.StartLocations, Warnings: m.Warnings, TerrainTextures: m.TerrainTextures,
 		Objects: []Object{},
 	}

@@ -17,10 +17,25 @@ Maps are MPQ archives, read with `icza/mpq`. Locked ladder maps may lack `(listf
 | 0x08 | u32 ×2, unknown (present when version ≥ 0x18) |
 | 0x10 | u32 width, u32 height (cells; equals the replay's `mapSizeX/Y`) |
 | 0x18 | preview-image settings; the layout varies, ~10–20 bytes |
-| … | cstring fog type (e.g. `Dark`), cstring tileset (e.g. `Elsecaro`) |
+| … | cstring fog type (e.g. `Dark`), cstring terrain type (e.g. `Elsecaro`, a `CTerrain` id) |
 | … | u32 camera left, bottom, right, top = **playable area** |
+| … | optional cstring: the loading screen image, a game-data path (`Assets\Textures\….dds`); absent for the default |
 
 The parser scans for the two printable strings followed by bounds inside the map, rather than decoding the preview block. Check: Abyssal Reef gives 24, 4, 176, 140, which is its known 152×136 playable area.
+
+The terrain type names the map's lighting: `CTerrain` has a `Lighting` field (default `##id##`, the terrain's own id) naming a `CLight`. Usually the two match (`HybridLabXelNaga`, `Elsecaro`); Ultralove's `RedstoneEx1` uses `Avernus` in 4.10 and `Redstone` in later versions. A map may define its own terrain types and adjust lights in `Base.SC2Data\GameData\TerrainData.xml` and `LightData.xml`, which apply over the game's. A `CLight`'s first `ToDInfoArray` holds `AmbientColor` and three `DirectionalLight`s (`Key`, `Fill`, `Back`) whose `Color`, `ColorMultiplier` and `Direction` appear as attributes or as child elements.
+
+## `DocumentHeader`
+
+The map's title and description, in each language the map has. After a header and the dependency list (`bnet:Void (Mod)/0.0/999,file:Mods/Void.SC2Mod`) come string entries:
+
+| Field | |
+| --- | --- |
+| u16 + bytes | key, e.g. `DocInfo/Name`, `DocInfo/DescLong`, `DocInfo/DescShort` (`1v1`, or a player count) |
+| 4 bytes | locale, reversed (`SUne` is enUS) |
+| u16 + bytes | UTF-8 value |
+
+The parser scans for keys rather than decoding the header. Values use the game's text markup: `<n/>` is a line break; other tags (colors, images) are dropped. Maps may also carry screenshots as JPEG files at the archive root (`Screenshot-01.jpg`); the first is used as the map's picture.
 
 ## `t3SyncHeightMap` (gameplay heights)
 
@@ -64,7 +79,7 @@ So "pathable" here means inside the playable bounds and bit 0 clear. Rocks, buil
 
 `<PlacedObjects Version="27">` contains three element types:
 
-- `ObjectUnit`: `UnitType`, `Position="x,y,z"`, optional `Rotation` (radians), `Player`, `Variation`. Minerals, geysers, rocks, Xel'Naga towers. Positions follow the footprint convention: a 2×1 mineral field sits at an integer x and a .5 y.
+- `ObjectUnit`: `UnitType`, `Position="x,y,z"`, optional `Rotation` (radians), `Player`, `Variation`, `Resources`. Minerals, geysers, rocks, Xel'Naga towers. Positions follow the footprint convention: a 2×1 mineral field sits at an integer x and a .5 y. `Resources` overrides how much a mineral field or geyser holds (Ley Lines' gold-rimmed fields hold 150); without it the amount is the type's, from its resource behavior's `Contents` in the game data.
 - `ObjectPoint`: `Type` (`StartLoc`, `BlockPathing`, …) and `Name`. Start locations come from here.
 - `ObjectDoodad`: decoration, thousands per ladder map. Left out of the JSON export unless `--doodads` is given.
 

@@ -29,7 +29,22 @@ type Map struct {
 	Name          string // file name without extension
 	Width, Height int    // in cells
 	Playable      Rect
-	Tileset, Fog  string
+	// Tileset is the map's terrain type (a CTerrain id, "RedstoneEx1"), which
+	// names the map's lighting.
+	Tileset, Fog string
+
+	// About the map, from DocumentHeader (English when the map has it).
+	Title       string // "Abyssal Reef LE"
+	Description string
+	Players     string // what the map says it is for: "1v1", "2"
+	// LoadingScreen is the game-data path of the loading screen image.
+	LoadingScreen string
+	// Preview is the first screenshot the map carries (JPEG), if any.
+	Preview []byte
+	// TerrainData and LightData are the map's own TerrainData.xml and
+	// LightData.xml, which add to or override the game's terrain types and
+	// lighting; nil when the map has none.
+	TerrainData, LightData []byte
 	// TerrainTextures are the terrain's texture layers (CTerrainTex ids),
 	// base layer first, from t3Terrain.xml.
 	TerrainTextures []string
@@ -82,6 +97,9 @@ type Object struct {
 	// numbered variations to show.
 	Scale     []float64 `json:",omitempty"`
 	Variation int       `json:",omitempty"`
+	// Units only: the starting amount when the map sets one (minerals and
+	// gas); 0 means the unit type's default.
+	Resources int `json:",omitempty"`
 }
 
 // Open decodes the map at path.
@@ -169,6 +187,21 @@ func Decode(a ReadFile) (*Map, error) {
 		for _, o := range objs {
 			if o.Kind == ObjectPoint && o.Type == "StartLoc" {
 				mp.StartLocations = append(mp.StartLocations, Point{o.X, o.Y})
+			}
+		}
+	}
+	if d := get("DocumentHeader"); d != nil {
+		parseDocumentHeader(d, mp)
+	}
+	mp.LightData = get(`Base.SC2Data\GameData\LightData.xml`)
+	mp.TerrainData = get(`Base.SC2Data\GameData\TerrainData.xml`)
+	if list := get("(listfile)"); list != nil {
+		for _, name := range strings.Split(string(list), "\n") {
+			name = strings.TrimSpace(name)
+			if !strings.ContainsAny(name, `\/`) && strings.HasSuffix(strings.ToLower(name), ".jpg") {
+				if mp.Preview = get(name); mp.Preview != nil {
+					break
+				}
 			}
 		}
 	}

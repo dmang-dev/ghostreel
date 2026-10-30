@@ -11,6 +11,7 @@ import (
 	"image"
 	"image/color"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -71,12 +72,72 @@ func parseMapInfo(d []byte, mp *Map) error {
 		r := Rect{int(le.Uint32(d[b:])), int(le.Uint32(d[b+4:])), int(le.Uint32(d[b+8:])), int(le.Uint32(d[b+12:]))}
 		if r.Left < r.Right && r.Bottom < r.Top && r.Right <= mp.Width && r.Top <= mp.Height {
 			mp.Fog, mp.Tileset, mp.Playable = fog, tileset, r
+			mp.LoadingScreen = loadingScreen(d[b+16:])
 			return nil
 		}
 	}
 	mp.Warnings = append(mp.Warnings, "MapInfo: camera bounds not found; using the whole map")
 	return nil
 }
+
+// loadingScreen finds the loading screen image's path, the first string
+// naming a .dds file after the camera bounds.
+func loadingScreen(d []byte) string {
+	for i := 0; i < len(d) && i < 256; i++ {
+		s, _, ok := cstring(d, i)
+		if ok && strings.HasSuffix(strings.ToLower(s), ".dds") {
+			return s
+		}
+	}
+	return ""
+}
+
+// parseDocumentHeader reads the map's title and description. After a header
+// and the dependency list, DocumentHeader holds localized strings:
+//
+//	u16 key length, key ("DocInfo/Name"), 4-byte locale reversed ("SUne"),
+//	u16 value length, UTF-8 value
+//
+// The layout before the strings varies, so the parser scans for keys.
+func parseDocumentHeader(d []byte, mp *Map) {
+	type val struct{ s, locale string }
+	found := map[string]val{}
+	for i := 0; i+2 < len(d); i++ {
+		kl := int(le.Uint16(d[i:]))
+		if kl < 6 || kl > 64 || i+2+kl+6 > len(d) {
+			continue
+		}
+		key := string(d[i+2 : i+2+kl])
+		if !docKey.MatchString(key) {
+			continue
+		}
+		locale := string(d[i+2+kl : i+2+kl+4])
+		vl := int(le.Uint16(d[i+2+kl+4:]))
+		end := i + 2 + kl + 6 + vl
+		if end > len(d) {
+			continue
+		}
+		v := string(d[i+2+kl+6 : end])
+		if prev, ok := found[key]; !ok || (locale == "SUne" && prev.locale != "SUne") {
+			found[key] = val{v, locale}
+		}
+		i = end - 1
+	}
+	mp.Title = plainText(found["DocInfo/Name"].s)
+	mp.Description = plainText(found["DocInfo/DescLong"].s)
+	mp.Players = plainText(found["DocInfo/DescShort"].s)
+}
+
+// plainText turns the game's text markup into plain text: <n/> is a line
+// break, other tags (colors, images) are dropped.
+func plainText(s string) string {
+	s = strings.ReplaceAll(s, "<n/>", "\n")
+	return strings.TrimSpace(textTag.ReplaceAllString(s, ""))
+}
+
+var textTag = regexp.MustCompile(`<[^>]*>`)
+
+var docKey = regexp.MustCompile(`^[A-Za-z]+(/[A-Za-z0-9]+)+$`)
 
 // cstring reads a printable NUL-terminated string at off; n includes the NUL.
 func cstring(d []byte, off int) (s string, n int, ok bool) {
@@ -364,6 +425,7 @@ type xmlObject struct {
 	Player    int     `xml:"Player,attr"`
 	Scale     string  `xml:"Scale,attr"`
 	Variation int     `xml:"Variation,attr"`
+	Resources int     `xml:"Resources,attr"`
 }
 
 // parseObjects reads the Objects XML (<PlacedObjects>).
@@ -380,6 +442,9 @@ func parseObjects(d []byte) ([]Object, error) {
 				typ = o.UnitType
 			}
 			obj := Object{Kind: kind, Type: typ, Name: o.Name, Rotation: o.Rotation, Player: o.Player}
+			if kind == ObjectUnit {
+				obj.Resources = o.Resources
+			}
 			p := strings.Split(o.Position, ",")
 			if len(p) >= 2 {
 				obj.X, _ = strconv.ParseFloat(p[0], 64)

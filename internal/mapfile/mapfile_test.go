@@ -169,6 +169,48 @@ func TestRealMaps(t *testing.T) {
 	}
 }
 
+// TestAboutMaps checks what the map says about itself on two ladder maps
+// with English strings, and the custom mineral amounts on Ley Lines. Maps
+// with the default loading screen name none.
+func TestAboutMaps(t *testing.T) {
+	cases := []struct {
+		file, title, lighting string
+		preview, resources    bool
+	}{
+		{"AbyssalReefAIE.SC2Map", "Abyssal Reef AIE", "", true, false},
+		{"LeyLinesAIE_v3.SC2Map", "Ley Lines AIE", "HybridLabXelNaga", true, true},
+	}
+	for _, c := range cases {
+		path := filepath.Join("..", "..", "testdata", "maps", c.file)
+		m, err := Open(path)
+		if err != nil {
+			t.Logf("skipping %s: %v", c.file, err)
+			continue
+		}
+		if m.Title != c.title || m.Description == "" {
+			t.Errorf("%s: title %q, description %q", c.file, m.Title, m.Description)
+		}
+		if c.lighting != "" && m.Tileset != c.lighting {
+			t.Errorf("%s: lighting %q, want %q", c.file, m.Tileset, c.lighting)
+		}
+		if m.LoadingScreen != "" && !strings.HasSuffix(strings.ToLower(m.LoadingScreen), ".dds") {
+			t.Errorf("%s: loading screen %q", c.file, m.LoadingScreen)
+		}
+		if (len(m.Preview) > 0) != c.preview || len(m.LightData) == 0 {
+			t.Errorf("%s: preview %d bytes, light data %d bytes", c.file, len(m.Preview), len(m.LightData))
+		}
+		custom := 0
+		for _, o := range m.Objects {
+			if o.Resources > 0 {
+				custom++
+			}
+		}
+		if (custom > 0) != c.resources {
+			t.Errorf("%s: %d objects with custom resources", c.file, custom)
+		}
+	}
+}
+
 // TestResourcesMatchReplay checks the map's placed minerals and geysers
 // against the neutral units a replay on that map reports at loop 0.
 func TestResourcesMatchReplay(t *testing.T) {
