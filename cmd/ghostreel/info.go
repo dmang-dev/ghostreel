@@ -3,6 +3,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -17,12 +19,21 @@ func cmdInfo(args []string) error {
 	fs := flag.NewFlagSet("info", flag.ExitOnError)
 	counts := fs.Bool("counts", false, "list event counts per s2prot event type")
 	positions := fs.Bool("positions", false, "report position-sample coverage (debug)")
-	fs.Parse(args)
+	asJSON := fs.Bool("json", false, "print one JSON object per replay (for scripts), with its map file if found locally")
+	rf := addResolverFlags(fs)
+	fs.Parse(reorder(fs, args))
 	if fs.NArg() == 0 {
 		return errors.New("info: no replay given")
 	}
 	failed := 0
+	enc := json.NewEncoder(os.Stdout)
 	for i, path := range fs.Args() {
+		if *asJSON {
+			if err := enc.Encode(infoJSON(path, rf)); err != nil {
+				return err
+			}
+			continue
+		}
 		if i > 0 {
 			fmt.Println()
 		}
@@ -41,6 +52,44 @@ func cmdInfo(args []string) error {
 		return fmt.Errorf("%d of %d replays failed", failed, fs.NArg())
 	}
 	return nil
+}
+
+// replayJSON is what `info -json` prints: enough for a script to choose
+// replays by version, race and map.
+type replayJSON struct {
+	Path      string       `json:"path"`
+	Error     string       `json:"error,omitempty"`
+	Version   string       `json:"version,omitempty"`
+	BaseBuild int          `json:"baseBuild,omitempty"`
+	Loops     int          `json:"loops,omitempty"`
+	Map       string       `json:"map,omitempty"`
+	MapFile   string       `json:"mapFile,omitempty"` // empty when not found locally
+	Players   []playerJSON `json:"players,omitempty"`
+}
+
+type playerJSON struct {
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Race  string `json:"race"`
+	Human bool   `json:"human"`
+}
+
+func infoJSON(path string, rf *resolverFlags) replayJSON {
+	out := replayJSON{Path: path}
+	r, err := replay.OpenWith(path, replay.Options{InfoOnly: true})
+	if err != nil {
+		out.Error = err.Error()
+		return out
+	}
+	in := &r.Info
+	out.Version, out.BaseBuild, out.Loops, out.Map = in.Version, in.BaseBuild, int(in.Loops), in.MapTitle
+	for _, p := range in.Players {
+		out.Players = append(out.Players, playerJSON{p.ID, p.Name, p.Race, p.Human})
+	}
+	if mp, _, err := rf.resolver().Resolve(context.Background(), in, rf.manual); err == nil {
+		out.MapFile = mp
+	}
+	return out
 }
 
 func printInfo(in *replay.Info, counts bool) {
