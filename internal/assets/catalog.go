@@ -35,7 +35,13 @@ type entry struct {
 	// Terms of <On ... Send="Create"/> events: the events that create the
 	// actor itself.
 	creates []string
+	// Every <On/> event in order, for the messages an actor sends itself
+	// (AnimGroupApply, Create of another actor).
+	events []event
 }
+
+// event is an actor event: when it fires (Terms) and the message it sends.
+type event struct{ terms, send string }
 
 func newCatalog() *catalog { return &catalog{entries: map[string]*entry{}} }
 
@@ -104,7 +110,7 @@ func (c *catalog) add(data []byte, keep func(class string) bool) error {
 					name += "[" + index + "]"
 				}
 				parent = name
-				if name == "On" {
+				if t.Name.Local == "On" {
 					var terms, send string
 					for _, a := range t.Attr {
 						switch a.Name.Local {
@@ -117,6 +123,7 @@ func (c *catalog) add(data []byte, keep func(class string) bool) error {
 					if send == "Create" {
 						cur.creates = append(cur.creates, terms)
 					}
+					cur.events = append(cur.events, event{terms, send})
 					continue
 				}
 				for _, a := range t.Attr {

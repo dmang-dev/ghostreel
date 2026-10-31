@@ -27,7 +27,7 @@ import (
 )
 
 // Version is part of the cache path; bump it when the conversion changes.
-const Version = "a2"
+const Version = "a3"
 
 // mods are the dependencies of a ladder map, lowest priority first.
 var mods = []string{"core", "liberty", "libertymulti", "swarm", "swarmmulti", "void", "voidmulti"}
@@ -42,7 +42,7 @@ type Library struct {
 	build    string
 	cacheDir string
 	files    map[string]string // "assets/units/.../x.m3" (lower case) → storage name
-	actors   *catalog
+	actors   *catalog          // CActorUnit, and the model actors and site ops they attach
 	models   *catalog
 	buttons  *catalog
 	terrain  *catalog          // CTerrainTex: terrain texture layers
@@ -103,7 +103,7 @@ func Open(installDir, cacheDir string) (*Library, error) {
 			c    *catalog
 			keep func(string) bool
 		}{
-			{"actordata.xml", l.actors, func(c string) bool { return c == "CActorUnit" }},
+			{"actordata.xml", l.actors, keepActor},
 			{"modeldata.xml", l.models, func(c string) bool { return c == "CModel" }},
 			{"buttondata.xml", l.buttons, func(c string) bool { return c == "CButton" }},
 			{"terraintexdata.xml", l.terrain, func(c string) bool { return c == "CTerrainTex" }},
@@ -121,7 +121,7 @@ func Open(installDir, cacheDir string) (*Library, error) {
 		}
 	}
 	for _, e := range l.actors.entries {
-		if e.id == "" || e.isDefault {
+		if e.id == "" || e.isDefault || e.class != "CActorUnit" {
 			continue
 		}
 		unit := e.id
@@ -137,7 +137,7 @@ func Open(installDir, cacheDir string) (*Library, error) {
 	// unit's actor, which says so in its creation events.
 	created := map[string]string{}
 	for _, e := range l.actors.entries {
-		if e.id == "" || e.isDefault {
+		if e.id == "" || e.isDefault || e.class != "CActorUnit" {
 			continue
 		}
 		for _, unit := range l.actors.createdBy("CActorUnit", e.id) {
@@ -238,9 +238,9 @@ func (l *Library) ModelGLB(id string, variation int) ([]byte, error) {
 		return nil, ErrNoModel
 	}
 	key := fmt.Sprintf("model.%s.%d", id, variation)
-	return l.cached(key, func() (string, []string, error) {
+	return l.cached(key, func() (source, error) {
 		name, err := l.modelFile(id, variation)
-		return name, l.models.list("CModel", id, "RequiredAnims"), err
+		return source{name: name, anims: l.models.list("CModel", id, "RequiredAnims")}, err
 	})
 }
 
@@ -254,19 +254,26 @@ func (l *Library) UnitGLB(unit string, death bool) ([]byte, error) {
 	if death {
 		key += ".death"
 	}
-	return l.cached(key, func() (string, []string, error) {
+	return l.cached(key, func() (source, error) {
 		name, err := l.ModelPath(unit, death)
 		if err != nil {
-			return "", nil, err
+			return source{}, err
 		}
 		id, _ := l.modelID(unit, death)
-		return name, l.models.list("CModel", id, "RequiredAnims"), nil
+		return source{name: name, anims: l.models.list("CModel", id, "RequiredAnims"), extras: l.unitLook(unit, death).extras()}, nil
 	})
 }
 
+// source is what a model converts from: the .m3 file, the animation files
+// it requires, and extras for the glTF (a unit's look).
+type source struct {
+	name   string
+	anims  []string
+	extras map[string]any
+}
+
 // cached converts a model once, keeping the result on disk under key.
-// resolve names the .m3 file and the animation files it requires.
-func (l *Library) cached(key string, resolve func() (string, []string, error)) ([]byte, error) {
+func (l *Library) cached(key string, resolve func() (source, error)) ([]byte, error) {
 	return l.once(key, func() ([]byte, error) {
 		cache := ""
 		if l.cacheDir != "" {
@@ -275,17 +282,17 @@ func (l *Library) cached(key string, resolve func() (string, []string, error)) (
 				return b, nil
 			}
 		}
-		name, anims, err := resolve()
+		src, err := resolve()
 		if err != nil {
 			return nil, err
 		}
 		// Cliff pieces fade into the terrain by their vertex alpha.
-		b, err := l.convertWith(name, anims, strings.HasPrefix(key, "cliff."))
+		b, err := l.convertWith(src.name, src.anims, strings.HasPrefix(key, "cliff."), src.extras)
 		if errors.Is(err, m3.ErrNoGeometry) {
-			return nil, fmt.Errorf("%w (%s has no geometry)", ErrNoModel, name)
+			return nil, fmt.Errorf("%w (%s has no geometry)", ErrNoModel, src.name)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("assets: %s: %w", name, err)
+			return nil, fmt.Errorf("assets: %s: %w", src.name, err)
 		}
 		if cache != "" {
 			if err := os.MkdirAll(filepath.Dir(cache), 0o755); err == nil {
@@ -321,12 +328,12 @@ var skipSequence = regexp.MustCompile(`(?i)dance|victory|cheer|portrait|talk|fid
 // convert reads a model and the animation files it requires and converts
 // them to glTF.
 func (l *Library) convert(name string, anims []string) ([]byte, error) {
-	return l.convertWith(name, anims, false)
+	return l.convertWith(name, anims, false, nil)
 }
 
 // convertWith converts a model; vertexAlpha keeps its vertex alpha (cliff
-// pieces).
-func (l *Library) convertWith(name string, anims []string, vertexAlpha bool) ([]byte, error) {
+// pieces), and extras go into the glTF's extras.
+func (l *Library) convertWith(name string, anims []string, vertexAlpha bool, extras map[string]any) ([]byte, error) {
 	b, err := l.st.ReadFile(name)
 	if err != nil {
 		return nil, err
@@ -354,6 +361,7 @@ func (l *Library) convertWith(name string, anims []string, vertexAlpha bool) ([]
 		Texture:     l.texture,
 		Sequences:   func(s string) bool { return !skipSequence.MatchString(s) },
 		VertexAlpha: vertexAlpha,
+		Extras:      extras,
 	})
 }
 

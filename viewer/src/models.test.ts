@@ -32,6 +32,20 @@ describe("pickClip", () => {
     expect(pickClip(clips("Walk Start", "Walk"), "walk")?.clip.name).toBe("Walk");
   });
 
+  it("plays the variant of an animation group where there is one", () => {
+    // The Command Center's model, drawn as a Planetary Fortress (group A).
+    const cc = clips("Stand", "Stand Work", "Stand A", "Stand Work A", "Fly Stand", "Fly Stand B", "Fly Walk B", "Attack");
+    expect(pickClip(cc, "stand", ["a"])?.clip.name).toBe("Stand A");
+    expect(pickClip(cc, "stand")?.clip.name).toBe("Stand");
+    expect(pickClip(cc, "attack", ["a"])?.clip.name).toBe("Attack"); // no variant: the plain one
+    expect(pickClip(cc, "walk", ["fly", "b"])?.clip.name).toBe("Fly Walk B");
+    expect(pickClip(cc, "stand", ["fly", "b"])?.clip.name).toBe("Fly Stand B");
+    // A rooted Spine Crawler stands burrowed but attacks with the plain clip.
+    const spine = clips("Stand", "Burrow", "Stand Burrow", "Attack", "Attack End");
+    expect(pickClip(spine, "stand", ["burrow"])?.clip.name).toBe("Stand Burrow");
+    expect(pickClip(spine, "attack", ["burrow"])?.clip.name).toBe("Attack");
+  });
+
   it("finds nothing for a rigid model", () => {
     expect(pickClip([], "stand")).toBeUndefined();
   });

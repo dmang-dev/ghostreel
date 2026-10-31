@@ -185,16 +185,16 @@ func (l *Library) CliffGLB(mesh, piece string, variation int) ([]byte, error) {
 		return nil, ErrNoModel
 	}
 	key := fmt.Sprintf("cliff.%s.%s.%d", mesh, piece, variation)
-	return l.cached(key, func() (string, []string, error) {
+	return l.cached(key, func() (source, error) {
 		dir, ok := l.cliffs.field("CCliffMesh", mesh, "ModelPath")
 		if !ok || dir == "" {
-			return "", nil, ErrNoModel
+			return source{}, ErrNoModel
 		}
 		name, ok := l.file(fmt.Sprintf("%s%s_%s_%02d.m3", dir, mesh, piece, variation))
 		if !ok {
-			return "", nil, fmt.Errorf("%w (no piece %s_%s_%02d)", ErrNoModel, mesh, piece, variation)
+			return source{}, fmt.Errorf("%w (no piece %s_%s_%02d)", ErrNoModel, mesh, piece, variation)
 		}
-		return name, nil, nil
+		return source{name: name}, nil
 	})
 }
 
@@ -204,15 +204,15 @@ func (l *Library) CliffMaterialGLB(set string) ([]byte, error) {
 	if !safeName.MatchString(set) {
 		return nil, ErrNoModel
 	}
-	return l.cached("cliffmaterial."+set, func() (string, []string, error) {
+	return l.cached("cliffmaterial."+set, func() (source, error) {
 		path, ok := l.cliffs.field("CCliff", set, "CliffMaterial")
 		if !ok || path == "" {
-			return "", nil, ErrNoModel
+			return source{}, ErrNoModel
 		}
 		name, ok := l.file(path)
 		if !ok {
-			return "", nil, fmt.Errorf("%w (%s is not in the game data)", ErrNoModel, path)
+			return source{}, fmt.Errorf("%w (%s is not in the game data)", ErrNoModel, path)
 		}
-		return name, nil, nil
+		return source{name: name}, nil
 	})
 }

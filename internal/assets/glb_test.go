@@ -12,6 +12,16 @@ import (
 type glbInfo struct {
 	anims    []string
 	textures int
+	extras   glbExtras
+}
+
+// glbExtras are the file's extras: the model's attachment points and the
+// unit's look.
+type glbExtras struct {
+	Attachments map[string]string
+	Scale       []float64
+	Groups      []string
+	Attach      []attachment
 }
 
 func parseGLB(b []byte) (*glbInfo, error) {
@@ -22,11 +32,12 @@ func parseGLB(b []byte) (*glbInfo, error) {
 	var doc struct {
 		Animations []struct{ Name string }
 		Textures   []json.RawMessage
+		Extras     glbExtras
 	}
 	if err := json.Unmarshal(b[20:20+n], &doc); err != nil {
 		return nil, err
 	}
-	g := &glbInfo{textures: len(doc.Textures)}
+	g := &glbInfo{textures: len(doc.Textures), extras: doc.Extras}
 	for _, a := range doc.Animations {
 		g.anims = append(g.anims, a.Name)
 	}

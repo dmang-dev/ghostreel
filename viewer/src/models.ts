@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { apiFetch } from "./api";
+import { attachTarget, parseLook, type Look } from "./look";
 
 /** Extras the exporter (internal/m3) writes on each animation. */
 export interface ClipInfo {
@@ -25,6 +26,8 @@ export interface ClipInfo {
 export interface Template {
   root: THREE.Object3D; // z-up, facing +x, origin on the ground
   clips: ClipInfo[];
+  /** Scale, animation groups and attached models from the game's actor data. */
+  look: Look;
 }
 
 /** What one unit should show this frame. */
@@ -120,12 +123,21 @@ export class UnitModels {
 
   private async parse(buf: ArrayBuffer): Promise<Template> {
     const gltf = await this.loader.parseAsync(buf, "");
-    const extras = animationExtras(buf);
+    const json = glbJSON(buf);
+    const extras: { looping?: boolean; moveSpeed?: number }[] = (json.animations ?? []).map((a: { extras?: object }) => a.extras ?? {});
+    const look = parseLook(json.extras);
     // glTF is y-up; undo the exporter's root rotation to stand the model on
     // our z-up ground, and turn it to face +x.
     const root = new THREE.Group();
     const inner = gltf.scene;
     inner.rotation.set(Math.PI / 2, 0, 0);
+    // The glTF's root node is the model's own space (the game's z-up, facing
+    // -y): the actor's scale applies there, and attachments ride in it.
+    const space = inner.children[0];
+    if (space) {
+      space.userData.modelSpace = true;
+      space.scale.set(...look.scale);
+    }
     const turn = new THREE.Group();
     turn.rotation.z = MODEL_FACING;
     turn.add(inner);
@@ -151,18 +163,32 @@ export class UnitModels {
       looping: extras[i]?.looping ?? true,
       moveSpeed: extras[i]?.moveSpeed ?? 0,
     }));
-    return { root, clips };
+    return { root, clips, look };
   }
 
-  /** A unit's own copy of a template. */
+  /** A unit's own copy of a template, with its attached models once they load. */
   instance(tpl: Template, team: THREE.Color): UnitInstance {
-    return new UnitInstance(tpl, team);
+    return new UnitInstance(tpl, team, (id) => this.template(`model/${id}`), () => this.onLoad?.());
   }
 }
 
-/** One unit's model: a skinned clone with its own mixer and team color. */
+/** The model's own space inside a template or instance root (see parse). */
+function modelSpace(root: THREE.Object3D): THREE.Object3D {
+  let found: THREE.Object3D | undefined;
+  root.traverse((o) => {
+    if (!found && o.userData.modelSpace) found = o;
+  });
+  return found ?? root;
+}
+
+/**
+ * One unit's model: a skinned clone with its own mixer and team color, and
+ * the models attached to it.
+ */
 export class UnitInstance {
-  readonly root: THREE.Object3D;
+  /** The unit's place in the scene: holds the model and its attachments. */
+  readonly root = new THREE.Group();
+  private readonly model: THREE.Object3D;
   private readonly mixer: THREE.AnimationMixer;
   private current?: { info: ClipInfo; action: THREE.AnimationAction };
   private readonly team = new THREE.Color();
@@ -170,11 +196,23 @@ export class UnitInstance {
   lastSeen = 0; // frame counter, for evicting units that left the screen
   /** Materials as they were before a warp-in changed them. */
   private warped?: { mat: THREE.MeshStandardMaterial; transparent: boolean; opacity: number; emissive: THREE.Color; depthWrite: boolean }[];
+  /**
+   * Models attached to this one (weapons, glows), posed with it. They follow
+   * their bone from beside the model rather than inside it, so the model's
+   * animations can't bind to their bones.
+   */
+  private readonly attached: { inst: UnitInstance; bone: THREE.Object3D; local: THREE.Matrix4 }[] = [];
+  private disposed = false;
 
-  constructor(private readonly tpl: Template, team: THREE.Color) {
-    this.root = SkeletonUtils.clone(tpl.root);
-    this.mixer = new THREE.AnimationMixer(this.root);
-    this.root.traverse((o) => {
+  /**
+   * load fetches an attached model's template by CModel id; loaded is
+   * called when one is added, so the view can redraw.
+   */
+  constructor(private readonly tpl: Template, team: THREE.Color, load?: (model: string) => Promise<Template | null>, loaded?: () => void) {
+    this.model = SkeletonUtils.clone(tpl.root);
+    this.root.add(this.model);
+    this.mixer = new THREE.AnimationMixer(this.model);
+    this.model.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
       // Per-unit materials so each carries its team color.
@@ -189,9 +227,31 @@ export class UnitInstance {
       m.material = Array.isArray(m.material) ? mats : mats[0];
     });
     this.setTeam(team);
+    if (!load) return;
+    for (const a of tpl.look.attach) {
+      const bone = attachTarget(tpl.look, modelSpace(this.model), a.point);
+      if (!bone) continue;
+      void load(a.model).then((t) => {
+        if (!t || this.disposed) return;
+        const inst = new UnitInstance(t, this.team);
+        modelSpace(inst.model).scale.set(...a.scale);
+        // Its own model space sits in the point's space: undo the turn
+        // every template root carries (the rest cancels out).
+        const local = new THREE.Matrix4().compose(
+          new THREE.Vector3(...a.offset),
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -MODEL_FACING),
+          new THREE.Vector3(1, 1, 1),
+        );
+        inst.root.matrixAutoUpdate = false;
+        this.root.add(inst.root);
+        this.attached.push({ inst, bone, local });
+        loaded?.();
+      });
+    }
   }
 
   setTeam(c: THREE.Color): void {
+    for (const a of this.attached) a.inst.setTeam(c);
     if (this.team.equals(c)) return;
     this.team.copy(c);
     this.teamUniform.value.copy(c);
@@ -232,8 +292,22 @@ export class UnitInstance {
     }
   }
 
-  /** Poses the model for this frame. */
+  /** Poses the model and its attachments for this frame. */
   pose(p: Pose): void {
+    this.poseModel(p);
+    for (const a of this.attached) {
+      a.inst.pose({ action: "stand", time: p.time, speed: 0 });
+      // The bone's transform within the model, as posed just now.
+      const m = a.inst.root.matrix.copy(a.local);
+      for (let o: THREE.Object3D | null = a.bone; o && o !== this.root; o = o.parent) {
+        o.updateMatrix();
+        m.premultiply(o.matrix);
+      }
+      a.inst.root.matrixWorldNeedsUpdate = true;
+    }
+  }
+
+  private poseModel(p: Pose): void {
     let info: ClipInfo | undefined;
     let t = p.time;
     let warp: number | undefined;
@@ -248,7 +322,7 @@ export class UnitInstance {
         warp = p.progress;
       }
     } else {
-      info = pickClip(this.tpl.clips, p.action);
+      info = pickClip(this.tpl.clips, p.action, this.tpl.look.groups);
     }
     this.setWarp(warp);
     if (!info) {
@@ -274,8 +348,10 @@ export class UnitInstance {
   }
 
   dispose(): void {
+    this.disposed = true;
+    for (const a of this.attached) a.inst.dispose();
     this.mixer.stopAllAction();
-    this.root.traverse((o) => {
+    this.model.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) for (const mat of materialsOf(m)) mat.dispose();
     });
@@ -312,8 +388,12 @@ export function buildPose(clips: ClipInfo[], progress: number, seconds: number):
 
 const SKIP = new Set(["start", "end", "cover", "flail", "unload", "spell", "morph"]);
 
-/** Chooses a clip for an action, preferring the plainest name that fits. */
-export function pickClip(clips: ClipInfo[], action: string): ClipInfo | undefined {
+/**
+ * Chooses a clip for an action, preferring the plainest name that fits.
+ * Animation groups (lower case) pick a variant where the model has one:
+ * group "a" makes "stand" play "Stand A".
+ */
+export function pickClip(clips: ClipInfo[], action: string, groups: string[] = []): ClipInfo | undefined {
   const want: Record<string, string[][]> = {
     stand: [["stand"], ["fly"]],
     walk: [["walk"], ["fly"], ["stand"]],
@@ -321,7 +401,8 @@ export function pickClip(clips: ClipInfo[], action: string): ClipInfo | undefine
     build: [["birth"], ["build"], ["stand"]],
     death: [["death"]],
   };
-  for (const words of want[action] ?? [["stand"]]) {
+  const tries = (want[action] ?? [["stand"]]).flatMap((w) => (groups.length ? [[...w, ...groups], w] : [w]));
+  for (const words of tries) {
     let best: ClipInfo | undefined;
     let bestScore = Infinity;
     for (const c of clips) {
@@ -417,14 +498,16 @@ export function ignoreMapAlpha(mat: THREE.Material): void {
   mat.customProgramCacheKey = () => "fixedalpha";
 }
 
-/** Reads each animation's extras (looping, moveSpeed) from a GLB's JSON chunk. */
-function animationExtras(buf: ArrayBuffer): { looping?: boolean; moveSpeed?: number }[] {
+/**
+ * A GLB's JSON chunk, for the extras the exporter writes: each animation's
+ * (looping, moveSpeed) and the file's (the look).
+ */
+function glbJSON(buf: ArrayBuffer): { animations?: { extras?: object }[]; extras?: unknown } {
   try {
     const dv = new DataView(buf);
     const len = dv.getUint32(12, true);
-    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, len)));
-    return (json.animations ?? []).map((a: { extras?: object }) => a.extras ?? {});
+    return JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, len)));
   } catch {
-    return [];
+    return {};
   }
 }

@@ -32,6 +32,9 @@ type Model struct {
 	Meshes    []Mesh
 	Materials []Material
 	Sequences []Sequence
+	// Attachments are the named points other models attach to ("Ref_Weapon",
+	// "Ref_Overhead"), each riding on a bone.
+	Attachments []Attachment
 	// BindInverse[i] is bone i's inverse bind matrix (column-major), the
 	// transform from model space into the bone's rest space.
 	BindInverse [][16]float32
@@ -48,6 +51,13 @@ type Bone struct {
 	// whether each holds its keys (constant interpolation).
 	tid, rid, sid       uint32
 	tStep, rStep, sStep bool
+}
+
+// Attachment is an attachment point: the game places other actors' models
+// (weapons, glows, overlays) at it. It sits at its bone's origin.
+type Attachment struct {
+	Name string
+	Bone int
 }
 
 // Vertex is one skinned vertex in model space (z up).
@@ -210,6 +220,7 @@ var sizes = map[string]map[uint32]int{
 	"STC_": {4: 204},
 	"STG_": {0: 24},
 	"IREF": {0: 64},
+	"ATT_": {1: 20},
 	"SD3V": {0: 32},
 	"SD4Q": {0: 32},
 }
@@ -320,7 +331,31 @@ func Parse(b []byte) (m *Model, err error) {
 	if err := f.sequences(m, field("sequences"), field("stc"), field("stg")); err != nil {
 		return nil, err
 	}
+	if err := f.attachments(m, field("attachment_points")); err != nil {
+		return nil, err
+	}
 	return m, nil
+}
+
+// attachments reads the attachment points: an unused int32, the name and
+// the bone.
+func (f *file) attachments(m *Model, off int) error {
+	offs, _, err := f.elems(f.ref(off), "ATT_")
+	if err != nil {
+		return err
+	}
+	for _, o := range offs {
+		name, err := f.str(o + 4)
+		if err != nil {
+			return err
+		}
+		bone := int(le.Uint32(f.b[o+16:]))
+		if bone >= len(m.Bones) {
+			return fmt.Errorf("m3: attachment %q on bone %d of %d", name, bone, len(m.Bones))
+		}
+		m.Attachments = append(m.Attachments, Attachment{Name: name, Bone: bone})
+	}
+	return nil
 }
 
 func (f *file) bones(m *Model, bonesOff, restsOff int) error {

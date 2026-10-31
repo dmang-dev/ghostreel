@@ -28,6 +28,9 @@ type GLBOptions struct {
 	// that alpha) when they have colors: cliff pieces fade into the
 	// terrain by it. Other models' vertex colors mean other things.
 	VertexAlpha bool
+	// Extras are added to the file's top-level extras (what the game data
+	// says about drawing the model: its scale, attached models).
+	Extras map[string]any
 }
 
 // The model's root node turns the game's z-up space into glTF's y-up; a
@@ -312,6 +315,22 @@ func (m *Model) GLB(opt GLBOptions) ([]byte, error) {
 	}
 	if len(anims) > 0 {
 		doc["animations"] = anims
+	}
+	// The file's extras: the caller's, and the attachment points by name
+	// with the bone (node name) each rides on.
+	extras := map[string]any{}
+	for k, v := range opt.Extras {
+		extras[k] = v
+	}
+	if len(m.Attachments) > 0 {
+		points := map[string]string{}
+		for _, a := range m.Attachments {
+			points[a.Name] = m.Bones[a.Bone].Name
+		}
+		extras["attachments"] = points
+	}
+	if len(extras) > 0 {
+		doc["extras"] = extras
 	}
 	for w.bin.Len()%4 != 0 {
 		w.bin.WriteByte(0)
