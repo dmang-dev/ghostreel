@@ -420,3 +420,64 @@ PLAN.md track A, items 2 and 4.
 - **Portable updates** can't be driven from outside the window: WebView2 (go-webview2 v1.0.22) ignores the environment and registry settings that would open a debugging port. So `GHOSTREEL_UPDATE_NOW=1` makes the app check for an update at start and install it without asking. The manifest signature and download hash checks still apply. A job can update the previous release's portable copy once that previous release has this switch, which means two releases from now.
 - **Not yet run:** none of this has run on Actions or on a Linux machine. It is checked only by parsing the workflows, shellcheck, and the PowerShell parser. The replay log line was seen with the local Windows build. The first run should be a manual one against v1.1.1, before the next release.
 
+## Actor scale, animation groups and attachments (2026-10-31)
+
+PLAN.md track D, item 4. Checked against the 5.0.16 install and the 4.10 test data.
+
+- **Scale.** A unit is drawn at its `CModel`'s `ScaleMin`/`ScaleMax` times its `CActorUnit`'s `Scale`; UnitData has no visual scale.
+  - Nearly every ladder model is drawn below its modelled size, so before this almost everything was too big. Examples:
+    - Thor 0.5
+    - Mothership, Sentry, Mutalisk and Supply Depot 0.6
+    - Stalker 0.69
+    - Zergling 0.77
+    - Archon and Siege Tank 0.8
+    - Ultralisk 0.85
+    - Marine 1
+    - Roach 1.1
+    - Nexus 1.2
+    - Lurker 1.25
+  - ScaleMin and ScaleMax are equal for every ladder unit, so the midpoint is used. The actor's `RandomScaleRange` (1,1 everywhere) is ignored.
+  - No ladder actor changes its scale for good with `SetScale` messages.
+  - The scale applies in the model's own space, so attachments and death models follow it.
+- **Animation groups.** The `AnimGroupApply`/`AnimGroupRemove` messages an actor sends on creation pick a variant of every clip:
+  - The Planetary Fortress and Orbital Command are the Command Center's model with group A or B. Before this, both were drawn as Command Centers.
+  - The Warp Gate is the Gateway's model with Superior; before this it was drawn as a Gateway.
+  - Lair and Hive are the Hatchery's with B and C.
+  - Flying Terran buildings use Fly.
+  - Burrowed Roach and Infestor, the lowered Supply Depot, and rooted crawlers use Burrow.
+
+  Only events on `ActorCreation`, and on `UnitBirth` of the type itself, with no other condition, count. Creation is applied before birth. The viewer tries each clip name with the groups first, then without: a rooted Spine Crawler stands in "Stand Burrow" but attacks with "Attack".
+- **Attachments.** Ladder units are almost all single models: turrets are bones of the unit's own model, turned by `CActorLookAt` actors, so they are drawn but don't aim. The few models attached for good follow one pattern:
+  - The unit's actor sends `Create X` on creation or birth.
+  - X is a `CActorModel` whose `HostSiteOps` name a `CActorSiteOpAttach`.
+  - That op's `AttachQuery Methods` keywords pick an attachment point of the host `.m3` ("Weapon" is `Ref_Weapon`), plus an optional `CActorSiteOpLocalOffset`.
+  - The `.m3` attachment points (ATT_) are now parsed.
+
+  Drawn now:
+  - the Tempest's charge sphere
+  - the Widow Mine's armed light
+  - the Overseer's Oversight eye stalk
+  - the Observer's Surveillance Mode model
+
+  Left out:
+  - one-shot actors (birth flashes, teleports)
+  - hit-test models
+  - anything behind a condition: upgrades (Cyclone beams, Anabolic Synthesis, Drilling Claws), clan flags
+- **How it travels.**
+  - The unit's glTF carries the look in its top-level extras: `scale`, `groups`, `attach`, and `attachments` (point → bone).
+  - The viewer loads attached models from `/api/assets/model/{id}` and places them at their bone each frame, beside the unit's model rather than inside it, so the unit's animations can't bind to their bones.
+  - The assets cache version is now `a3`.
+- **Checked.**
+  - Tests on synthetic actor data: template order, creation before birth, one-shot and conditional events.
+  - Tests against the install: sizes and groups of known units, and that every attachment's point exists on its host.
+  - Before/after screenshots in 3D on three bot games show:
+    - the Orbital Command's dish and the Planetary Fortress's turret dome
+    - Warp Gates, Hive spires, rooted Spore Crawlers
+    - the Tempest's sphere and the Widow Mine's light
+    - everything at its smaller size
+- **Not done.**
+  - Default animations set by `AnimPlay … PlayForever` and `AnimBracketStart`: the burrowed Widow Mine, Hydralisk, Queen, Ultralisk and Swarm Host still stand; the Thor plays Stand rather than "Cover Stand"; the Liberator in AG mode and the phasing Warp Prism play Stand rather than "Stand Work".
+  - Attachments that depend on upgrades. The timeline has the upgrade timings, so these could follow.
+  - Turrets aiming.
+  - CModel scale on doodads.
+
