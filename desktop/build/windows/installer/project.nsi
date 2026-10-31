@@ -100,6 +100,10 @@ Section
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
 
     !insertmacro wails.associateFiles
+    # Wails writes the open command with the exe's path unquoted, and the
+    # install folder has spaces; quote it (wails_tools.nsh is regenerated
+    # on every build, so this is done here).
+    WriteRegStr SHELL_CONTEXT "Software\Classes\ghostreel.SC2Replay\shell\open\command" "" '"$INSTDIR\${PRODUCT_EXECUTABLE}" "%1"'
     !insertmacro wails.associateCustomProtocols
 
     !insertmacro wails.writeUninstaller
@@ -111,6 +115,8 @@ Section "uninstall"
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 
     RMDir /r $INSTDIR
+    # The company folder of a per-machine install, if nothing else is in it.
+    RMDir "$PROGRAMFILES64\${INFO_COMPANYNAME}"
 
     Delete "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk"
     Delete "$DESKTOP\${INFO_PRODUCTNAME}.lnk"
