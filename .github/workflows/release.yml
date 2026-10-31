@@ -212,3 +212,16 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           files: artifacts/*
+
+  # The browser build goes on the project's GitHub Pages site, for releases
+  # only (a pre-release keeps the current site).
+  pages:
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
+    with:
+      tag: ${{ github.ref_name }}

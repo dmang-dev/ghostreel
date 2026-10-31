@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Publishes the browser build of a release to GitHub Pages, so ghostreel can
+# be tried without installing it. It deploys the release's own web zip, not
+# a fresh build, so the site is exactly what was released. The release
+# workflow calls this after publishing a release (not a pre-release); run it
+# by hand to publish an earlier release's web build.
+name: pages
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release to publish (v1.2.3)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer one doesn't cancel one in progress.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Get the release's browser build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "ghostreel_${TAG}_web.zip"
+          mkdir site && unzip -q "ghostreel_${TAG}_web.zip" -d site
+          test -f site/index.html
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5
