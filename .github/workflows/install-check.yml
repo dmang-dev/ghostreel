@@ -1,0 +1,461 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Installs a published release's desktop downloads on clean runners and
+# checks that each one installs, starts, stays up, and reads a replay given
+# on its command line. The release workflow calls it after publishing a
+# release (not a pre-release); run it by hand to check an earlier one.
+#
+# The repository ships no replays, and none may be committed, so "reads a
+# replay" is checked with a file named .SC2Replay that isn't one: the app
+# hands a replay from its command line to the decoder at start-up and logs
+# "<path>: <error>" when it doesn't decode (desktop/main.go). That log line
+# shows the file reached the decoder; a successful decode can't be shown
+# without a real replay.
+#
+# It only reads the release. Downloads a release doesn't have (v1.1.1 has no
+# .deb or AppImage) are skipped with a notice.
+#
+# Not covered: updating a portable copy from the release before. The app
+# applies an update only when the viewer's button calls its in-process API,
+# and nothing outside the window can reach that API: there is no TCP port,
+# and go-webview2 overwrites WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, so no
+# DevTools port either.
+name: install-check
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release to check (v1.2.3)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  windows:
+    name: Windows installer and portable
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Get the release's downloads
+        id: assets
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/assets"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | tr -d '\r' >"$RUNNER_TEMP/assets.txt"
+          get() { # OUTPUT ASSET
+            if grep -qxF "$2" "$RUNNER_TEMP/assets.txt"; then
+              gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$2" --dir "$RUNNER_TEMP/assets"
+              echo "$1=true" >>"$GITHUB_OUTPUT"
+            else
+              echo "::notice::$TAG has no $2; not checking it"
+            fi
+          }
+          get setup "ghostreel-desktop_${TAG}_windows_amd64_setup.exe"
+          get portable "ghostreel-desktop_${TAG}_windows_amd64_portable.zip"
+      - name: Test helpers
+        shell: pwsh
+        run: |
+          $lib = @'
+          $ErrorActionPreference = 'Stop'
+          # Not a replay (see the top of install-check.yml). The space checks
+          # that paths are passed whole.
+          $Replay = Join-Path $env:RUNNER_TEMP 'install check.SC2Replay'
+          function Fail([string]$Message) { Write-Output "::error::$Message"; exit 1 }
+          # Starts Exe with $Replay, checks it's still running after $Seconds and
+          # that it logged "<replay path>: <decoder error>", then stops it.
+          function Test-Start([string]$Exe, [string]$Label, [int]$Seconds = 20) {
+            $out = Join-Path $env:RUNNER_TEMP "$Label-stdout.log"
+            $err = Join-Path $env:RUNNER_TEMP "$Label-stderr.log"
+            $p = Start-Process -FilePath $Exe -ArgumentList "`"$Replay`"" -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+            Start-Sleep -Seconds $Seconds
+            $exited = $p.HasExited
+            if (-not $exited) { Stop-Process -Id $p.Id -Force; $p.WaitForExit() }
+            $log = (Get-Content -Raw -LiteralPath $out, $err) -join "`n"
+            Write-Output "--- ${Label}: its output"
+            Write-Output $log
+            if ($exited) { Fail "${Label}: exited within $Seconds s (code $($p.ExitCode))" }
+            if (-not $log.Contains("${Replay}: ")) {
+              Fail "${Label}: no decoder error logged for $Replay, so it may not have read the replay from its command line"
+            }
+            Write-Output "${Label}: stayed up $Seconds s and passed the replay from its command line to the decoder"
+          }
+          '@
+          Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'lib.ps1') -Value $lib -Encoding utf8
+          Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'install check.SC2Replay') -Encoding utf8 `
+            -Value 'Not a replay: the install check gives it to the app to see that it reads a replay from its command line.'
+      - name: Installer
+        if: ${{ !cancelled() && steps.assets.outputs.setup == 'true' }}
+        shell: pwsh
+        run: |
+          . (Join-Path $env:RUNNER_TEMP 'lib.ps1')
+          $setup = Join-Path $env:RUNNER_TEMP "assets\ghostreel-desktop_$($env:TAG)_windows_amd64_setup.exe"
+          $version = $env:TAG -replace '^v', '' -replace '-.*$', ''
+
+          Write-Output '::group::Silent install'
+          $p = Start-Process -FilePath $setup -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Fail "the installer exited with code $($p.ExitCode)" }
+          $uninstallKeys = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+          $key = Get-ChildItem -LiteralPath $uninstallKeys | Where-Object { $_.GetValue('DisplayName') -eq 'ghostreel' } | Select-Object -First 1
+          if (-not $key) { Fail 'no uninstall entry named ghostreel' }
+          Write-Output "Uninstall entry: $($key.Name)"
+          foreach ($n in $key.GetValueNames()) { Write-Output "  $n = $($key.GetValue($n))" }
+          $exe = $key.GetValue('DisplayIcon')
+          $dir = Split-Path -Parent $exe
+          foreach ($f in @($exe, (Join-Path $dir 'uninstall.exe'), (Join-Path $dir 'replayicon.ico'))) {
+            if (-not (Test-Path -LiteralPath $f)) { Fail "not installed: $f" }
+          }
+          Get-ChildItem -LiteralPath $dir | Format-Table Name, Length
+          if ($key.GetValue('DisplayVersion') -ne $version) { Fail "the uninstall entry says version $($key.GetValue('DisplayVersion')), not $version" }
+          if (-not $key.GetValue('QuietUninstallString')) { Fail 'the uninstall entry has no QuietUninstallString' }
+          $links = @(
+            (Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\ghostreel.lnk'),
+            (Join-Path $env:PUBLIC 'Desktop\ghostreel.lnk')
+          )
+          foreach ($l in $links) { if (-not (Test-Path -LiteralPath $l)) { Fail "no shortcut $l" } }
+          Write-Output '::endgroup::'
+
+          Write-Output '::group::.SC2Replay file association'
+          $classes = 'HKLM:\SOFTWARE\Classes'
+          if (-not (Test-Path -LiteralPath "$classes\.SC2Replay")) { Fail 'no .SC2Replay key in HKLM\SOFTWARE\Classes' }
+          $progId = (Get-Item -LiteralPath "$classes\.SC2Replay").GetValue('')
+          if ($progId -ne 'ghostreel.SC2Replay') { Fail ".SC2Replay is associated with '$progId', not ghostreel.SC2Replay" }
+          $openKey = "$classes\ghostreel.SC2Replay\shell\open\command"
+          if (-not (Test-Path -LiteralPath $openKey)) { Fail "no $openKey" }
+          $command = (Get-Item -LiteralPath $openKey).GetValue('')
+          Write-Output "open command: $command"
+          if (-not $command.Contains($exe) -or -not $command.Contains('"%1"')) { Fail "the open command doesn't run $exe with the file" }
+          if ($command.StartsWith($exe) -and $exe.Contains(' ')) {
+            Write-Output "::warning::the open command doesn't quote the exe's path ($exe); Windows copes, but a quoted path is safer"
+          }
+          # What the shell resolves: HKCR merges the user's classes over the machine's.
+          $merged = (Get-Item -LiteralPath 'Registry::HKEY_CLASSES_ROOT\.SC2Replay').GetValue('')
+          if ($merged -ne 'ghostreel.SC2Replay') { Fail "HKEY_CLASSES_ROOT\.SC2Replay resolves to '$merged'" }
+          cmd /c assoc .SC2Replay
+          cmd /c ftype ghostreel.SC2Replay
+          Write-Output '::endgroup::'
+
+          Write-Output '::group::Start the installed app'
+          Test-Start -Exe $exe -Label 'installed'
+          Write-Output '::endgroup::'
+
+          Write-Output '::group::Open a replay through its file type (a double-click)'
+          $name = Split-Path -Leaf $exe
+          Start-Process -FilePath $Replay
+          $proc = $null
+          $deadline = (Get-Date).AddSeconds(30)
+          while (-not $proc -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 2
+            $proc = Get-CimInstance Win32_Process -Filter "Name = '$name'" |
+              Where-Object { $_.CommandLine -and $_.CommandLine.Contains($Replay) } | Select-Object -First 1
+          }
+          if (-not $proc) { Fail "opening $Replay didn't start $name with it" }
+          Write-Output "the shell started: $($proc.CommandLine)"
+          Start-Sleep -Seconds 10
+          if (-not (Get-Process -Id $proc.ProcessId -ErrorAction SilentlyContinue)) { Fail "$name exited within 10 s of opening the replay" }
+          Stop-Process -Id $proc.ProcessId -Force
+          Write-Output '::endgroup::'
+
+          Write-Output '::group::Silent uninstall'
+          Get-Process -Name ([IO.Path]::GetFileNameWithoutExtension($exe)) -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 2
+          Start-Process -FilePath (Join-Path $dir 'uninstall.exe') -ArgumentList '/S' -Wait
+          # NSIS's uninstaller copies itself to %TEMP%, starts the copy and
+          # returns at once, so wait for the copy to finish.
+          $deadline = (Get-Date).AddSeconds(120)
+          while ((Test-Path -LiteralPath $dir) -or (Test-Path -LiteralPath $key.PSPath)) {
+            if ((Get-Date) -gt $deadline) { Fail "uninstalling left $dir or its uninstall entry behind" }
+            Start-Sleep -Seconds 2
+          }
+          if (Test-Path -LiteralPath "$classes\ghostreel.SC2Replay") { Fail 'uninstalling left the ghostreel.SC2Replay file class' }
+          if ((Test-Path -LiteralPath "$classes\.SC2Replay") -and (Get-Item -LiteralPath "$classes\.SC2Replay").GetValue('') -eq 'ghostreel.SC2Replay') {
+            Fail 'uninstalling left .SC2Replay associated with ghostreel'
+          }
+          foreach ($l in $links) { if (Test-Path -LiteralPath $l) { Fail "uninstalling left the shortcut $l" } }
+          $parent = Split-Path -Parent $dir
+          if (Test-Path -LiteralPath $parent) { Write-Output "::notice::uninstalling leaves the folder $parent" }
+          Write-Output '::endgroup::'
+          Write-Output 'Installed, opened a replay by its file type, and uninstalled.'
+          exit 0
+      - name: Portable
+        if: ${{ !cancelled() && steps.assets.outputs.portable == 'true' }}
+        shell: pwsh
+        run: |
+          . (Join-Path $env:RUNNER_TEMP 'lib.ps1')
+          $zip = Join-Path $env:RUNNER_TEMP "assets\ghostreel-desktop_$($env:TAG)_windows_amd64_portable.zip"
+          $dir = Join-Path $env:RUNNER_TEMP 'portable'
+          Expand-Archive -LiteralPath $zip -DestinationPath $dir
+          Get-ChildItem -LiteralPath $dir | Format-Table Name, Length
+          $exe = Join-Path $dir 'ghostreel-desktop.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { Fail 'the portable zip has no ghostreel-desktop.exe' }
+          Test-Start -Exe $exe -Label 'portable'
+          exit 0
+
+  macos:
+    name: macOS app
+    runs-on: macos-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Get the release's download
+        id: assets
+        run: |
+          zip="ghostreel-desktop_${TAG}_macos_universal.zip"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' >"$RUNNER_TEMP/assets.txt"
+          if ! grep -qxF "$zip" "$RUNNER_TEMP/assets.txt"; then
+            echo "::notice::$TAG has no $zip; not checking it"
+            exit 0
+          fi
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$zip" --dir "$RUNNER_TEMP"
+          echo "zip=$RUNNER_TEMP/$zip" >>"$GITHUB_OUTPUT"
+      - name: Start the app
+        if: steps.assets.outputs.zip != ''
+        env:
+          ZIP: ${{ steps.assets.outputs.zip }}
+        run: |
+          fail() { echo "::error::$*"; exit 1; }
+          alive() { local s; s=$(ps -o stat= -p "$1" 2>/dev/null) || return 1; [ -n "$s" ] && [ "${s#Z}" = "$s" ]; }
+          # Not a replay (see the top of install-check.yml).
+          replay="$RUNNER_TEMP/install check.SC2Replay"
+          echo 'Not a replay: the install check gives it to the app to see that it reads a replay from its command line.' >"$replay"
+
+          ditto -x -k "$ZIP" "$RUNNER_TEMP/mac"
+          ls -l "$RUNNER_TEMP/mac"
+          app=$(find "$RUNNER_TEMP/mac" -maxdepth 1 -name '*.app' | head -n 1)
+          [ -n "$app" ] || fail "the zip has no .app"
+          # Unsigned: clear the quarantine flags, as a user allowing it would.
+          xattr -cr "$app"
+          plist="$app/Contents/Info.plist"
+          exe=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")
+          bin="$app/Contents/MacOS/$exe"
+          [ -x "$bin" ] || fail "no executable $bin"
+          lipo -info "$bin"
+
+          # Opening replays from Finder needs the app to declare the type.
+          # Until a release has the entry, it's a warning (PLAN.md, A3).
+          if types=$(plutil -extract CFBundleDocumentTypes json -o - "$plist" 2>/dev/null) && grep -qi 'sc2replay' <<<"$types"; then
+            echo "Info.plist declares .SC2Replay: $types"
+          else
+            echo "::warning::Info.plist has no CFBundleDocumentTypes entry for .SC2Replay, so Finder won't open replays with ghostreel"
+          fi
+
+          log="$RUNNER_TEMP/macos.log"
+          "$bin" "$replay" >"$log" 2>&1 &
+          pid=$!
+          sleep 20
+          if ! alive "$pid"; then
+            cat "$log"
+            fail "the app exited within 20 s"
+          fi
+          kill "$pid" 2>/dev/null || true
+          echo "--- its output"
+          cat "$log"
+          grep -qF "$replay: " "$log" || fail "no decoder error logged for $replay, so it may not have read the replay from its command line"
+          echo "Stayed up 20 s and passed the replay from its command line to the decoder."
+
+  linux:
+    name: Linux ${{ matrix.kind }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The tarball links webkit2gtk-4.0, which 24.04 doesn't have.
+          - { os: ubuntu-22.04, kind: tarball }
+          # The .deb and AppImage link WebKitGTK 4.1, for 24.04 and later;
+          # they're built on 22.04 and claim to run there too.
+          - { os: ubuntu-24.04, kind: packages }
+          - { os: ubuntu-22.04, kind: packages }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Get the release's downloads
+        id: assets
+        env:
+          KIND: ${{ matrix.kind }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/assets"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' >"$RUNNER_TEMP/assets.txt"
+          get() { # OUTPUT ASSET
+            if grep -qxF "$2" "$RUNNER_TEMP/assets.txt"; then
+              gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$2" --dir "$RUNNER_TEMP/assets"
+              echo "$1=true" >>"$GITHUB_OUTPUT"
+            else
+              echo "::notice::$TAG has no $2; not checking it"
+            fi
+          }
+          base="ghostreel-desktop_${TAG}_linux_amd64"
+          if [ "$KIND" = tarball ]; then
+            get tarball "$base.tar.gz"
+          else
+            get deb "$base.deb"
+            get appimage "$base.AppImage"
+          fi
+      - name: Display and test helpers
+        if: steps.assets.outputs.tarball == 'true' || steps.assets.outputs.deb == 'true' || steps.assets.outputs.appimage == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb
+          Xvfb :99 -screen 0 1440x900x24 >"$RUNNER_TEMP/xvfb.log" 2>&1 &
+          for _ in $(seq 30); do [ -S /tmp/.X11-unix/X99 ] && break; sleep 1; done
+          [ -S /tmp/.X11-unix/X99 ] || { cat "$RUNNER_TEMP/xvfb.log"; exit 1; }
+          echo "DISPLAY=:99" >>"$GITHUB_ENV"
+          echo 'Not a replay: the install check gives it to the app to see that it reads a replay from its command line.' \
+            >"$RUNNER_TEMP/install check.SC2Replay"
+          cat >"$RUNNER_TEMP/lib.sh" <<'EOF'
+          # Not a replay (see the top of install-check.yml). The space checks
+          # that paths are passed whole.
+          replay="$RUNNER_TEMP/install check.SC2Replay"
+          fail() { echo "::error::$*"; exit 1; }
+          # alive PID: running, and not a zombie waiting to be reaped.
+          alive() { local s; s=$(ps -o stat= -p "$1" 2>/dev/null) || return 1; [ -n "$s" ] && [ "${s#Z}" = "$s" ]; }
+          # check_start LABEL COMMAND...: runs COMMAND with $replay in a session
+          # of its own, checks it's still running after 20 s and that it logged
+          # "<replay path>: <decoder error>", then stops it and its children.
+          check_start() {
+            local label=$1 log="$RUNNER_TEMP/$1.log" pid
+            shift
+            setsid "$@" "$replay" >"$log" 2>&1 &
+            pid=$!
+            sleep 20
+            if ! alive "$pid"; then
+              cat "$log"
+              fail "$label: exited within 20 s"
+            fi
+            kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+            sleep 1
+            echo "--- $label: its output"
+            cat "$log"
+            grep -qF "$replay: " "$log" ||
+              fail "$label: no decoder error logged for $replay, so it may not have read the replay from its command line"
+            echo "$label: stayed up 20 s and passed the replay from its command line to the decoder"
+          }
+          EOF
+      - name: Tarball
+        if: ${{ !cancelled() && steps.assets.outputs.tarball == 'true' }}
+        run: |
+          . "$RUNNER_TEMP/lib.sh"
+          # What the user guide asks for: GTK 3 and WebKitGTK 4.0.
+          sudo apt-get install -y --no-install-recommends libgtk-3-0 libwebkit2gtk-4.0-37
+          mkdir -p "$RUNNER_TEMP/tarball"
+          tar -xzf "$RUNNER_TEMP/assets/ghostreel-desktop_${TAG}_linux_amd64.tar.gz" -C "$RUNNER_TEMP/tarball"
+          ls -l "$RUNNER_TEMP/tarball"
+          check_start tarball "$RUNNER_TEMP/tarball/ghostreel-desktop"
+      - name: .deb
+        if: ${{ !cancelled() && steps.assets.outputs.deb == 'true' }}
+        run: |
+          . "$RUNNER_TEMP/lib.sh"
+          deb="$RUNNER_TEMP/assets/ghostreel-desktop_${TAG}_linux_amd64.deb"
+          echo "::group::The package"
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb"
+          depends=$(dpkg-deb --field "$deb" Depends)
+          case $depends in
+          *libwebkit2gtk-4.1-0*) ;;
+          *) fail "the .deb doesn't depend on WebKitGTK 4.1: $depends" ;;
+          esac
+          if dpkg-query -W -f '${Status}\n' libwebkit2gtk-4.1-0 2>/dev/null | grep -q 'install ok installed'; then
+            echo "::notice::libwebkit2gtk-4.1-0 was already installed here, so this run doesn't show the .deb pulling it in"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Install"
+          # What a desktop has: the MIME and desktop-entry databases (the
+          # package's triggers update them), and the tools that read them.
+          sudo apt-get install -y --no-install-recommends shared-mime-info desktop-file-utils xdg-utils libglib2.0-bin
+          sudo apt-get install -y "$deb"
+          for f in /usr/bin/ghostreel-desktop /usr/share/applications/ghostreel-desktop.desktop \
+            /usr/share/mime/packages/ghostreel.xml /usr/share/icons/hicolor/512x512/apps/ghostreel.png; do
+            [ -e "$f" ] || fail "not installed: $f"
+          done
+          desktop-file-validate /usr/share/applications/ghostreel-desktop.desktop
+          echo "::endgroup::"
+
+          echo "::group::.SC2Replay file type"
+          [ -e /usr/share/mime/application/x-sc2replay.xml ] ||
+            fail "the MIME database has no application/x-sc2replay (update-mime-database didn't run)"
+          grep -q '^application/x-sc2replay=.*ghostreel-desktop\.desktop' /usr/share/applications/mimeinfo.cache ||
+            fail "mimeinfo.cache doesn't list ghostreel for application/x-sc2replay (update-desktop-database didn't run)"
+          # Without a desktop, xdg-mime asks file(1), which knows no
+          # .SC2Replay; as GNOME it asks GIO, which reads the MIME database.
+          type=$(XDG_CURRENT_DESKTOP=GNOME xdg-mime query filetype "$replay")
+          echo "xdg-mime query filetype: $type"
+          [ "$type" = application/x-sc2replay ] || fail "a .SC2Replay is $type, not application/x-sc2replay"
+          default=$(xdg-mime query default application/x-sc2replay)
+          echo "xdg-mime query default: $default"
+          [ "$default" = ghostreel-desktop.desktop ] || fail "the default app for replays is '$default'"
+          gio mime application/x-sc2replay | tee "$RUNNER_TEMP/gio-mime.txt"
+          grep -q 'ghostreel-desktop\.desktop' "$RUNNER_TEMP/gio-mime.txt" || fail "GIO has no app for replays"
+          echo "::endgroup::"
+
+          echo "::group::Start the installed app"
+          check_start deb /usr/bin/ghostreel-desktop
+          echo "::endgroup::"
+
+          echo "::group::Open a replay through its file type (a double-click in a file manager)"
+          gio open "$replay" >"$RUNNER_TEMP/gio-open.log" 2>&1
+          pid=""
+          for _ in $(seq 20); do
+            pid=$(pgrep -n -f 'ghostreel-desktop .*install check\.SC2Replay' || true)
+            [ -n "$pid" ] && break
+            sleep 1
+          done
+          [ -n "$pid" ] || { cat "$RUNNER_TEMP/gio-open.log"; fail "gio open didn't start ghostreel-desktop with the replay"; }
+          echo "started: $(tr '\0' ' ' <"/proc/$pid/cmdline")"
+          sleep 15
+          alive "$pid" || { cat "$RUNNER_TEMP/gio-open.log"; fail "ghostreel-desktop exited within 15 s of opening the replay"; }
+          kill "$pid" 2>/dev/null || true
+          cat "$RUNNER_TEMP/gio-open.log"
+          echo "::endgroup::"
+
+          echo "::group::Remove"
+          sudo apt-get remove -y ghostreel-desktop
+          [ ! -e /usr/bin/ghostreel-desktop ] || fail "removing left /usr/bin/ghostreel-desktop"
+          [ ! -e /usr/share/mime/application/x-sc2replay.xml ] || fail "removing left application/x-sc2replay in the MIME database"
+          [ -z "$(xdg-mime query default application/x-sc2replay)" ] || fail "removing left a default app for replays"
+          echo "::endgroup::"
+          echo "Installed, opened a replay by its file type, and removed."
+      - name: AppImage
+        if: ${{ !cancelled() && steps.assets.outputs.appimage == 'true' }}
+        run: |
+          . "$RUNNER_TEMP/lib.sh"
+          ai="$RUNNER_TEMP/assets/ghostreel-desktop_${TAG}_linux_amd64.AppImage"
+          chmod +x "$ai"
+          # It runs on the system's GTK 3 and WebKitGTK 4.1, which it doesn't
+          # bundle (desktop/build/linux/package.sh says why).
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-0 desktop-file-utils
+
+          echo "::group::Contents"
+          mkdir -p "$RUNNER_TEMP/appimage"
+          (cd "$RUNNER_TEMP/appimage" && "$ai" --appimage-extract >/dev/null)
+          root="$RUNNER_TEMP/appimage/squashfs-root"
+          ls -la "$root"
+          [ -x "$root/AppRun" ] || fail "no AppRun"
+          desktop-file-validate "$root/ghostreel-desktop.desktop"
+          grep -qx 'MimeType=application/x-sc2replay;' "$root/ghostreel-desktop.desktop" ||
+            fail "the desktop entry declares no application/x-sc2replay"
+          [ -f "$root/usr/share/mime/packages/ghostreel.xml" ] || fail "no MIME type for integration tools to install"
+          echo "::endgroup::"
+
+          if [ -c /dev/fuse ] && { command -v fusermount3 || command -v fusermount; } >/dev/null; then
+            echo "Running the AppImage as users do, mounted with FUSE"
+          else
+            echo "::notice::No FUSE here: running the AppImage extracted (APPIMAGE_EXTRACT_AND_RUN=1)"
+            export APPIMAGE_EXTRACT_AND_RUN=1
+          fi
+          check_start appimage "$ai"

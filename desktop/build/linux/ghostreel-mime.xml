@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0
+     The .SC2Replay file type (shared-mime-info), installed as
+     /usr/share/mime/packages/ghostreel.xml. Globs are case-insensitive. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-sc2replay">
+    <comment>SC2 replay</comment>
+    <glob pattern="*.SC2Replay"/>
+  </mime-type>
+</mime-info>

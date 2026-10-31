@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+[Desktop Entry]
+Type=Application
+Name=ghostreel
+GenericName=Replay viewer
+Comment=Watch SC2 replays in 2D and 3D
+Exec=ghostreel-desktop %f
+Icon=ghostreel
+Terminal=false
+Categories=Game;StrategyGame;
+MimeType=application/x-sc2replay;
+Keywords=replay;SC2;
+StartupWMClass=ghostreel-desktop

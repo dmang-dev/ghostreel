@@ -98,6 +98,21 @@ func main() {
 		OnStartup: func(ctx context.Context) {
 			appCtx = ctx
 			wailsruntime.EventsOn(ctx, "viewer-ready", func(...any) { opener.Ready() })
+			// GHOSTREEL_UPDATE_NOW=1 installs the latest release at start
+			// without asking, for the release workflow's install check (a
+			// copy of the previous release updated to the new one). The
+			// manifest's signature and the download's hash are still checked.
+			if os.Getenv("GHOSTREEL_UPDATE_NOW") == "1" {
+				go func() {
+					st := upd.Check(context.Background())
+					log.Printf("update check: available=%v canApply=%v latest=%s", st.Available, st.CanApply, st.Latest)
+					if st.CanApply {
+						if err := upd.Apply(); err != nil {
+							log.Printf("update: %v", err)
+						}
+					}
+				}()
+			}
 		},
 		// Dropped files reach the viewer with their paths (window.runtime.
 		// OnFileDrop); the page still gets the drop too, for map files.
