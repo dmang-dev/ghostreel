@@ -189,8 +189,9 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+      # The shell creates SHA256SUMS before find runs, so leave it out.
       - name: Checksums
-        run: cd artifacts && find . -maxdepth 1 -type f -printf '%f\n' | sort | xargs sha256sum > SHA256SUMS
+        run: cd artifacts && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | sort | xargs sha256sum > SHA256SUMS
       # The signed manifest the desktop app updates from. Without the key the
       # release still goes out, but installed apps won't see it.
       - name: Update manifest
