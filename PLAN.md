@@ -160,9 +160,9 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 **A. Release and distribution** — exit: a published release installs and opens a replay on Windows, macOS and Linux.
 
 1. ~~Get CI and the release workflow green on real runners, including the NSIS installer step (Phase 4).~~ Done: v1.1.0 was built and published by the workflow, with a signed `latest.json` (2026-10-30).
-2. Install each artifact on a clean machine per OS, and check the `.SC2Replay` file association on Windows (Phase 4). Updating from one published release to the next: an installed copy works (1.1.0 → 1.1.1, 2026-10-31); a portable copy is still untried.
+2. Install each artifact on a clean machine per OS, and check the `.SC2Replay` file association on Windows (Phase 4). Updating from one published release to the next: an installed copy works (1.1.0 → 1.1.1, 2026-10-31); a portable copy is still untried. `install-check.yml` now does the clean-machine part on GitHub's runners after each release (see DECISIONS, "Linux packages and install checks"); it hasn't run yet. The portable update can be checked there once the previous release has `GHOSTREEL_UPDATE_NOW`.
 3. ~~Open replays from Finder on macOS: handle Wails' file-open events after start-up, not only command-line files (Phase 4).~~ Done 2026-10-31 (see DECISIONS, "Finishing Phase 6 items"); not yet tried on a Mac.
-4. Linux packages: `.deb` and AppImage, and a build for WebKitGTK 4.1 (Ubuntu 24.04+) (Phase 4).
+4. ~~Linux packages: `.deb` and AppImage, and a build for WebKitGTK 4.1 (Ubuntu 24.04+) (Phase 4).~~ Done 2026-10-31 in the release workflow; first built with the next release.
 5. ~~Code signing for Windows and notarization for macOS (Phase 4).~~ Dropped 2026-10-31: the owner decided against it. SmartScreen and Gatekeeper warnings stay; the user guide says how to get past them.
 6. ~~Host the browser build (GitHub Pages) (Phase 4).~~ Done 2026-10-31: each full release publishes its web zip (`.github/workflows/pages.yml`) to `dmang-dev.github.io/ghostreel`, which the owner's custom domain serves as `dmang.com/ghostreel/`. v1.1.1 is live.
 7. ~~Make the repository public; add screenshots.~~ Done 2026-10-29; screenshots may show the game's art (see DECISIONS).

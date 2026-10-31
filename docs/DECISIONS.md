@@ -396,3 +396,27 @@ PLAN.md track D, item 3.
   - SC2 keeps only the builds it has needed, so the script lists the replays it skipped by build; opening one such replay in the game installs that build.
   - `ghostreel info -json` gives it each replay's build, players and cached map. It reads only the header, about 0.4 s a replay, against 26 s for a full decode of a long one.
 
+## Linux packages and install checks (2026-10-31)
+
+PLAN.md track A, items 2 and 4.
+
+- **Linux packages.** Releases keep the webkit2gtk-4.0 tarball (Ubuntu 22.04). They add a `.deb` and an AppImage built for WebKitGTK 4.1 (`wails build -tags webkit2_41`), which Ubuntu 24.04 and later have instead of 4.0.
+  - Both are built on 22.04, which has 4.1 too, so they also run there (glibc 2.35).
+  - The `.deb` is made with plain `dpkg-deb`, and `dpkg-shlibdeps` writes its dependencies. The build fails if WebKitGTK 4.1 isn't among them.
+  - The `.deb` installs a desktop entry, icons, and an `application/x-sc2replay` MIME type (`*.SC2Replay`). There are no maintainer scripts: dpkg triggers update the MIME and desktop databases.
+  - The AppImage (appimagetool 1.9.1, runtime 20251108, both pinned by SHA-256) holds the app only and uses the system's GTK and WebKitGTK 4.1. Bundling WebKitGTK would mean patching the paths of its helper processes, and the bundled web engine would miss the distribution's security fixes.
+  - Packaging is `desktop/build/linux/package.sh`.
+- **Updates on Linux** link to the release page, as before.
+  - A `.deb` must not overwrite files dpkg owns.
+  - An AppImage could replace itself; that needs a manifest role in `releasetool` and a Linux installer, and isn't done.
+  - The manifest's `linux-amd64` role still matches only the tarball.
+- **Install checks.** `install-check.yml` runs after each release, and on demand for any tag. It installs the downloads on clean GitHub runners and checks each one:
+  - **Windows installer:** silent install; the uninstall entry, shortcuts and `.SC2Replay` association are present; the app starts, including by opening a file through its type; a silent uninstall removes everything.
+  - **Windows portable zip, macOS app, Linux tarball:** the app starts.
+  - **`.deb`:** installs, and the MIME type and default app are set (`xdg-mime`, `gio`). Opening a file with `gio open` starts the app. `apt remove` removes it.
+  - **AppImage:** its contents are complete, and it starts.
+  - **What "opens a replay" means:** the repository has no replays and may not hold any. So each job passes a file named `install check.SC2Replay` that isn't one, and requires the app's log line with the decoder's error for it. That proves the path reached the decoder through each way of opening, not that a real replay renders.
+  - **Not checked:** opening from Finder (Apple events), whether the window draws, and AppImage desktop integration.
+- **Portable updates** can't be driven from outside the window: WebView2 (go-webview2 v1.0.22) ignores the environment and registry settings that would open a debugging port. So `GHOSTREEL_UPDATE_NOW=1` makes the app check for an update at start and install it without asking. The manifest signature and download hash checks still apply. A job can update the previous release's portable copy once that previous release has this switch, which means two releases from now.
+- **Not yet run:** none of this has run on Actions or on a Linux machine. It is checked only by parsing the workflows, shellcheck, and the PowerShell parser. The replay log line was seen with the local Windows build. The first run should be a manual one against v1.1.1, before the next release.
+

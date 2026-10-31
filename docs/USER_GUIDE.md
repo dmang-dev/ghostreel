@@ -19,8 +19,13 @@ Downloads are on the project's releases page. The builds are not code-signed, so
 ### Desktop app
 
 - **Windows:** run `ghostreel-desktop_…_setup.exe`. It associates `.SC2Replay` files, so double-clicking a replay opens it. A portable `.zip` is there too.
-- **macOS:** unzip and move `ghostreel.app` to Applications.
-- **Linux:** unpack the `.tar.gz` and run `ghostreel-desktop`. It needs GTK 3 and WebKitGTK 4.0 (`libwebkit2gtk-4.0`).
+- **macOS:** unzip and move `ghostreel.app` to Applications. Double-clicking a replay in Finder, or **Open With → ghostreel**, opens it.
+- **Linux:** three choices, all needing GTK 3 and glibc 2.35 or later (Ubuntu 22.04, Debian 12 and newer):
+  - The `.deb` (`sudo apt install ./ghostreel-desktop_…_linux_amd64.deb`) installs a menu entry and opens `.SC2Replay` files on double-click. It uses WebKitGTK 4.1, which apt installs.
+  - The `.AppImage`: make it executable and run it. It needs WebKitGTK 4.1 installed (`libwebkit2gtk-4.1-0`).
+  - The `.tar.gz`: unpack it and run `ghostreel-desktop`. It needs WebKitGTK 4.0 (`libwebkit2gtk-4.0-37`), which Ubuntu 24.04 no longer has.
+
+  On Linux the app tells you about new releases but doesn't install them: download the new package from the release page.
 
 Open a replay with **Open replay…**, by dropping it on the window, or from the **Library** menu, which lists your game's replay folders.
 
