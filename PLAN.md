@@ -159,22 +159,24 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 
 **A. Release and distribution** — exit: a published release installs and opens a replay on Windows, macOS and Linux.
 
-1. Get CI and the release workflow green on real runners, including the NSIS installer step, which has never run (Phase 4: NSIS couldn't be installed locally).
-2. Install each artifact on a clean machine per OS, and check the `.SC2Replay` file association on Windows (Phase 4).
+1. ~~Get CI and the release workflow green on real runners, including the NSIS installer step (Phase 4).~~ Done: v1.1.0 was built and published by the workflow, with a signed `latest.json` (2026-10-30).
+2. Install each artifact on a clean machine per OS, and check the `.SC2Replay` file association on Windows (Phase 4). Also update an installed and a portable copy from one published release to the next, which only two real releases can show.
 3. Open replays from Finder on macOS: handle Wails' file-open events after start-up, not only command-line files (Phase 4).
 4. Linux packages: `.deb` and AppImage, and a build for WebKitGTK 4.1 (Ubuntu 24.04+) (Phase 4).
 5. Code signing for Windows and notarization for macOS; needs maintainers' certificates (Phase 4).
 6. Host the browser build (GitHub Pages) (Phase 4). `ghostreel.wasm` is now 14.3 MB, fetched as a 3.4 MB `.gz` that the page decodes itself, so any static host works (see docs/DECISIONS.md, "Smaller browser build").
-7. Make the repository public once 1–2 are done; add screenshots (done; since 2026-10-29 they may show the game's art, see DECISIONS).
+7. ~~Make the repository public; add screenshots.~~ Done 2026-10-29; screenshots may show the game's art (see DECISIONS).
 
 **B. Checks against a current full game install** — exit: every ladder unit type verified, and ground truth exists for current game versions and for Zerg players.
 
-1. Run `ghostreel assets` against a current Windows/macOS install: the Archon (stripped from the Linux 4.10 package) and full-resolution textures, models and ground textures (Phase 3).
+1. ~~Run `ghostreel assets` against a current Windows/macOS install (Phase 3).~~ Done 2026-10-29 on 5.0.16 (base build 97563): every model converts, textures at full size (see DECISIONS, "Checked against a full install").
 2. Record engine ground truth (`ghostreel-engine`) on current-version replays. The Linux client is 4.10 only, so this needs a Windows or macOS client (Phase 2).
 3. Include games where the Zerg side is a player rather than the AI, so creep speed can finally be measured (Phase 2).
 4. Re-check terrain heights against command target heights on those maps; Magannatha's 2-unit offset is believed to be a map-version mismatch (Phase 3).
 
 **C. Command tier, round 4** — exit (as before): every change lowers the measured error; a change that doesn't is reverted and recorded.
+
+Round 4 done 2026-10-27 (see DECISIONS, "Command tier, round 4"): items 1 and 3 kept (selection recall was a measurement problem; Siege Tanks path with their own clearance), item 2 reverted (tracker-tier enemy positions are too coarse to chase), item 4 has nothing to measure against (no recorded game boosts), item 5 out of scope. What's left needs ground truth from current games (track B) first.
 
 1. Selection-tracking recall (85% of commands found): raw-API bots and control-group edge cases. Missed commands leave units parked (Phase 2/5).
 2. Fights: kiting and chasing between attack-move stops (Phase 2).
@@ -191,6 +193,8 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 5. The minimap's handling of fog-hidden units: it may lag a frame; unverified (Phase 3).
 
 **E. Analysis** — exit: the common questions about a game are answered in the panel.
+
+Done 2026-10-27 (see DECISIONS, "Analysis: APM, production, army, upgrades, supply to the loop"): items 1–3 as below.
 
 1. APM and actions over time: keep a per-player count of commands in the timeline (Phase 5).
 2. Production idle time, army composition over time, upgrade timings per player (Phase 5).
