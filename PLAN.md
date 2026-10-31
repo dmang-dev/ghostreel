@@ -161,16 +161,16 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 
 1. ~~Get CI and the release workflow green on real runners, including the NSIS installer step (Phase 4).~~ Done: v1.1.0 was built and published by the workflow, with a signed `latest.json` (2026-10-30).
 2. Install each artifact on a clean machine per OS, and check the `.SC2Replay` file association on Windows (Phase 4). Updating from one published release to the next: an installed copy works (1.1.0 → 1.1.1, 2026-10-31); a portable copy is still untried.
-3. Open replays from Finder on macOS: handle Wails' file-open events after start-up, not only command-line files (Phase 4).
+3. ~~Open replays from Finder on macOS: handle Wails' file-open events after start-up, not only command-line files (Phase 4).~~ Done 2026-10-31 (see DECISIONS, "Finishing Phase 6 items"); not yet tried on a Mac.
 4. Linux packages: `.deb` and AppImage, and a build for WebKitGTK 4.1 (Ubuntu 24.04+) (Phase 4).
-5. Code signing for Windows and notarization for macOS; needs maintainers' certificates (Phase 4).
+5. ~~Code signing for Windows and notarization for macOS (Phase 4).~~ Dropped 2026-10-31: the owner decided against it. SmartScreen and Gatekeeper warnings stay; the user guide says how to get past them.
 6. ~~Host the browser build (GitHub Pages) (Phase 4).~~ Done 2026-10-31: each full release publishes its web zip (`.github/workflows/pages.yml`) to `dmang-dev.github.io/ghostreel`, which the owner's custom domain serves as `dmang.com/ghostreel/`. v1.1.1 is live.
 7. ~~Make the repository public; add screenshots.~~ Done 2026-10-29; screenshots may show the game's art (see DECISIONS).
 
 **B. Checks against a current full game install** — exit: every ladder unit type verified, and ground truth exists for current game versions and for Zerg players.
 
 1. ~~Run `ghostreel assets` against a current Windows/macOS install (Phase 3).~~ Done 2026-10-29 on 5.0.16 (base build 97563): every model converts, textures at full size (see DECISIONS, "Checked against a full install").
-2. Record engine ground truth (`ghostreel-engine`) on current-version replays. The Linux client is 4.10 only, so this needs a Windows or macOS client (Phase 2).
+2. Record engine ground truth (`ghostreel-engine`) on current-version replays. The Linux client is 4.10 only, so this needs a Windows or macOS client (Phase 2). `scripts/record-engine.ps1` does it on the owner's Windows PC (items 2–4 together); waiting on its first run.
 3. Include games where the Zerg side is a player rather than the AI, so creep speed can finally be measured (Phase 2).
 4. Re-check terrain heights against command target heights on those maps; Magannatha's 2-unit offset is believed to be a map-version mismatch (Phase 3).
 
@@ -186,11 +186,11 @@ Round 4 done 2026-10-27 (see DECISIONS, "Command tier, round 4"): items 1 and 3 
 
 **D. 3D fidelity** — exit: a ladder map in 3D reads like the game at a glance, at 60 fps on a mid-range GPU.
 
-1. A performance pass on a real GPU: so far it was measured only on a software renderer, 55 ms per frame with 96 models (Phase 3).
+1. ~~A performance pass on a real GPU (Phase 3).~~ Done 2026-10-31: the owner reports it runs well on a desktop with an RTX 5070 Ti. No numbers were taken.
 2. ~~Cliff meshes from the tile set's cliff models in place of the heightfield's walls (Phase 3/5).~~ Done 2026-10-27 (see DECISIONS).
 3. ~~Water, and creep that recedes after its source dies rather than vanishing (Phase 3/5).~~ Done 2026-10-31 (see DECISIONS, "Water and receding creep"). No test map shows water in play, so it was checked on a synthetic lake only.
 4. Weapon and attachment models, and per-actor scale (Phase 3). Lighting per map: done 2026-10-30 (see DECISIONS).
-5. The minimap's handling of fog-hidden units: it may lag a frame; unverified (Phase 3).
+5. ~~The minimap's handling of fog-hidden units: it may lag a frame; unverified (Phase 3).~~ Checked 2026-10-31: no lag (see DECISIONS, "Finishing Phase 6 items").
 
 **E. Analysis** — exit: the common questions about a game are answered in the panel.
 

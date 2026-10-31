@@ -14,7 +14,7 @@ Pick one of three ways to run it. All of them read the same replays and show the
 | Lists your replay folders | Yes | No | With `--replays` |
 | Exact positions from `ghostreel-engine` | Yes | No | Yes |
 
-Downloads are on the project's releases page. The builds are not code-signed yet, so Windows SmartScreen may ask "Run anyway?", and on macOS you right-click the app and choose **Open** the first time.
+Downloads are on the project's releases page. The builds are not code-signed, so Windows SmartScreen may ask "Run anyway?", and on macOS you right-click the app and choose **Open** the first time.
 
 ### Desktop app
 

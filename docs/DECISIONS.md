@@ -382,3 +382,17 @@ PLAN.md track D, item 3.
 
   This was checked with a synthetic lake and lava pool on Persephone, because no test map has water in play. Waves, shore foam and the game's water shaders aren't modelled.
 - **Creep recedes** after its source (a finished hatchery, lair or hive, or a creep tumor) dies. The disc shrinks from the edge inward at 0.4 cells a second, so a hatchery's creep is gone in about 30 seconds. It starts from the radius the creep had reached when the source died, at the source's last position. Buildings that die unfinished leave no creep. Checked on a 2026-05-10 bot game in which three tumors die at about 51:30. The rate is an estimate, like the spread (the game removes creep cell by cell); no recorded game has a Zerg player to measure it against (track B, item 3).
+
+## Finishing Phase 6 items (2026-10-31)
+
+- **Code signing is dropped** (PLAN A5), by the owner's decision. The Windows and macOS builds stay unsigned, so SmartScreen and Gatekeeper warn on first start (the user guide says how to proceed). The update manifest is still signed with the project's own key, so updates are verified either way.
+- **Performance on a real GPU** (PLAN D1): the owner reports the 3D view runs well on a desktop with an RTX 5070 Ti. No frame times were measured, so the software-renderer numbers in Phase 3 remain the only measured ones.
+- **The minimap and fog** (PLAN D5): no lag, by reading the code. Each frame `Scene.render` places the units, computes fog, and marks hidden units. `drawMinimap` then runs in the same tick and reads those marks through `drawnUnits()`. What the minimap does have is a redraw limit of 10 per second, so during playback it can trail the main view by up to 100 ms (about 9 loops at 4× speed). That is by design, and it catches up within 100 ms when paused.
+- **Opening replays from Finder** (PLAN A3). macOS hands a document to a running app (or to one it starts for that document) as an `openFile` event, not as a command-line argument. Wails passes that event to `mac.Options.OnFileOpen`. The app queues such files until the page emits `viewer-ready`, then sends the last one as an `open-replay` event, and the viewer opens it by path as it does a dropped file. The queue covers a cold start, when the event can come before the page has loaded. `CFBundleDocumentTypes` for `.SC2Replay` was already in the app's Info.plist, which Wails writes from `wails.json`'s `fileAssociations`. This is untested on a Mac: CI builds it, and `fileOpener` has a unit test.
+- **Recording on Windows** (PLAN B2–B4): `scripts/record-engine.ps1` runs `ghostreel-engine` on the owner's PC, where the install is local and writable (the read-only share stopped the first try; see "The engine on Windows: first try").
+  - It first re-records a 4.10 game the VM already recorded, so the two platforms can be compared.
+  - Then it records games with a human Zerg player (B3), then the newest games whose client build is installed (B2).
+  - It copies each replay's cached map into `testdata/maps`, for the height check (B4).
+  - SC2 keeps only the builds it has needed, so the script lists the replays it skipped by build; opening one such replay in the game installs that build.
+  - `ghostreel info -json` gives it each replay's build, players and cached map. It reads only the header, about 0.4 s a replay, against 26 s for a full decode of a long one.
+
