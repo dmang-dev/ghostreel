@@ -164,7 +164,7 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 3. Open replays from Finder on macOS: handle Wails' file-open events after start-up, not only command-line files (Phase 4).
 4. Linux packages: `.deb` and AppImage, and a build for WebKitGTK 4.1 (Ubuntu 24.04+) (Phase 4).
 5. Code signing for Windows and notarization for macOS; needs maintainers' certificates (Phase 4).
-6. Host the browser build (GitHub Pages) (Phase 4). The workflow is ready: each full release publishes its web zip to `dmang-dev.github.io/ghostreel` (`.github/workflows/pages.yml`). Left: turn Pages on (source: GitHub Actions) and run it once.
+6. ~~Host the browser build (GitHub Pages) (Phase 4).~~ Done 2026-10-31: each full release publishes its web zip (`.github/workflows/pages.yml`) to `dmang-dev.github.io/ghostreel`, which the owner's custom domain serves as `dmang.com/ghostreel/`. v1.1.1 is live.
 7. ~~Make the repository public; add screenshots.~~ Done 2026-10-29; screenshots may show the game's art (see DECISIONS).
 
 **B. Checks against a current full game install** — exit: every ladder unit type verified, and ground truth exists for current game versions and for Zerg players.
