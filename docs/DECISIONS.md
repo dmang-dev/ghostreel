@@ -353,3 +353,11 @@ More of what replays, maps and the game install record, shown in the viewer:
 - **Display names** come from the install's GameStrings; without the game (and in the browser build), ids are spaced into words.
 - **Self-kills:** a cancelled building is reported as killed by itself (the replay names its own tag as the killer), which the feed showed as "Barracks Tech Lab killed by Barracks Tech Lab". Such deaths get no killer. `CacheVersion` is now `tl10`.
 - **Not yet:** inhibitor and acceleration zone radii (4, 5 and 6 cells by size) are approximate; their real sizes sit in behavior and effect data not followed yet. No test replay has a ping, so pings are checked against the protocol (the same fixed point as command targets) and a hand-made timeline only.
+
+## v1.1.1: the first real update (2026-10-31)
+
+- **Installed copy: works.** v1.1.0, installed with its own installer on Windows 11, found v1.1.1 through the signed `latest.json` on the release, downloaded the installer, ran it silently into the same folder (one elevation prompt) and restarted. The installed exe is byte-identical to the 1.1.1 build, and the uninstall entry reads 1.1.1. This is the first check against two published releases; before it, only a local fake release had been used.
+- **Portable copy: not tried.** The owner skipped it. The swap is still tested only against the fake release (`desktop/update_test.go`, `desktop/install_windows_test.go`).
+- **`SHA256SUMS` listed itself.** The release job's shell created the file before `find` listed the folder, so every release through v1.1.0 had a line for `SHA256SUMS` with the empty file's hash, and `sha256sum -c` reported one failure. Fixed for v1.1.1, which checks clean. The app never used this file (it checks the hashes in the signed manifest).
+- **The updated publish step ran for the first time** (download-artifact v7, action-gh-release v3.0.3) and published all 14 files.
+- **Automation note.** From an agent's shell, the installer's elevation prompt was cancelled at once and the app's window couldn't be driven (Wails sets its own WebView2 arguments, so no debugging port; UI Automation saw no content), so the clicks were the owner's.

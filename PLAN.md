@@ -160,7 +160,7 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 **A. Release and distribution** — exit: a published release installs and opens a replay on Windows, macOS and Linux.
 
 1. ~~Get CI and the release workflow green on real runners, including the NSIS installer step (Phase 4).~~ Done: v1.1.0 was built and published by the workflow, with a signed `latest.json` (2026-10-30).
-2. Install each artifact on a clean machine per OS, and check the `.SC2Replay` file association on Windows (Phase 4). Also update an installed and a portable copy from one published release to the next, which only two real releases can show.
+2. Install each artifact on a clean machine per OS, and check the `.SC2Replay` file association on Windows (Phase 4). Updating from one published release to the next: an installed copy works (1.1.0 → 1.1.1, 2026-10-31); a portable copy is still untried.
 3. Open replays from Finder on macOS: handle Wails' file-open events after start-up, not only command-line files (Phase 4).
 4. Linux packages: `.deb` and AppImage, and a build for WebKitGTK 4.1 (Ubuntu 24.04+) (Phase 4).
 5. Code signing for Windows and notarization for macOS; needs maintainers' certificates (Phase 4).
