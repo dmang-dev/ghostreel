@@ -23,6 +23,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/dmang-dev/ghostreel/internal/app"
@@ -78,6 +79,11 @@ func main() {
 		}
 	}
 
+	// Replays opened from Finder while the app runs, or that start it, come
+	// as events on macOS. The page opens them by path once it says it's
+	// listening ("viewer-ready"); see fileOpener.
+	opener := &fileOpener{send: func(p string) { wailsruntime.EventsEmit(appCtx, "open-replay", p) }}
+
 	err = wails.Run(&options.App{
 		Title:            "ghostreel",
 		Width:            1440,
@@ -89,10 +95,20 @@ func main() {
 			Assets:  dist,
 			Handler: srv.Handler(), // /api/* (everything not in the viewer build)
 		},
-		OnStartup: func(ctx context.Context) { appCtx = ctx },
+		OnStartup: func(ctx context.Context) {
+			appCtx = ctx
+			wailsruntime.EventsOn(ctx, "viewer-ready", func(...any) { opener.Ready() })
+		},
 		// Dropped files reach the viewer with their paths (window.runtime.
 		// OnFileDrop); the page still gets the drop too, for map files.
 		DragAndDrop: &options.DragAndDrop{EnableFileDrop: true},
+		Mac: &mac.Options{
+			OnFileOpen: func(p string) {
+				if strings.EqualFold(filepath.Ext(p), ".SC2Replay") {
+					opener.Open(p)
+				}
+			},
+		},
 	})
 	if err != nil {
 		log.Fatal(err)

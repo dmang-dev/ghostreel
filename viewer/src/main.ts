@@ -702,7 +702,11 @@ let dropsByPath = false;
 declare global {
   interface Window {
     // Wails' runtime, in the desktop app.
-    runtime?: { OnFileDrop?: (cb: (x: number, y: number, paths: string[]) => void, useDropTarget?: boolean) => void };
+    runtime?: {
+      OnFileDrop?: (cb: (x: number, y: number, paths: string[]) => void, useDropTarget?: boolean) => void;
+      EventsOn?: (name: string, cb: (...data: unknown[]) => void) => void;
+      EventsEmit?: (name: string, ...data: unknown[]) => void;
+    };
   }
 }
 /** The desktop app's settings: the game data folder and map folders. */
@@ -800,6 +804,14 @@ api.config().then((c) => {
       const p = paths.find((x) => /\.sc2replay$/i.test(x));
       if (p) load(() => api.openReplayPath(p), fileName(p));
     }, false);
+  }
+  // Replays opened from the OS while the app runs (macOS Finder): the app
+  // holds them until the page says it's listening.
+  if (c.openPaths && window.runtime?.EventsOn && window.runtime.EventsEmit) {
+    window.runtime.EventsOn("open-replay", (p) => {
+      if (typeof p === "string") load(() => api.openReplayPath(p), fileName(p));
+    });
+    window.runtime.EventsEmit("viewer-ready");
   }
 }).catch(() => {
   // No config endpoint: the file picker still works.
