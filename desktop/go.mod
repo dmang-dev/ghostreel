@@ -19,7 +19,7 @@ require (
 	github.com/icza/mpq v0.0.0-20230330132843-d3cdc0b651b7 // indirect
 	github.com/icza/s2prot v1.5.2-0.20260901194732-bfc6da08753d // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
-	github.com/labstack/echo/v4 v4.16.2 // indirect
+	github.com/labstack/echo/v4 v4.16.3 // indirect
 	github.com/labstack/gommon v0.5.0 // indirect
 	github.com/leaanthony/go-ansi-parser v1.6.1 // indirect
 	github.com/leaanthony/gosod v1.0.4 // indirect
