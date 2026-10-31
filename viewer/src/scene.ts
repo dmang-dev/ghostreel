@@ -19,6 +19,7 @@
 
 import * as THREE from "three";
 import type { Vitals } from "./gen/timeline/v1/timeline_pb";
+import { CREEP_RADIUS, creepDeaths, creepStart, grownRadius, recedingCreep, type CreepDeath, type CreepDisc } from "./creep";
 import { disposeLayers, fineHeights, splat, stepCliffs, SUB, type GroundLayers } from "./ground";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, isAlive, positionAt, type UnitState } from "./model";
 import type { UnitInstance, UnitModels } from "./models";
@@ -53,12 +54,6 @@ const DEATH_WINDOW = 112; // loops a death marker stays visible (5 s on the cloc
 const AIR_HEIGHT = 4; // cells above the ground for flying units in 3D
 const FOG_DARK = 0.62; // how much unseen ground is darkened
 const GROUND_TILE = 8; // cells per repeat of the ground texture
-// Creep radius (cells) around each source when fully spread, and the time
-// it takes to spread (loops).
-const CREEP_RADIUS: Record<string, number> = {
-  Hatchery: 12, Lair: 12, Hive: 12, CreepTumor: 10, CreepTumorBurrowed: 10, CreepTumorQueen: 10,
-};
-const CREEP_GROWTH = 22.4 * 12;
 const EVICT_FRAMES = 600; // drop a unit's model after this many frames unused
 // Models give way to stand-ins when they'd be a few pixels tall, and past a
 // count where skinning every unit costs more than it shows.
@@ -86,6 +81,8 @@ export class Scene {
   private creepData?: Uint8Array;
   private creepKey = "";
   private hasCreep = false;
+  /** Dead creep sources of the model they were found in, for receding creep. */
+  private creepDeaths: { model?: Model; deaths: CreepDeath[] } = { deaths: [] };
   private pathable?: Uint8Array;
   private terrainTex?: THREE.CanvasTexture;
   private groundDetail?: THREE.Texture;
@@ -714,23 +711,23 @@ export class Scene {
   }
 
   /**
-   * Creep around Zerg town halls and creep tumors, grown over CREEP_GROWTH
-   * after they finish and limited to walkable ground. An estimate: the game
-   * spreads creep cell by cell and lets it recede slowly after a source dies.
+   * Creep around Zerg town halls and creep tumors, limited to walkable
+   * ground: growing around live sources, receding around dead ones (creep.ts).
    */
   private updateCreep(model: Model, loop: number): void {
-    const parts: string[] = [];
-    const sources: { x: number; y: number; r: number }[] = [];
+    if (this.creepDeaths.model !== model) {
+      this.creepDeaths = { model, deaths: creepDeaths(model.units, model.types, model.tracks) };
+    }
+    const sources: (CreepDisc & { id: number })[] = [];
     for (let i = 0; i < this.drawnCount; i++) {
       const d = this.drawn[i];
       const full = CREEP_RADIUS[model.types[d.type]?.name ?? ""];
       if (!full || d.constructing) continue;
-      const u = model.units[d.id];
-      const start = u.constructed ? (u.doneLoop ?? loop) : u.bornLoop;
-      const r = Math.round(full * Math.min(1, Math.max(0.15, (loop - start) / CREEP_GROWTH)) * 2) / 2;
-      sources.push({ x: d.x, y: d.y, r });
-      parts.push(`${d.id}:${r}`);
+      sources.push({ id: d.id, x: d.x, y: d.y, r: grownRadius(full, creepStart(model.units[d.id], loop), loop) });
     }
+    recedingCreep(this.creepDeaths.deaths, loop, sources);
+    const parts: string[] = [];
+    for (const s of sources) parts.push(`${s.id}:${s.r}`);
     const key = parts.join(",");
     if (key === this.creepKey) return;
     this.creepKey = key;
