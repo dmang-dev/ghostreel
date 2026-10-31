@@ -177,7 +177,7 @@ Still open:
 
 - **`t3TextureMasks` is decoded.** It holds 8 layers, each 4 texels per cell across and 8 up (on all 13 maps tried). A layer is 32×32-byte tiles in strips two tiles high: down the strip first, then across, strips from the bottom up. Two measurements found this. First, byte-difference autocorrelation showed 1 byte per texel and 32-byte rows. Second, matching tile edges showed that the next tile (+1) continues upward and +2 continues to the right. The 8 weights of a texel sum to 255. The Phase 3 guesses (64×64 blocks, BC4) were wrong.
 - The server composes the ground from those masks and the layer textures (`CTerrainTex`), tiled as `uvtiling` says, at up to 8 pixels per cell, in about 0.3–0.8 s per map. Composed images matched each map's own minimap by eye. The viewer offers the result as **Ground textures** in 2D and 3D, the default when it's available. It needs the game's data, so the browser build doesn't have it.
-- **Creep** is drawn around finished hatcheries (12 cells) and creep tumors (10), grown over 12 s and kept to walkable ground. It is an estimate: the game spreads creep cell by cell and lets it recede slowly.
+- **Creep** is drawn around finished hatcheries (12 cells) and creep tumors (10), grown over 12 s and kept to walkable ground. It is an estimate: the game spreads creep cell by cell and lets it recede slowly. (Receding was added on 2026-10-31; see "Water and receding creep".)
 - **Cliff meshes** are not done: the game builds cliffs from tile-set cliff models placed by rules not decoded here, so the heightfield's walls remain.
 
 ### Command tier, round 3: nothing kept
@@ -365,3 +365,20 @@ More of what replays, maps and the game install record, shown in the viewer:
 ## The engine on Windows: first try (2026-10-31)
 
 PLAN.md track B, item 2. `ghostreel-engine` was run on Windows 11 against the full install read from a network share (`S:\`, which has every client from 4.10 to 5.0.16 under `Versions/`). The launcher found `Versions\Base75689\SC2_x64.exe` for a 4.10 bot replay and started it from `Support64` with `-dataDir S:\`, as designed. SC2 then stopped within 30 seconds with "Core: access permission error … doesn't have write access. "S:\"" (its report is in `Documents\StarCraft II\GameLogs`): the client needs write access to the folder given as `-dataDir`, and the share is read-only. A local folder of links to the share needs administrator rights or Developer Mode on Windows. So the engine needs a writable install: a copy (28 GB, nearly all `SC2Data`), or a writable share. On hold until one exists; the first run should be a 4.10 bot game already recorded on the VM, compared sample by sample, to show the Windows path gives the same recording.
+
+## Water and receding creep (2026-10-31)
+
+PLAN.md track D, item 3.
+
+- **Water areas** come from the map's `t3Water`: a 32-byte `WATR` header with the record count (u32) at offset 8, then 56-byte records. Each record has a NUL-terminated type name (16 bytes) and, at +40, four float32 giving the rectangle in cells (x0, y0, x1, y1). This was checked by hand against Ley Lines (67 areas), Persephone (54) and Pylon (none). The other bytes of a record aren't decoded.
+- **Water types** (`CWater`) give the surface height in absolute terrain units, the color, and `IsLava`. Only the first state counts: later states are the game's water changing level. The game's own catalogs come first, core mod first, and then the map's `WaterData.xml` applies over them. A map can write Height and Color as attributes or as child elements. The game's catalogs declare `us-ascii`, which Go's XML decoder rejects unless given a charset reader. Without game data (and in the browser build), only the map's own types apply, and anything else gets the game's default: height 9, a blue-grey at 0.3 alpha. Served at `GET /api/r/{id}/water`.
+- **Most water is hidden.** Maps keep areas whose surface lies below the ground, or outside the playable area. On the test maps:
+  - Persephone shows 18 cells, all at the edges.
+  - Magannatha's Char lava (3.5) and Ley Lines' Agria lava (3.4) show none.
+
+  So the viewer draws a surface only where it is above the ground:
+  - In 3D, a flat sheet at that height, which the terrain hides below ground. Water is see-through (twice its alpha, between 0.5 and 0.85); lava is nearly opaque and unlit.
+  - In 2D, the cells whose mean corner height is below the surface.
+
+  This was checked with a synthetic lake and lava pool on Persephone, because no test map has water in play. Waves, shore foam and the game's water shaders aren't modelled.
+- **Creep recedes** after its source (a finished hatchery, lair or hive, or a creep tumor) dies. The disc shrinks from the edge inward at 0.4 cells a second, so a hatchery's creep is gone in about 30 seconds. It starts from the radius the creep had reached when the source died, at the source's last position. Buildings that die unfinished leave no creep. Checked on a 2026-05-10 bot game in which three tumors die at about 51:30. The rate is an estimate, like the spread (the game removes creep cell by cell); no recorded game has a Zerg player to measure it against (track B, item 3).

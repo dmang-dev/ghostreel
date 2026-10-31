@@ -307,6 +307,34 @@ export async function fetchLighting(id: string): Promise<Lighting | null> {
   return resp.json();
 }
 
+/** An area of water or lava, in cells (internal/mapfile/water.go). */
+export interface WaterArea {
+  type: string;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** How a kind of water looks: surface height, RGB and opacity (0–1), lava or not. */
+export interface WaterType {
+  height: number;
+  color: number[];
+  lava?: boolean;
+}
+
+export interface Water {
+  areas: WaterArea[];
+  types: Record<string, WaterType>;
+}
+
+/** The map's water and lava; no areas when it has none, null without a map. */
+export async function fetchWater(id: string): Promise<Water | null> {
+  const resp = await apiFetch(`/api/r/${id}/water`);
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
 /** One of a unit's weapons (internal/assets/info.go); times in clock seconds. */
 export interface WeaponInfo {
   name?: string;

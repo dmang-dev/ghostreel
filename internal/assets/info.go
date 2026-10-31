@@ -68,6 +68,7 @@ type data struct {
 	buildTime map[string]float64 // unit → Normal-speed seconds to train or build
 	strings   map[string]string  // GameStrings: "Unit/Name/Marine" → "Marine"
 	lights    lightSet
+	water     [][]byte // each mod's WaterData.xml, core first (mapfile.ResolveWater)
 }
 
 func (l *Library) loadData() *data {
@@ -98,6 +99,9 @@ func (l *Library) loadData() *data {
 			}
 			if b, err := l.st.ReadFile(dir + "lightdata.xml"); err == nil {
 				d.lights.add(b)
+			}
+			if b, err := l.st.ReadFile(dir + "waterdata.xml"); err == nil {
+				d.water = append(d.water, b)
 			}
 			if b, err := l.st.ReadFile("mods/" + m + ".sc2mod/enus.sc2data/localizeddata/gamestrings.txt"); err == nil {
 				readStrings(b, d.strings)

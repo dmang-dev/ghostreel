@@ -21,6 +21,8 @@ import * as THREE from "three";
 import type { Vitals } from "./gen/timeline/v1/timeline_pb";
 import { CREEP_RADIUS, creepDeaths, creepStart, grownRadius, recedingCreep, type CreepDeath, type CreepDisc } from "./creep";
 import { disposeLayers, fineHeights, splat, stepCliffs, SUB, type GroundLayers } from "./ground";
+import { surfaceOpacity, waterCells, waterSheets } from "./water";
+import type { Water } from "./api";
 import { LOOPS_PER_CLOCK_SECOND, Model, UnitClass, isAlive, positionAt, type UnitState } from "./model";
 import type { UnitInstance, UnitModels } from "./models";
 
@@ -81,6 +83,9 @@ export class Scene {
   private creepData?: Uint8Array;
   private creepKey = "";
   private hasCreep = false;
+  /** Water and lava (water.ts): colored cells in 2D, sheets at their height in 3D. */
+  private water2?: THREE.Mesh;
+  private water3?: THREE.Group;
   /** Dead creep sources of the model they were found in, for receding creep. */
   private creepDeaths: { model?: Model; deaths: CreepDeath[] } = { deaths: [] };
   private pathable?: Uint8Array;
@@ -212,7 +217,64 @@ export class Scene {
     this.creepTex.needsUpdate = true;
     this.creepKey = "";
     this.hasCreep = false;
+    this.setWater(null);
     this.setTerrain(terrain);
+    this.applyMode();
+  }
+
+  /** Shows the map's water and lava; null removes it. */
+  setWater(water: Water | null): void {
+    if (this.water2) {
+      this.scene.remove(this.water2);
+      this.water2.geometry.dispose();
+      const m = this.water2.material as THREE.MeshBasicMaterial;
+      m.map?.dispose();
+      m.dispose();
+      this.water2 = undefined;
+    }
+    if (this.water3) {
+      this.scene.remove(this.water3);
+      for (const c of this.water3.children as THREE.Mesh[]) {
+        c.geometry.dispose();
+        (c.material as THREE.Material).dispose();
+      }
+      this.water3 = undefined;
+    }
+    if (!water || water.areas.length === 0) return;
+    const w = this.worldW, h = this.worldH;
+    // 2D needs the ground's heights to know where the surface shows.
+    const cells = this.corners && waterCells(water.areas, water.types, this.corners, w, h);
+    if (cells) {
+      const tex = new THREE.DataTexture(cells, w, h, THREE.RGBAFormat);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.magFilter = tex.minFilter = THREE.LinearFilter;
+      tex.needsUpdate = true;
+      this.water2 = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({
+        map: tex, transparent: true, depthTest: false, depthWrite: false,
+      }));
+      this.water2.position.set(w / 2, h / 2, 0);
+      this.water2.renderOrder = 0.4; // over the ground, under creep and fog
+      this.scene.add(this.water2);
+    }
+    // 3D: one sheet per type at its height; the terrain hides what's below ground.
+    this.water3 = new THREE.Group();
+    for (const [id, t] of Object.entries(water.types)) {
+      const areas = water.areas.filter((a) => a.type === id);
+      if (!areas.length) continue;
+      const { positions, indices } = waterSheets(areas, t.height);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geo.setIndex(new THREE.BufferAttribute(indices, 1));
+      geo.computeVertexNormals();
+      const color = new THREE.Color().setRGB(t.color[0], t.color[1], t.color[2], THREE.SRGBColorSpace);
+      const opts = { color, transparent: true, opacity: surfaceOpacity(t), depthWrite: false, side: THREE.DoubleSide };
+      // Lava glows; water takes the map's lighting.
+      const mat = t.lava ? new THREE.MeshBasicMaterial(opts) : new THREE.MeshLambertMaterial(opts);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.renderOrder = 0.6;
+      this.water3.add(mesh);
+    }
+    this.scene.add(this.water3);
     this.applyMode();
   }
 
@@ -394,6 +456,8 @@ export class Scene {
     this.meshes2?.setVisible(!three);
     this.meshes3?.setVisible(three);
     if (this.doodads) this.doodads.visible = three;
+    if (this.water2) this.water2.visible = !three;
+    if (this.water3) this.water3.visible = three;
     this.selection2.visible = this.selection3.visible = false;
     this.updateFogVisibility();
   }

@@ -164,7 +164,7 @@ Each item names the phase that left it open (details in [docs/DECISIONS.md](docs
 3. Open replays from Finder on macOS: handle Wails' file-open events after start-up, not only command-line files (Phase 4).
 4. Linux packages: `.deb` and AppImage, and a build for WebKitGTK 4.1 (Ubuntu 24.04+) (Phase 4).
 5. Code signing for Windows and notarization for macOS; needs maintainers' certificates (Phase 4).
-6. Host the browser build (GitHub Pages) (Phase 4). `ghostreel.wasm` is now 14.3 MB, fetched as a 3.4 MB `.gz` that the page decodes itself, so any static host works (see docs/DECISIONS.md, "Smaller browser build").
+6. Host the browser build (GitHub Pages) (Phase 4). The workflow is ready: each full release publishes its web zip to `dmang-dev.github.io/ghostreel` (`.github/workflows/pages.yml`). Left: turn Pages on (source: GitHub Actions) and run it once.
 7. ~~Make the repository public; add screenshots.~~ Done 2026-10-29; screenshots may show the game's art (see DECISIONS).
 
 **B. Checks against a current full game install** — exit: every ladder unit type verified, and ground truth exists for current game versions and for Zerg players.
@@ -188,7 +188,7 @@ Round 4 done 2026-10-27 (see DECISIONS, "Command tier, round 4"): items 1 and 3 
 
 1. A performance pass on a real GPU: so far it was measured only on a software renderer, 55 ms per frame with 96 models (Phase 3).
 2. ~~Cliff meshes from the tile set's cliff models in place of the heightfield's walls (Phase 3/5).~~ Done 2026-10-27 (see DECISIONS).
-3. Water, and creep that recedes after its source dies rather than vanishing (Phase 3/5).
+3. ~~Water, and creep that recedes after its source dies rather than vanishing (Phase 3/5).~~ Done 2026-10-31 (see DECISIONS, "Water and receding creep"). No test map shows water in play, so it was checked on a synthetic lake only.
 4. Weapon and attachment models, and per-actor scale (Phase 3). Lighting per map: done 2026-10-30 (see DECISIONS).
 5. The minimap's handling of fog-hidden units: it may lag a frame; unverified (Phase 3).
 

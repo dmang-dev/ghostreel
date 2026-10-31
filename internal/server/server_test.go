@@ -137,6 +137,10 @@ func TestOpenReplayAndFetch(t *testing.T) {
 	if code, _ := get(t, ts.URL+"/api/assets/cliff/CliffNatural0Ex1/aabb"); code != 404 {
 		t.Errorf("cliff piece without game data: %d", code)
 	}
+	// Water doesn't: Abyssal Reef has none, and says so.
+	if code, body := get(t, ts.URL+"/api/r/"+s.ID+"/water"); code != 200 || string(bytes.TrimSpace(body)) != `{"areas":[],"types":{}}` {
+		t.Errorf("water: %d %s", code, body)
+	}
 	// So do lighting, the loading screen and unit stats.
 	for _, p := range []string{"/api/r/" + s.ID + "/lighting", "/api/r/" + s.ID + "/loading", "/api/assets/info?units=Marine"} {
 		if code, _ := get(t, ts.URL+p); code != 404 {

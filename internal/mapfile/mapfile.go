@@ -45,6 +45,11 @@ type Map struct {
 	// LightData.xml, which add to or override the game's terrain types and
 	// lighting; nil when the map has none.
 	TerrainData, LightData []byte
+	// WaterData is the map's own WaterData.xml (see ResolveWater); nil when
+	// the map has none.
+	WaterData []byte
+	// Water is the water and lava the map paints (t3Water); empty when none.
+	Water []WaterRect
 	// TerrainTextures are the terrain's texture layers (CTerrainTex ids),
 	// base layer first, from t3Terrain.xml.
 	TerrainTextures []string
@@ -195,6 +200,14 @@ func Decode(a ReadFile) (*Map, error) {
 	}
 	mp.LightData = get(`Base.SC2Data\GameData\LightData.xml`)
 	mp.TerrainData = get(`Base.SC2Data\GameData\TerrainData.xml`)
+	mp.WaterData = get(`Base.SC2Data\GameData\WaterData.xml`)
+	if d := get("t3Water"); d != nil {
+		if w, err := parseWater(d); err != nil {
+			warn("t3Water", err)
+		} else {
+			mp.Water = w
+		}
+	}
 	if list := get("(listfile)"); list != nil {
 		for _, name := range strings.Split(string(list), "\n") {
 			name = strings.TrimSpace(name)

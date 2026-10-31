@@ -38,6 +38,7 @@
 //	GET  /api/assets/cliff/{mesh}/{piece}  binary glTF of a cliff piece, ?v= variation
 //	GET  /api/assets/cliffmaterial/{set}   binary glTF of a cliff set's material model
 //	GET  /api/r/{id}/lighting      JSON of the map's lighting (assets.Lighting)
+//	GET  /api/r/{id}/water         {areas, types}: the map's water and lava (mapfile.WaterRect, mapfile.ResolveWater)
 //	GET  /api/r/{id}/loading       PNG of the map's loading screen
 //	GET  /api/assets/info          JSON stats and display names (assets.Info) for ?units=, ?upgrades=, ?abilities= (comma-separated)
 package server
@@ -307,6 +308,7 @@ func (s *Server) Handler() http.Handler {
 			writeJSON(w, map[string]any{"available": false})
 		})
 		mux.HandleFunc("GET /api/r/{id}/masks", s.masks)
+		mux.HandleFunc("GET /api/r/{id}/water", s.water(nil))
 		return mux
 	}
 	mux.HandleFunc("GET /api/assets", func(w http.ResponseWriter, r *http.Request) {
@@ -335,6 +337,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/r/{id}/masks", s.masks)
 	mux.HandleFunc("GET /api/r/{id}/cliffs", s.cliffs)
 	mux.HandleFunc("GET /api/r/{id}/lighting", s.lighting)
+	mux.HandleFunc("GET /api/r/{id}/water", s.water(func() [][]byte {
+		if l := s.assets.Load(); l != nil {
+			return l.WaterData()
+		}
+		return nil
+	}))
 	mux.HandleFunc("GET /api/r/{id}/loading", s.loadingScreen)
 	mux.HandleFunc("GET /api/assets/info", s.info)
 	mux.HandleFunc("GET /api/assets/cliff/{mesh}/{piece}", func(w http.ResponseWriter, r *http.Request) {

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/dmang-dev/ghostreel/internal/mapfile"
 )
 
 // preview serves the screenshot a map carries, if any.
@@ -51,6 +53,38 @@ func (s *Server) lighting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, lt)
+}
+
+// water serves the map's water and lava: where it lies and how each kind
+// looks, from the game's WaterData (gameWater, nil without game data) with
+// the map's own on top.
+func (s *Server) water(gameWater func() [][]byte) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := s.App.Get(r.PathValue("id"))
+		if l == nil || l.MapFile() == nil {
+			httpError(w, http.StatusNotFound, errors.New("no map"))
+			return
+		}
+		m := l.MapFile()
+		areas := m.Water
+		if areas == nil {
+			areas = []mapfile.WaterRect{}
+		}
+		var ids []string
+		seen := map[string]bool{}
+		for _, a := range areas {
+			if !seen[a.Type] {
+				seen[a.Type] = true
+				ids = append(ids, a.Type)
+			}
+		}
+		var docs [][]byte
+		if gameWater != nil {
+			docs = append(docs, gameWater()...)
+		}
+		docs = append(docs, m.WaterData)
+		writeJSON(w, map[string]any{"areas": areas, "types": mapfile.ResolveWater(ids, docs...)})
+	}
 }
 
 // info serves unit stats and display names from the game data for the

@@ -115,6 +115,11 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
   void loadExtras(summary.id, model);
 
   scene.setWorld(model, width, height, terrainMode === "minimap" && art ? art : shaded, map?.heights, map?.pathable);
+  if (map) {
+    void api.fetchWater(summary.id).then((w) => {
+      if (cur?.summary.id === summary.id) scene.setWater(w);
+    }, () => {});
+  }
   if (terrainMode === "ground") setTerrainMode("shade");
   $<HTMLOptionElement>("terrain-mode-ground").hidden = true;
   if (map) void assetsReady.then((ok) => ok && loadGround(summary.id));

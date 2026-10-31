@@ -188,3 +188,9 @@ func vec3(s string) [3]float64 {
 	}
 	return v
 }
+
+// WaterData returns the game's WaterData.xml catalogs, core first, for
+// mapfile.ResolveWater.
+func (l *Library) WaterData() [][]byte {
+	return l.loadData().water
+}
