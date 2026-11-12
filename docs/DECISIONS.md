@@ -422,7 +422,7 @@ PLAN.md track A, items 2 and 4.
 
 ## v1.2.0 (2026-11-12)
 
-- **Pages deploy from a tag was refused.** The `github-pages` environment allowed deployments only from `main`, and a release's call to `pages.yml` runs from the tag, so the deploy failed: "Tag "v1.2.0" is not allowed to deploy to github-pages due to environment protection rules". Everything else in the release passed. The site was published by running `pages.yml` from `main` with `tag=v1.2.0`, as for v1.1.1. Fix: let the environment accept `v*` tags as well as `main`. This changes a repository setting, so it is the owner's call.
+- **Pages deploy from a tag was refused.** The `github-pages` environment allowed deployments only from `main`, and a release's call to `pages.yml` runs from the tag, so the deploy failed: "Tag "v1.2.0" is not allowed to deploy to github-pages due to environment protection rules". Everything else in the release passed. The site was published by running `pages.yml` from `main` with `tag=v1.2.0`, as for v1.1.1. Fixed the same day, with the owner's OK: the environment now accepts `v*` tags as well as `main`. Re-running the release's failed deploy job from the tag then passed.
 
 ## Actor scale, animation groups and attachments (2026-10-31)
 
