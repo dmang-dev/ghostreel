@@ -418,7 +418,11 @@ PLAN.md track A, items 2 and 4.
   - **What "opens a replay" means:** the repository has no replays and may not hold any. So each job passes a file named `install check.SC2Replay` that isn't one, and requires the app's log line with the decoder's error for it. That proves the path reached the decoder through each way of opening, not that a real replay renders.
   - **Not checked:** opening from Finder (Apple events), whether the window draws, and AppImage desktop integration.
 - **Portable updates** can't be driven from outside the window: WebView2 (go-webview2 v1.0.22) ignores the environment and registry settings that would open a debugging port. So `GHOSTREEL_UPDATE_NOW=1` makes the app check for an update at start and install it without asking. The manifest signature and download hash checks still apply. A job can update the previous release's portable copy once that previous release has this switch, which means two releases from now.
-- **Not yet run:** none of this has run on Actions or on a Linux machine. It is checked only by parsing the workflows, shellcheck, and the PowerShell parser. The replay log line was seen with the local Windows build. The first run should be a manual one against v1.1.1, before the next release.
+- **First runs:** by hand against v1.1.1 (no Linux packages; it flagged the unquoted open command and the leftover company folder, fixed in the installer script), then after the v1.2.0 release, 2026-11-12, where every job passed with no warnings, including the first `.deb` and AppImage on Ubuntu 22.04 and 24.04.
+
+## v1.2.0 (2026-11-12)
+
+- **Pages deploy from a tag was refused.** The `github-pages` environment allowed deployments only from `main`, and a release's call to `pages.yml` runs from the tag, so the deploy failed: "Tag "v1.2.0" is not allowed to deploy to github-pages due to environment protection rules". Everything else in the release passed. The site was published by running `pages.yml` from `main` with `tag=v1.2.0`, as for v1.1.1. Fix: let the environment accept `v*` tags as well as `main`. This changes a repository setting, so it is the owner's call.
 
 ## Actor scale, animation groups and attachments (2026-10-31)
 
