@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
@@ -27,7 +28,7 @@ import (
 )
 
 // Version is part of the cache path; bump it when the conversion changes.
-const Version = "a3"
+const Version = "a4"
 
 // mods are the dependencies of a ladder map, lowest priority first.
 var mods = []string{"core", "liberty", "libertymulti", "swarm", "swarmmulti", "void", "voidmulti"}
@@ -47,6 +48,7 @@ type Library struct {
 	buttons  *catalog
 	terrain  *catalog          // CTerrainTex: terrain texture layers
 	cliffs   *catalog          // CCliff and CCliffMesh: cliff sets and their pieces
+	reqs     *catalog          // validators, requirements and their nodes: which upgrade an actor event waits for
 	actorOf  map[string]string // unit type → actor id
 	data     data              // stats, names and lighting, loaded on first use
 
@@ -73,7 +75,7 @@ func Open(installDir, cacheDir string) (*Library, error) {
 	}
 	l := &Library{
 		st: st, cacheDir: cacheDir, files: map[string]string{},
-		actors: newCatalog(), models: newCatalog(), buttons: newCatalog(), terrain: newCatalog(), cliffs: newCatalog(),
+		actors: newCatalog(), models: newCatalog(), buttons: newCatalog(), terrain: newCatalog(), cliffs: newCatalog(), reqs: newCatalog(),
 		actorOf: map[string]string{}, pending: map[string]*result{},
 	}
 	l.build = strings.Fields(st.Config["build-name"] + " unknown")[0]
@@ -109,6 +111,9 @@ func Open(installDir, cacheDir string) (*Library, error) {
 			{"terraintexdata.xml", l.terrain, func(c string) bool { return c == "CTerrainTex" }},
 			{"cliffdata.xml", l.cliffs, func(c string) bool { return c == "CCliff" }},
 			{"cliffmeshdata.xml", l.cliffs, func(c string) bool { return c == "CCliffMesh" }},
+			{"validatordata.xml", l.reqs, keepReq},
+			{"requirementdata.xml", l.reqs, keepReq},
+			{"requirementnodedata.xml", l.reqs, keepReq},
 		} {
 			b, err := st.ReadFile(dir + f.file)
 			if err != nil {
@@ -240,13 +245,38 @@ func (l *Library) ModelGLB(id string, variation int) ([]byte, error) {
 	key := fmt.Sprintf("model.%s.%d", id, variation)
 	return l.cached(key, func() (source, error) {
 		name, err := l.modelFile(id, variation)
-		return source{name: name, anims: l.models.list("CModel", id, "RequiredAnims")}, err
+		// The model's own scale: doodads are placed at it times their own.
+		extras := look{Scale: l.modelScale(id)}.extras()
+		return source{name: name, anims: l.models.list("CModel", id, "RequiredAnims"), extras: extras}, err
 	})
 }
 
 // UnitGLB returns a unit type's model (or its death model) as binary glTF,
 // converting it on first use.
 func (l *Library) UnitGLB(unit string, death bool) ([]byte, error) {
+	return l.unitGLB(unit, death, nil)
+}
+
+// UpgradedUnitGLB returns a unit type's model as it looks once its owner
+// has the given upgrades, each one its look lists (the "upgrades" extra of
+// UnitGLB's file).
+func (l *Library) UpgradedUnitGLB(unit string, upgrades []string) ([]byte, error) {
+	if !safeName.MatchString(unit) {
+		return nil, ErrNoModel
+	}
+	ups := slices.Clone(upgrades)
+	slices.Sort(ups)
+	ups = slices.Compact(ups)
+	known := l.unitLook(unit, false, nil).Upgrades
+	for _, u := range ups {
+		if !slices.Contains(known, u) {
+			return nil, fmt.Errorf("%w (%s doesn't change %s)", ErrNoModel, u, unit)
+		}
+	}
+	return l.unitGLB(unit, false, ups)
+}
+
+func (l *Library) unitGLB(unit string, death bool, ups []string) ([]byte, error) {
 	if !safeName.MatchString(unit) {
 		return nil, ErrNoModel
 	}
@@ -254,13 +284,23 @@ func (l *Library) UnitGLB(unit string, death bool) ([]byte, error) {
 	if death {
 		key += ".death"
 	}
+	if len(ups) > 0 {
+		key += ".up." + strings.Join(ups, ".")
+	}
 	return l.cached(key, func() (source, error) {
 		name, err := l.ModelPath(unit, death)
 		if err != nil {
 			return source{}, err
 		}
 		id, _ := l.modelID(unit, death)
-		return source{name: name, anims: l.models.list("CModel", id, "RequiredAnims"), extras: l.unitLook(unit, death).extras()}, nil
+		lk := l.unitLook(unit, death, ups)
+		if lk.Model != "" {
+			if name, err = l.modelFile(lk.Model, 0); err != nil {
+				return source{}, err
+			}
+			id = lk.Model
+		}
+		return source{name: name, anims: l.models.list("CModel", id, "RequiredAnims"), extras: lk.extras()}, nil
 	})
 }
 

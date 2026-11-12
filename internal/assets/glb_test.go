@@ -22,6 +22,8 @@ type glbExtras struct {
 	Scale       []float64
 	Groups      []string
 	Attach      []attachment
+	Idle        *idle
+	Upgrades    []string
 }
 
 func parseGLB(b []byte) (*glbInfo, error) {

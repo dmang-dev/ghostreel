@@ -36,12 +36,17 @@ type entry struct {
 	// actor itself.
 	creates []string
 	// Every <On/> event in order, for the messages an actor sends itself
-	// (AnimGroupApply, Create of another actor).
+	// (AnimGroupApply, Create of another actor), and <Remove/> entries that
+	// take out an earlier event with the same terms and message.
 	events []event
 }
 
-// event is an actor event: when it fires (Terms) and the message it sends.
-type event struct{ terms, send string }
+// event is an actor event: when it fires (Terms), the message it sends, and
+// the actor it sends it to ("" for itself). remove marks a <Remove/>.
+type event struct {
+	terms, send, target string
+	remove              bool
+}
 
 func newCatalog() *catalog { return &catalog{entries: map[string]*entry{}} }
 
@@ -110,20 +115,22 @@ func (c *catalog) add(data []byte, keep func(class string) bool) error {
 					name += "[" + index + "]"
 				}
 				parent = name
-				if t.Name.Local == "On" {
-					var terms, send string
+				if t.Name.Local == "On" || t.Name.Local == "Remove" {
+					ev := event{remove: t.Name.Local == "Remove"}
 					for _, a := range t.Attr {
 						switch a.Name.Local {
 						case "Terms":
-							terms = a.Value
+							ev.terms = a.Value
 						case "Send":
-							send = a.Value
+							ev.send = a.Value
+						case "Target":
+							ev.target = a.Value
 						}
 					}
-					if send == "Create" {
-						cur.creates = append(cur.creates, terms)
+					if ev.send == "Create" && !ev.remove {
+						cur.creates = append(cur.creates, ev.terms)
 					}
-					cur.events = append(cur.events, event{terms, send})
+					cur.events = append(cur.events, ev)
 					continue
 				}
 				for _, a := range t.Attr {

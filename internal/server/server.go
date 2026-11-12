@@ -27,7 +27,7 @@
 //	POST /api/r/{id}/find-map      look for a missing map again (after the settings change) → Summary
 //	GET  /api/startup              Summary of a replay opened at launch, or null
 //	GET  /api/assets               {available, build}: whether 3D models can be served
-//	GET  /api/assets/unit/{type}   binary glTF of a unit type's model (404 when none)
+//	GET  /api/assets/unit/{type}   binary glTF of a unit type's model (404 when none); ?up=a,b as it looks with those upgrades (its file's "upgrades" extra)
 //	GET  /api/assets/death/{type}  binary glTF of its death model (404 when none)
 //	GET  /api/assets/icon/{type}   PNG command-card icon (404 when none)
 //	GET  /api/assets/model/{id}    binary glTF of a model by id, ?v= variation (doodads)
@@ -319,9 +319,16 @@ func (s *Server) Handler() http.Handler {
 		}
 		writeJSON(w, map[string]any{"available": true, "build": l.Build()})
 	})
-	mux.HandleFunc("GET /api/assets/unit/{type}", s.asset("model/gltf-binary", func(l *assets.Library, t string) ([]byte, error) {
-		return l.UnitGLB(t, false)
-	}))
+	mux.HandleFunc("GET /api/assets/unit/{type}", func(w http.ResponseWriter, r *http.Request) {
+		// ?up=a,b: as it looks once its owner has those upgrades.
+		up := r.URL.Query().Get("up")
+		s.asset("model/gltf-binary", func(l *assets.Library, t string) ([]byte, error) {
+			if up != "" {
+				return l.UpgradedUnitGLB(t, strings.Split(up, ","))
+			}
+			return l.UnitGLB(t, false)
+		})(w, r)
+	})
 	mux.HandleFunc("GET /api/assets/death/{type}", s.asset("model/gltf-binary", func(l *assets.Library, t string) ([]byte, error) {
 		return l.UnitGLB(t, true)
 	}))
