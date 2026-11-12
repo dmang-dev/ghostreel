@@ -12,7 +12,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { apiFetch } from "./api";
-import { attachTarget, parseLook, type Look } from "./look";
+import { attachTarget, parseLook, type Idle, type Look } from "./look";
 
 /** Extras the exporter (internal/m3) writes on each animation. */
 export interface ClipInfo {
@@ -90,6 +90,22 @@ export class UnitModels {
       if (alias) return this.get(alias);
     }
     return t;
+  }
+
+  /**
+   * A unit type's template as it looks once its owner has the given
+   * upgrades (those of the plain template's look.upgrades that are done),
+   * with the key it was loaded by. The plain one stands in while the
+   * variant loads, and if there is none.
+   */
+  getUpgraded(type: string, upgrades: string[]): { tpl: Template | null | undefined; key: string } {
+    const plain = this.get(type);
+    const key = `unit/${type}`;
+    if (!plain || !upgrades.length) return { tpl: plain, key };
+    const upKey = `${key}?up=${upgrades.map(encodeURIComponent).join(",")}`;
+    const t = this.templates.get(upKey);
+    if (t === undefined) void this.template(upKey);
+    return t ? { tpl: t, key: upKey } : { tpl: plain, key };
   }
 
   /**
@@ -322,8 +338,12 @@ export class UnitInstance {
         warp = p.progress;
       }
     } else {
-      info = pickClip(this.tpl.clips, p.action, this.tpl.look.groups);
+      info = pickClip(this.tpl.clips, p.action, this.tpl.look.groups, this.tpl.look.idle);
     }
+    // An idle animation played once stays on its last frame (a burrowed
+    // Hydralisk at the end of "Burrow").
+    const idle = this.tpl.look.idle;
+    const hold = p.action === "stand" && idle?.hold === true && !!info && idle.anim.every((w) => info!.words.includes(w));
     this.setWarp(warp);
     if (!info) {
       if (this.current) {
@@ -342,7 +362,8 @@ export class UnitInstance {
     if (p.action === "walk" && info.moveSpeed > 0 && p.speed > 0) {
       t *= THREE.MathUtils.clamp(p.speed / info.moveSpeed, 0.5, 2);
     }
-    if (dur > 0) t = info.looping && p.action !== "death" ? t % dur : Math.min(t, dur - 1e-3);
+    if (hold) t = dur;
+    if (dur > 0) t = info.looping && p.action !== "death" && !hold ? t % dur : Math.min(t, dur - 1e-3);
     this.current.action.time = t;
     this.mixer.update(0);
   }
@@ -391,9 +412,10 @@ const SKIP = new Set(["start", "end", "cover", "flail", "unload", "spell", "morp
 /**
  * Chooses a clip for an action, preferring the plainest name that fits.
  * Animation groups (lower case) pick a variant where the model has one:
- * group "a" makes "stand" play "Stand A".
+ * group "a" makes "stand" play "Stand A". A unit's idle animation, when it
+ * has one, comes before Stand.
  */
-export function pickClip(clips: ClipInfo[], action: string, groups: string[] = []): ClipInfo | undefined {
+export function pickClip(clips: ClipInfo[], action: string, groups: string[] = [], idle?: Idle): ClipInfo | undefined {
   const want: Record<string, string[][]> = {
     stand: [["stand"], ["fly"]],
     walk: [["walk"], ["fly"], ["stand"]],
@@ -401,17 +423,21 @@ export function pickClip(clips: ClipInfo[], action: string, groups: string[] = [
     build: [["birth"], ["build"], ["stand"]],
     death: [["death"]],
   };
-  const tries = (want[action] ?? [["stand"]]).flatMap((w) => (groups.length ? [[...w, ...groups], w] : [w]));
+  const lists = want[action] ?? [["stand"]];
+  if (action === "stand" && idle) lists.unshift(idle.anim);
+  const tries = lists.flatMap((w) => (groups.length ? [[...w, ...groups], w] : [w]));
   for (const words of tries) {
     let best: ClipInfo | undefined;
     let bestScore = Infinity;
     for (const c of clips) {
       if (!words.every((w) => c.words.includes(w))) continue;
-      // Fewer extra words is plainer; numbered variants and transitions last.
-      let score = c.words.length * 10;
+      // Fewer extra words is plainer; transitions last. A number is a
+      // variation of the same animation ("Burrow 01" is a Burrow, "Burrow
+      // Stand" something else), so it costs less than a word.
+      let score = 0;
       for (const w of c.words) {
+        score += /^\d+$/.test(w) ? 5 : 10;
         if (SKIP.has(w)) score += 100;
-        if (/^\d+$/.test(w)) score += 5;
         if (w === "work") score += 20; // "Stand Work" is for busy structures
       }
       if (score < bestScore) {

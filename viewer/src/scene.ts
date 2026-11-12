@@ -132,7 +132,7 @@ export class Scene {
 
   /** Game models, when the server has game data. */
   models?: UnitModels;
-  private readonly instances = new Map<number, { inst: UnitInstance; type: string; death: boolean }>();
+  private readonly instances = new Map<number, { inst: UnitInstance; key: string }>();
   private doodads?: THREE.Group;
   private frame = 0;
 
@@ -609,7 +609,7 @@ export class Scene {
         const u = model.units[dr.id];
         const build = dr.constructing ? { progress: model.buildProgress(u, loop), buildTime: model.buildTotal(u) / LOOPS_PER_CLOCK_SECOND } : undefined;
         // A per-unit phase keeps identical units from moving in lockstep.
-        if (this.placeModel(t.name, false, dr, action, clock + (dr.id % 97) * 0.173, t.speed * 1.4, build)) {
+        if (this.placeModel(t.name, false, dr, action, clock + (dr.id % 97) * 0.173, t.speed * 1.4, build, loop)) {
           nModels++;
           continue;
         }
@@ -724,21 +724,32 @@ export class Scene {
    */
   private placeModel(
     type: string, death: boolean, d: DrawnUnit, action: string, time: number, speed: number,
-    build?: { progress: number; buildTime: number },
+    build?: { progress: number; buildTime: number }, loop?: number,
   ): boolean {
     const models = this.models!;
     let tpl = death ? models.get(type, true) : models.get(type);
+    let key = death ? `death/${type}` : `unit/${type}`;
     let isDeathModel = death;
     if (death && !tpl) {
       tpl = models.get(type);
+      key = `unit/${type}`;
       isDeathModel = false;
       if (tpl && !tpl.clips.some((c) => c.words.includes("death"))) return false;
     }
     if (!tpl) return false;
+    // Upgrades its owner has finished that change how it looks (Zerglings
+    // with Metabolic Boost have wings).
+    if (!isDeathModel && loop !== undefined && tpl.look.upgrades.length && this.model) {
+      const v = models.getUpgraded(type, this.model.upgradesDone(d.owner, tpl.look.upgrades, loop));
+      if (v.tpl) {
+        tpl = v.tpl;
+        key = v.key;
+      }
+    }
     let e = this.instances.get(d.id);
-    if (!e || e.type !== type || e.death !== isDeathModel) {
+    if (!e || e.key !== key) {
       if (e) this.removeInstance(d.id);
-      e = { inst: models.instance(tpl, this.colorOf(d.owner)), type, death: isDeathModel };
+      e = { inst: models.instance(tpl, this.colorOf(d.owner)), key };
       this.instances.set(d.id, e);
       this.scene.add(e.inst.root);
     }

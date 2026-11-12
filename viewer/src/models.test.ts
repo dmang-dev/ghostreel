@@ -46,6 +46,20 @@ describe("pickClip", () => {
     expect(pickClip(spine, "attack", ["burrow"])?.clip.name).toBe("Attack");
   });
 
+  it("stands in the unit's idle animation where it has one", () => {
+    const thor = clips("Stand", "Stand 01", "Cover Start", "Cover", "Cover Stand", "Walk", "Attack");
+    const idle = { anim: ["cover", "stand"], hold: false };
+    expect(pickClip(thor, "stand", [], idle)?.clip.name).toBe("Cover Stand");
+    expect(pickClip(thor, "walk", [], idle)?.clip.name).toBe("Walk"); // only standing changes
+    expect(pickClip(thor, "attack", [], idle)?.clip.name).toBe("Attack");
+    // A numbered clip is a variation of the same animation, so "Burrow 01"
+    // answers Burrow before "Burrow Stand" does.
+    const mine = clips("Stand", "Burrow 01", "Burrow Stand", "Unburrow");
+    expect(pickClip(mine, "stand", [], { anim: ["burrow"], hold: true })?.clip.name).toBe("Burrow 01");
+    // A model without the idle clip stands as usual.
+    expect(pickClip(clips("Stand", "Walk"), "stand", [], idle)?.clip.name).toBe("Stand");
+  });
+
   it("finds nothing for a rigid model", () => {
     expect(pickClip([], "stand")).toBeUndefined();
   });

@@ -3,8 +3,10 @@
 // What the game's actor data adds to a unit's model, as the server writes it
 // into the unit's glTF extras (internal/assets/actor.go): the scale it is
 // drawn at, the animation groups that pick a variant of each clip (the
-// Planetary Fortress is the Command Center's model with group A), and other
-// models attached to its attachment points (the Tempest's charge sphere).
+// Planetary Fortress is the Command Center's model with group A), the
+// animation it plays instead of Stand (the Thor's "Cover Stand"), other
+// models attached to its attachment points (the Tempest's charge sphere),
+// and the upgrades that change it (served as their own files).
 
 import * as THREE from "three";
 
@@ -16,10 +18,19 @@ export interface Attachment {
   scale: [number, number, number]; // the attached model's own
 }
 
+/** The animation a unit plays when it isn't doing anything else. */
+export interface Idle {
+  anim: string[]; // the clip's words, lower case ("cover", "stand")
+  hold: boolean; // played once: show its last frame
+}
+
 export interface Look {
   scale: [number, number, number];
   groups: string[]; // lower case
   attach: Attachment[];
+  idle?: Idle;
+  /** Upgrades that change the look, as the server spells them (unit/<type>?up=a,b). */
+  upgrades: string[];
   /** The model's attachment points: name → the bone (node name) it rides on. */
   points: Record<string, string>;
 }
@@ -40,7 +51,11 @@ export function parseLook(extras: unknown): Look {
   if (e.attachments && typeof e.attachments === "object") {
     for (const [k, v] of Object.entries(e.attachments)) if (typeof v === "string") points[k] = v;
   }
-  return { scale: vec3(e.scale, 1), groups, attach, points };
+  const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+  const it = (e.idle && typeof e.idle === "object" ? e.idle : {}) as Record<string, unknown>;
+  const words = strings(it.anim).map((w) => w.toLowerCase());
+  const idle = words.length ? { anim: words, hold: it.hold === true } : undefined;
+  return { scale: vec3(e.scale, 1), groups, attach, points, idle, upgrades: strings(e.upgrades) };
 }
 
 /**

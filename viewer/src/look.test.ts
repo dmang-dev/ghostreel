@@ -6,8 +6,9 @@ import { attachTarget, parseLook } from "./look";
 
 describe("parseLook", () => {
   it("is the plain model without extras", () => {
-    expect(parseLook(undefined)).toEqual({ scale: [1, 1, 1], groups: [], attach: [], points: {} });
-    expect(parseLook({ scale: "big", groups: 3, attach: [{}] })).toEqual({ scale: [1, 1, 1], groups: [], attach: [], points: {} });
+    const plain = { scale: [1, 1, 1], groups: [], attach: [], points: {}, idle: undefined, upgrades: [] };
+    expect(parseLook(undefined)).toEqual(plain);
+    expect(parseLook({ scale: "big", groups: 3, attach: [{}], idle: { anim: [] }, upgrades: "x" })).toEqual(plain);
   });
 
   it("reads what the server writes", () => {
@@ -24,6 +25,13 @@ describe("parseLook", () => {
       { model: "Glow", point: "", offset: [0, 0, 0], scale: [1, 1, 1] },
     ]);
     expect(lk.points.Ref_Target).toBe("Vol_Target");
+  });
+
+  it("reads the idle animation and the upgrades", () => {
+    const lk = parseLook({ idle: { anim: ["Burrow"], hold: true }, upgrades: ["zerglingmovementspeed", 3] });
+    expect(lk.idle).toEqual({ anim: ["burrow"], hold: true });
+    expect(lk.upgrades).toEqual(["zerglingmovementspeed"]);
+    expect(parseLook({ idle: { anim: ["Cover", "Stand"] } }).idle).toEqual({ anim: ["cover", "stand"], hold: false });
   });
 });
 

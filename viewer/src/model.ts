@@ -196,6 +196,8 @@ export class Model {
   readonly hasVitals: boolean;
   /** Typical construction time per type in loops, from buildings that finished. */
   private readonly buildLoops = new Map<number, number>();
+  /** The loop each player finished each upgrade (lower-case name), by player. */
+  private readonly upgradeLoops = new Map<number, Map<string, number>>();
   /** Loops at which each unit got a kill (killing blows), sorted, by killer id. */
   private readonly kills = new Map<number, number[]>();
   /** Each player's camera keys, in loop order. */
@@ -271,9 +273,14 @@ export class Model {
           this.feed.push({ loop: e.loop, player: ownerAt(u, e.loop), kind: "finished", subject: this.typeName(typeAt(u, e.loop)), unitId: u.id });
           break;
         }
-        case "upgrade":
+        case "upgrade": {
           if (e.loop > 0) this.feed.push({ loop: e.loop, player: k.value.player, kind: "upgrade", subject: k.value.name });
+          let ups = this.upgradeLoops.get(k.value.player);
+          if (!ups) this.upgradeLoops.set(k.value.player, (ups = new Map()));
+          const name = k.value.name.toLowerCase();
+          if (!ups.has(name)) ups.set(name, e.loop);
           break;
+        }
         case "chat":
           this.feed.push({ loop: e.loop, player: k.value.player, kind: "chat", subject: k.value.text });
           break;
@@ -367,6 +374,16 @@ export class Model {
       else lo = mid + 1;
     }
     return lo > 0 ? keys[lo - 1] : undefined;
+  }
+
+  /** Which of names (upgrade ids, any case) player had finished by loop, in the order given. */
+  upgradesDone(player: number, names: string[], loop: number): string[] {
+    const ups = this.upgradeLoops.get(player);
+    if (!ups) return [];
+    return names.filter((n) => {
+      const at = ups.get(n.toLowerCase());
+      return at !== undefined && at <= loop;
+    });
   }
 
   /**
