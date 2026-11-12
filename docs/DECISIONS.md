@@ -479,9 +479,52 @@ PLAN.md track D, item 4. Checked against the 5.0.16 install and the 4.10 test da
     - Warp Gates, Hive spires, rooted Spore Crawlers
     - the Tempest's sphere and the Widow Mine's light
     - everything at its smaller size
-- **Not done.**
+- **Not done.** (Default animations, upgrades and doodad scale followed on 2026-11-12; see "Idle animations, upgrades and doodad scale".)
   - Default animations set by `AnimPlay … PlayForever` and `AnimBracketStart`: the burrowed Widow Mine, Hydralisk, Queen, Ultralisk and Swarm Host still stand; the Thor plays Stand rather than "Cover Stand"; the Liberator in AG mode and the phasing Warp Prism play Stand rather than "Stand Work".
   - Attachments that depend on upgrades. The timeline has the upgrade timings, so these could follow.
   - Turrets aiming.
   - CModel scale on doodads.
 
+## Idle animations, upgrades and doodad scale (2026-11-12)
+
+The rest of PLAN.md track D, item 4, except turret aiming. Checked against the 4.10 test data (B75689); the 5.0.16 install wasn't reachable.
+
+- **Idle animations.** An actor's messages on creation and birth are replayed as the game runs them, and the animation still playing at the end replaces Stand:
+  - `AnimPlay name props flags` with `PlayForever` plays props for good; with `NonLooping` as well it stays on the last frame. Without `PlayForever` it plays once and is gone.
+  - `AnimBracketStart name opening loop closing flags` plays its loop for good. With no loop (`IGNORE`, `{}`) and `OpeningPlayForever`, it stays on the opening's last frame.
+  - `AnimClear` and `AnimBracketStop` end one by name. The latest still playing wins.
+
+  Results:
+  - The Thor stands in "Cover Stand", and the Thor in high-impact mode in "Morph Stand".
+  - The Liberator in AG mode plays "Stand Work", and so does the phasing Warp Prism.
+  - The burrowed Hydralisk, Queen, Ultralisk, Swarm Host and Lurker hold the end of "Burrow"; the burrowed Widow Mine holds the end of "Burrow 01".
+  - The Swarm Host's "Spell Alternate" (sacs full) is its default until it spawns Locusts, which isn't followed.
+
+  For the Widow Mine, the clip choice now counts a number as a variation, not a word: "Burrow 01" answers Burrow before "Burrow Stand" does.
+- **Upgrades.** The same messages count when they wait only for an upgrade:
+  - either sent on `Upgrade.X.Add` (with at most `ValidateUnit NotDead…`),
+  - or on creation or birth behind a validator that checks the player has X. Validators are followed to the upgrade: `CValidatorPlayerRequirement` → `CRequirement` (its `Use` node) → `CRequirementCountUpgrade`, through `CRequirementNot` and one-operand `CValidatorCombine` negations, and `Find` (without it, a validator passes when the requirement isn't met).
+
+  `ModelSwap` counts only here: on birth it is a passing model (the Changeling's birth model is swapped back by later events). An upgrade is listed only if it changes something drawn, so the Marine's Combat Shield isn't.
+
+  Found in the 4.10 data:
+  - Zerglings with Metabolic Boost and Roaches with Tunneling Claws swap to their upgraded models; Bunkers do with Neosteel Frame (and, in this data, Building Armor).
+  - Banelings with Centrifugal Hooks play their Superior variants; Battlecruisers with the specialization upgrade play group A.
+  - The Cyclone gains two attachments with its lock-on upgrade, the Ultralisk one with Anabolic Synthesis, and the Widow Mine one with Drilling Claws.
+- **How it travels.**
+  - The unit's glTF extras gain `idle` (`anim` words and `hold`) and `upgrades`, the upgrades that change it.
+  - `/api/assets/unit/{type}?up=a,b` serves the unit as it looks with those upgrades: swapped model, groups, attachments, idle. The server refuses upgrades the plain file doesn't list, so the cache stays bounded.
+  - The viewer keeps the loop each player finished each upgrade, and asks for the variant once the owner has one; the plain model stands in while it loads.
+  - `<Remove/>` entries now take out the earlier event they name, and events sent to another actor (`Target=`) no longer count as the unit's own.
+- **Doodads.** A model served by id now carries its CModel's scale, so doodads are drawn at it times their placed scale. In the 4.10 data, 54 doodad models set one (destructible city debris at 0.85, for example).
+- The assets cache version is now `a4`.
+- **Checked.**
+  - Tests on synthetic data: idle from AnimPlay and brackets (held openings, one-shots that don't replace, clears), targeted and removed events, the validator chain with negations, a validator that isn't about an upgrade, an upgrade that changes nothing, and the swapped model's scale.
+  - Tests against the game data: the idle animations above; the Zergling, Baneling and Marine upgrades; every attachment point with all of a unit's upgrades; the upgraded Zergling file; a model's scale in its file.
+  - In the viewer, on bot games recorded by the engine:
+    - a Zergling grows wings when the event list shows Metabolic Boost (7:15);
+    - Banelings switch to their Centrifugal Hooks variant;
+    - a burrowed Ultralisk sits under the ground showing its back spikes, at the end of "Burrow";
+    - a burrowed Widow Mine holds "Burrow 01", and the Liberator in AG mode plays "Stand Work".
+  - Not seen in the viewer: the Thor, Cyclone, Bunker and Ultralisk upgrades (no test replay has them).
+- **Turrets aiming: not done.** Replays don't record what a unit shoots at, and the timeline has no target. Aiming would mean guessing a target (the nearest enemy in range), and turning the bones the m3 file's turret data names. The engine recordings could carry targets (`engaged_target_tag` in the game's API); that is the way to do this properly, and it waits for track B.

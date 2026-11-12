@@ -189,7 +189,7 @@ Round 4 done 2026-10-27 (see DECISIONS, "Command tier, round 4"): items 1 and 3 
 1. ~~A performance pass on a real GPU (Phase 3).~~ Done 2026-10-31: the owner reports it runs well on a desktop with an RTX 5070 Ti. No numbers were taken.
 2. ~~Cliff meshes from the tile set's cliff models in place of the heightfield's walls (Phase 3/5).~~ Done 2026-10-27 (see DECISIONS).
 3. ~~Water, and creep that recedes after its source dies rather than vanishing (Phase 3/5).~~ Done 2026-10-31 (see DECISIONS, "Water and receding creep"). No test map shows water in play, so it was checked on a synthetic lake only.
-4. ~~Weapon and attachment models, and per-actor scale (Phase 3).~~ Done 2026-10-31 (see DECISIONS, "Actor scale, animation groups and attachments"). Lighting per map: done 2026-10-30. Left: default animations set by actor messages (burrowed units, Thor, Liberator, Warp Prism), attachments that depend on upgrades, and turrets aiming at their targets.
+4. ~~Weapon and attachment models, and per-actor scale (Phase 3).~~ Done 2026-10-31 (see DECISIONS, "Actor scale, animation groups and attachments"). Lighting per map: done 2026-10-30. Default animations, upgrade-dependent looks (model swaps, animation variants, attachments) and doodad scale: done 2026-11-12 (see DECISIONS, "Idle animations, upgrades and doodad scale"). Left: turrets aiming at their targets, which needs target data replays don't have (engine recordings could carry it).
 5. ~~The minimap's handling of fog-hidden units: it may lag a frame; unverified (Phase 3).~~ Checked 2026-10-31: no lag (see DECISIONS, "Finishing Phase 6 items").
 
 **E. Analysis** — exit: the common questions about a game are answered in the panel.
