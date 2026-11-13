@@ -15,11 +15,13 @@
 # It only reads the release. Downloads a release doesn't have (v1.1.1 has no
 # .deb or AppImage) are skipped with a notice.
 #
-# Not covered: updating a portable copy from the release before. The app
-# applies an update only when the viewer's button calls its in-process API,
-# and nothing outside the window can reach that API: there is no TCP port,
-# and go-webview2 overwrites WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, so no
-# DevTools port either.
+# It also updates a portable Windows copy of the release before to this one.
+# Nothing outside the window can press the viewer's update button (there is
+# no TCP port, and go-webview2 overwrites WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS,
+# so no DevTools port either), so the old copy is started with
+# GHOSTREEL_UPDATE_NOW=1, which installs the latest release at start without
+# asking (desktop/main.go). That only works from v1.2.0 on, and only when the
+# release checked is the latest, since copies update to the latest.
 name: install-check
 
 on:
@@ -200,6 +202,111 @@ jobs:
           $exe = Join-Path $dir 'ghostreel-desktop.exe'
           if (-not (Test-Path -LiteralPath $exe)) { Fail 'the portable zip has no ghostreel-desktop.exe' }
           Test-Start -Exe $exe -Label 'portable'
+          exit 0
+
+  portable-update:
+    name: Windows portable update from the release before
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Get this release's and the one before's portable zips
+        id: assets
+        shell: bash
+        run: |
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name | tr -d '\r')
+          if [ "$latest" != "$TAG" ]; then
+            echo "::notice::$TAG isn't the latest release ($latest is), and copies update to the latest; not checking an update"
+            exit 0
+          fi
+          # Releases the app can update from: not drafts or pre-releases.
+          prev=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 100 \
+            --json tagName --jq '.[].tagName' | tr -d '\r' | sort -V | awk -v t="$TAG" '$0 == t { print p; exit } { p = $0 }')
+          if [ -z "$prev" ]; then
+            echo "::notice::no release before $TAG; not checking an update"
+            exit 0
+          fi
+          if [ "$(printf '%s\n' v1.2.0 "$prev" | sort -V | head -n 1)" != v1.2.0 ]; then
+            echo "::notice::$prev is older than v1.2.0, the first with GHOSTREEL_UPDATE_NOW; not checking an update"
+            exit 0
+          fi
+          echo "Updating a portable copy of $prev to $TAG"
+          mkdir -p "$RUNNER_TEMP/update-assets"
+          for t in "$prev" "$TAG"; do
+            zip="ghostreel-desktop_${t}_windows_amd64_portable.zip"
+            if ! gh release download "$t" --repo "$GITHUB_REPOSITORY" --pattern "$zip" --dir "$RUNNER_TEMP/update-assets"; then
+              echo "::notice::$t has no $zip; not checking an update"
+              exit 0
+            fi
+          done
+          echo "prev=$prev" >>"$GITHUB_OUTPUT"
+      - name: Update
+        if: steps.assets.outputs.prev != ''
+        shell: pwsh
+        env:
+          PREV: ${{ steps.assets.outputs.prev }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Fail([string]$Message) { Write-Output "::error::$Message"; exit 1 }
+          $assets = Join-Path $env:RUNNER_TEMP 'update-assets'
+          $old = Join-Path $env:RUNNER_TEMP 'portable-old'
+          $new = Join-Path $env:RUNNER_TEMP 'portable-new'
+          Expand-Archive -LiteralPath (Join-Path $assets "ghostreel-desktop_$($env:PREV)_windows_amd64_portable.zip") -DestinationPath $old
+          Expand-Archive -LiteralPath (Join-Path $assets "ghostreel-desktop_$($env:TAG)_windows_amd64_portable.zip") -DestinationPath $new
+          $exe = Join-Path $old 'ghostreel-desktop.exe'
+          $want = (Get-FileHash -LiteralPath (Join-Path $new 'ghostreel-desktop.exe')).Hash
+          if ((Get-FileHash -LiteralPath $exe).Hash -eq $want) { Fail "$($env:PREV) and $($env:TAG) have the same exe, so an update can't be seen" }
+
+          Write-Output "::group::Start $($env:PREV) with GHOSTREEL_UPDATE_NOW=1"
+          $out = Join-Path $env:RUNNER_TEMP 'update-stdout.log'
+          $err = Join-Path $env:RUNNER_TEMP 'update-stderr.log'
+          $env:GHOSTREEL_UPDATE_NOW = '1'
+          $p = Start-Process -FilePath $exe -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          $hash = ''
+          $deadline = (Get-Date).AddMinutes(5)
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 5
+            try { $hash = (Get-FileHash -LiteralPath $exe).Hash } catch { $hash = '' }
+            if ($p.HasExited -and $hash -eq $want) { break }
+            # A failed check or install is logged ("update check: <error>", "update:
+            # <error>"), and a copy that can't update says canApply=false.
+            $log = try { (Get-Content -Raw -LiteralPath $out, $err) -join "`n" } catch { '' }
+            if ($log -match 'update check: (?!available=)|canApply=false|update: ') { break }
+          }
+          $log = (Get-Content -Raw -LiteralPath $out, $err) -join "`n"
+          Write-Output $log
+          Write-Output '::endgroup::'
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; Fail "$($env:PREV) is still running, so it didn't hand over to an update (its log is above)" }
+          if ($hash -ne $want) { Fail "$($env:PREV) exited (code $($p.ExitCode)) but its exe isn't $($env:TAG)'s" }
+          if (-not $log.Contains("latest=$($env:TAG)")) { Fail "$($env:PREV) didn't log finding $($env:TAG)" }
+
+          Write-Output "::group::$($env:TAG) starts in its place"
+          $proc = $null
+          $deadline = (Get-Date).AddSeconds(30)
+          while (-not $proc -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 2
+            $proc = Get-CimInstance Win32_Process -Filter "Name = 'ghostreel-desktop.exe'" |
+              Where-Object { $_.ProcessId -ne $p.Id -and $_.ExecutablePath -eq $exe } | Select-Object -First 1
+          }
+          if (-not $proc) { Fail "the updated exe didn't start" }
+          Write-Output "running: $($proc.ExecutablePath) (pid $($proc.ProcessId))"
+          Start-Sleep -Seconds 10
+          if (-not (Get-Process -Id $proc.ProcessId -ErrorAction SilentlyContinue)) { Fail "the updated exe exited within 10 s" }
+          Stop-Process -Id $proc.ProcessId -Force
+          Get-ChildItem -LiteralPath $old | Format-Table Name, Length
+          Write-Output '::endgroup::'
+
+          # It starts while the old one is still closing, so the old exe it set aside
+          # is removed on the start after that.
+          Write-Output '::group::The next start removes the old exe'
+          if (-not (Test-Path -LiteralPath "$exe.old")) { Write-Output "::notice::$exe.old was already gone" }
+          Remove-Item Env:GHOSTREEL_UPDATE_NOW
+          $q = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 10
+          if ($q.HasExited) { Fail "the updated exe exited within 10 s of starting again (code $($q.ExitCode))" }
+          Stop-Process -Id $q.Id -Force
+          if (Test-Path -LiteralPath "$exe.old") { Fail "starting again didn't remove $exe.old, the exe the update set aside" }
+          Write-Output '::endgroup::'
+          Write-Output "A portable copy of $($env:PREV) updated itself to $($env:TAG) and started."
           exit 0
 
   macos:
