@@ -424,6 +424,10 @@ PLAN.md track A, items 2 and 4.
 
 - **Pages deploy from a tag was refused.** The `github-pages` environment allowed deployments only from `main`, and a release's call to `pages.yml` runs from the tag, so the deploy failed: "Tag "v1.2.0" is not allowed to deploy to github-pages due to environment protection rules". Everything else in the release passed. The site was published by running `pages.yml` from `main` with `tag=v1.2.0`, as for v1.1.1. Fixed the same day, with the owner's OK: the environment now accepts `v*` tags as well as `main`. Re-running the release's failed deploy job from the tag then passed.
 
+## v1.3.0 (2026-11-13)
+
+- **A Windows build failed for a reason outside the project.** The Windows desktop job couldn't install NSIS: the Chocolatey feed returned 504 (Gateway Timeout). Every other build passed, and the jobs that publish the release, run the install check and deploy the site were skipped. Re-running the failed job passed, and the skipped jobs then ran and passed, including the first Pages deploy straight from a tag. No change made: a retry is cheap, and caching NSIS would add a step to keep up to date.
+
 ## Actor scale, animation groups and attachments (2026-10-31)
 
 PLAN.md track D, item 4. Checked against the 5.0.16 install and the 4.10 test data.
