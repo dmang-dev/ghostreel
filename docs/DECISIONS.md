@@ -434,6 +434,13 @@ PLAN.md track A, items 2 and 4.
 
 - **A Windows build failed for a reason outside the project.** The Windows desktop job couldn't install NSIS: the Chocolatey feed returned 504 (Gateway Timeout). Every other build passed, and the jobs that publish the release, run the install check and deploy the site were skipped. Re-running the failed job passed, and the skipped jobs then ran and passed, including the first Pages deploy straight from a tag. No change made: a retry is cheap, and caching NSIS would add a step to keep up to date.
 
+## v1.4.0 (2026-11-23)
+
+The release of gp-live's construction models, player camera and model preloading (commit 2f6cfd4; see "Construction models and the player camera").
+
+- **The install check's first automatic portable update** passed: a v1.3.0 portable copy updated itself to v1.4.0 and started.
+- **The Pages deploy failed twice, and neither failure came from the project.** In both attempts the job uploaded the site, and `actions/deploy-pages@v5` then failed to read it back ("Fetching artifact metadata failed", "No artifacts named "github-pages" were found"). The artifact was on the run both times, and `pages.yml` hadn't changed since v1.3.0, whose deploy passed. The re-run left a second `github-pages` artifact on the run. So the site was published as for v1.1.1 and v1.2.0: by running `pages.yml` from `main` with `tag=v1.4.0`, which passed. No change made. If it happens again, a fresh `pages.yml` run is the fix, not a re-run.
+
 ## Actor scale, animation groups and attachments (2026-10-31)
 
 PLAN.md track D, item 4. Checked against the 5.0.16 install and the 4.10 test data.
