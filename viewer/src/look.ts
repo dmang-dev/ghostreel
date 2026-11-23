@@ -6,7 +6,8 @@
 // Planetary Fortress is the Command Center's model with group A), the
 // animation it plays instead of Stand (the Thor's "Cover Stand"), other
 // models attached to its attachment points (the Tempest's charge sphere),
-// and the upgrades that change it (served as their own files).
+// the upgrades that change it (served as their own files), and the model
+// drawn with it while it's being built (scaffolding, cocoon, warp-in matrix).
 
 import * as THREE from "three";
 
@@ -31,6 +32,8 @@ export interface Look {
   idle?: Idle;
   /** Upgrades that change the look, as the server spells them (unit/<type>?up=a,b). */
   upgrades: string[];
+  /** The CModel drawn with it while it's being built (model/<id>), if any. */
+  build?: string;
   /** The model's attachment points: name → the bone (node name) it rides on. */
   points: Record<string, string>;
 }
@@ -55,7 +58,8 @@ export function parseLook(extras: unknown): Look {
   const it = (e.idle && typeof e.idle === "object" ? e.idle : {}) as Record<string, unknown>;
   const words = strings(it.anim).map((w) => w.toLowerCase());
   const idle = words.length ? { anim: words, hold: it.hold === true } : undefined;
-  return { scale: vec3(e.scale, 1), groups, attach, points, idle, upgrades: strings(e.upgrades) };
+  const build = typeof e.build === "string" && e.build ? e.build : undefined;
+  return { scale: vec3(e.scale, 1), groups, attach, points, idle, upgrades: strings(e.upgrades), build };
 }
 
 /**

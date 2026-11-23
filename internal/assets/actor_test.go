@@ -18,6 +18,8 @@ const testActors = `<?xml version="1.0" encoding="us-ascii"?>
 <Catalog>
     <CActorUnit id="GenericUnit" default="1">
         <On Terms="ActorCreation" Send="AnimGroupRemove A"/>
+        <On Terms="UnitConstruction.##unitName##.Start" Send="Create ##unitName##Build"/>
+        <On Terms="UnitConstruction.##unitName##.Start" Send="Create BuildingTerrainFlatten"/>
     </CActorUnit>
     <CActorUnit id="Fortress" parent="GenericUnit" unitName="Fortress">
         <Scale value="0.500000"/>
@@ -38,6 +40,7 @@ const testActors = `<?xml version="1.0" encoding="us-ascii"?>
     <CActorModel id="FortressFlash" parent="ModelAnimationStyleOneShot">
         <Model value="Gun"/>
     </CActorModel>
+    <CActorModel id="FortressBuild"/>
     <CActorSiteOpAttach id="SOpAttachWeapon01">
         <AttachQuery Methods="Weapon 1"/>
     </CActorSiteOpAttach>
@@ -57,6 +60,7 @@ const testModels = `<?xml version="1.0" encoding="us-ascii"?>
         <Model value="Assets\Gun.m3"/>
         <ScaleMax value="0.5"/>
     </CModel>
+    <CModel id="FortressBuild"><Model value="Assets\Scaffold.m3"/></CModel>
 </Catalog>`
 
 func TestUnitLook(t *testing.T) {
@@ -91,6 +95,14 @@ func TestUnitLook(t *testing.T) {
 		if !reflect.DeepEqual(lk.Attach, []attachment{gun}) {
 			t.Errorf("%s: attachments %+v, want %+v", c.unit, lk.Attach, gun)
 		}
+	}
+	// The construction model the template creates, by the unit's name; the
+	// terrain flattener has no model.
+	if b := l.unitLook("Fortress", false, nil).Build; b != "FortressBuild" {
+		t.Errorf("Fortress: construction model %q, want FortressBuild", b)
+	}
+	if b := l.unitLook("Fortress", true, nil).Build; b != "" {
+		t.Errorf("dead Fortress: construction model %q, want none", b)
 	}
 	if ex := (look{Scale: [3]float64{1, 1, 1}}).extras(); len(ex) != 0 {
 		t.Errorf("plain look has extras %v", ex)
@@ -220,6 +232,19 @@ func TestLadderLooks(t *testing.T) {
 	} {
 		if g := l.unitLook(unit, false, nil).Groups; !slices.Equal(g, want) {
 			t.Errorf("%s: groups %v, want %v", unit, g, want)
+		}
+	}
+	// What each race's buildings are drawn with while they're built.
+	for unit, want := range map[string]string{
+		"Barracks": "BarracksBuild", "SupplyDepot": "SupplyDepotBuild", "Hatchery": "HatcheryBuild",
+		"SpawningPool": "SpawningPoolBuild", "Gateway": "GatewayBuild", "Pylon": "PylonBuild", "Marine": "",
+	} {
+		if want != "" && !l.actors.has("CActorModel", want) {
+			t.Logf("%s: no %s in this game data", unit, want) // testdata/casc has only part of it
+			continue
+		}
+		if b := l.unitLook(unit, false, nil).Build; b != want {
+			t.Errorf("%s: construction model %q, want %q", unit, b, want)
 		}
 	}
 	// Idle animations from AnimPlay ... PlayForever and AnimBracketStart.

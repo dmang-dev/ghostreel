@@ -538,3 +538,22 @@ The rest of PLAN.md track D, item 4, except turret aiming. Checked against the 4
     - a burrowed Widow Mine holds "Burrow 01", and the Liberator in AG mode plays "Stand Work".
   - Not seen in the viewer: the Thor, Cyclone, Bunker and Ultralisk upgrades (no test replay has them).
 - **Turrets aiming: not done.** Replays don't record what a unit shoots at, and the timeline has no target. Aiming would mean guessing a target (the nearest enemy in range), and turning the bones the m3 file's turret data names. The engine recordings could carry targets (`engaged_target_tag` in the game's API); that is the way to do this properly, and it waits for track B.
+
+## Construction models and the player camera (2026-11-22)
+
+Asked for by gp-live, which films GhostProtocol's ladder games: buildings didn't go up the way they do in the game, and the exported video's camera didn't open on the player's base.
+
+- **Construction models.** A building's own model only does part of the job: through Build A and B a Barracks sits below the ground (its bounds reach 0.21 above it), a Supply Depot until C, and a Hatchery until D. What the game shows over it is a second actor, created when construction starts. Building actor templates send `UnitConstruction.##unitName##.Start` → `Create ##unitName##Build`, a `CActorModel` whose model is the CModel of the same name:
+  - Terran: `TerranBuild.m3` scaffolding, scaled per building (Barracks 0.93, Supply Depot 0.45). Clips `Birth A–C Start/Stand`, and `Birth D Start`, which plays when the building finishes.
+  - Zerg: the `ZergBuild.m3` cocoon at 1.1. Clips `Build A–C Start/Stand`, and `Build D Start`.
+  - Protoss: the `ProtossBuild.m3` warp-in matrix. Clips `Stand Build Start`, `Stand Build` (looping) and `Stand Build End`.
+
+  The converter follows that event (`look.Build`, glTF extra `build`); the terrain flattener the same templates create has no model and is skipped. The viewer loads the model the first time a building is posed under construction and stands it at the building's origin:
+  - scaffolding and cocoons go through their stages A–C in equal shares of the build time, like the building's own stages;
+  - the matrix plays its start, loops, and plays its end over the last seconds;
+  - it goes when the building is done. Stage D (scaffolding coming down) isn't shown.
+
+  The Protoss warp-in tint still applies to the building but not to the matrix. The repository's `testdata/casc` lacks the Protoss entries; the test checks them only where the data has them, and passes against the 5.0.16 install.
+- **Models load before filming.** The viewer used to fetch a type's model the first time a unit of it was on screen and draw a box until it arrived; the exporter doesn't wait, so a video could show the box for most of a second (a Command Center turning into an Orbital Command, at 1:49 in one test game). Opening a replay in 3D now loads every unit type in it, with its death model and the models drawn beside it, together with the doodads. `ghostreel assets` converts those too (death models, attachments, construction models), so the server has them ready.
+- **Player camera.** The export's director takes a point of view (`Camera` in the export options: Overview, or a player's view). With a player, the camera opens on that player's main base at the game's default zoom (22 cells across) and stays close: hotspots and deaths are framed at 0.9–1.5 times that, and between them it follows the player's army, or holds on their oldest town hall.
+- The assets cache version is now `a5`.

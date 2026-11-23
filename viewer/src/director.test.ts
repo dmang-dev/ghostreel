@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { Director, selectReel } from "./director";
+import { Director, GAME_ZOOM, selectReel } from "./director";
 import type { Model } from "./model";
 import type { Marker } from "./reports";
 
@@ -45,5 +45,36 @@ describe("Director", () => {
     expect(eased.cx).toBeLessThan(50);
     const cut = d.shotAt(2200 + 200); // jump: cut straight to it
     expect(cut.cx).toBeCloseTo(30);
+  });
+});
+
+describe("Director with a point of view", () => {
+  // Player 1's town hall at (20, 30) from the start, a second one at (60, 50) later.
+  const hall = (id: number, x: number, y: number, born: number, died?: number) => ({ id, owner: 1, type: 0, bornLoop: born, diedLoop: died });
+  const model = (units: ReturnType<typeof hall>[]) => ({
+    units,
+    types: [{ name: "CommandCenter", class: 0 }],
+    tracks: units.map((u) => [{ loop: 0, x: [20, 60][u.id], y: [30, 50][u.id] }]),
+    loops: 20000,
+    tl: { meta: { players: [{ id: 1, name: "A" }, { id: 2, name: "B" }] } },
+  }) as unknown as Model;
+
+  it("opens on the player's main base at the game's zoom, not the whole map", () => {
+    const d = new Director(model([hall(0, 20, 30, 0)]), [], bounds, { pov: 1 });
+    expect(d.target(0)).toMatchObject({ cx: 20, cy: 30, span: GAME_ZOOM });
+    expect(new Director(model([hall(0, 20, 30, 0)]), [], bounds).target(0)).toMatchObject({ span: 80 });
+  });
+
+  it("goes back to the oldest town hall still standing", () => {
+    const d = new Director(model([hall(0, 20, 30, 0, 5000), hall(1, 60, 50, 3000)]), [], bounds, { pov: 1 });
+    expect(d.target(4000)).toMatchObject({ cx: 20, cy: 30 });
+    expect(d.target(6000)).toMatchObject({ cx: 60, cy: 50 });
+  });
+
+  it("frames hotspots close, near the game's zoom", () => {
+    const big = { ...hot(2000, 2400, 0.8, 30, 40), r: 20 };
+    const d = new Director(model([hall(0, 20, 30, 0)]), [big], bounds, { pov: 1 });
+    expect(d.target(2100).span).toBeLessThanOrEqual(GAME_ZOOM * 1.5);
+    expect(new Director(empty, [big], bounds).target(2100).span).toBe(56);
   });
 });

@@ -33,6 +33,12 @@ describe("parseLook", () => {
     expect(lk.upgrades).toEqual(["zerglingmovementspeed"]);
     expect(parseLook({ idle: { anim: ["Cover", "Stand"] } }).idle).toEqual({ anim: ["cover", "stand"], hold: false });
   });
+
+  it("reads the construction model", () => {
+    expect(parseLook({ build: "BarracksBuild" }).build).toBe("BarracksBuild");
+    expect(parseLook({ build: 3 }).build).toBeUndefined();
+    expect(parseLook({ build: "" }).build).toBeUndefined();
+  });
 });
 
 describe("attachTarget", () => {

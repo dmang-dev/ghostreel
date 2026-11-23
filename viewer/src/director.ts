@@ -9,12 +9,26 @@
 //   3. otherwise, the bigger army of one player, alternating every 20 s;
 //   4. otherwise, the whole map.
 //
+// With a point of view (a player), it watches like that player's own camera
+// in the game instead: it opens on their main base at the game's zoom, keeps
+// fights framed near that zoom, and when nothing is happening goes back to
+// their army (3), or their main base (4), rather than the whole map.
+//
 // Everything is a function of the replay clock (the loop), not wall time:
 // pausing holds the shot, and video export gets the same camera on every run.
 
+import { TOWNHALLS } from "./mining";
 import type { Model } from "./model";
 import { UnitClass, isAlive, positionAt } from "./model";
 import type { Marker } from "./reports";
+
+/** Cells from the top of the screen to the bottom at the game's default camera zoom (about). */
+export const GAME_ZOOM = 22;
+
+export interface DirectorOptions {
+  /** The player whose side to watch like their own camera; 0 or unset is the overview. */
+  pov?: number;
+}
 
 export interface Shot {
   cx: number;
@@ -41,6 +55,7 @@ export class Director {
     private readonly model: Model,
     private readonly hotspots: Marker[],
     private readonly bounds: { left: number; bottom: number; right: number; top: number },
+    private readonly opts: DirectorOptions = {},
   ) {
     const p = { x: 0, y: 0, facing: 0 };
     for (const u of model.units) {
@@ -61,8 +76,10 @@ export class Director {
       if (loop < h.loop - LEAD || loop > (h.end ?? h.loop) + TAIL) continue;
       if (!best || (h.score ?? 0) > (best.score ?? 0)) best = h;
     }
+    const pov = this.opts.pov ?? 0;
     if (best && best.x !== undefined && best.y !== undefined) {
-      return { cx: best.x, cy: best.y, span: clamp((best.r ?? 6) * 2.8, 18, 70), hotspot: best };
+      const span = pov ? clamp((best.r ?? 6) * 2.2, GAME_ZOOM * 0.9, GAME_ZOOM * 1.5) : clamp((best.r ?? 6) * 2.8, 18, 70);
+      return { cx: best.x, cy: best.y, span, hotspot: best };
     }
     // 2. Recent deaths.
     let n = 0, sx = 0, sy = 0;
@@ -71,7 +88,14 @@ export class Director {
       sy += this.deaths[i].y;
       n++;
     }
-    if (n >= 2) return { cx: sx / n, cy: sy / n, span: 30 };
+    if (n >= 2) return { cx: sx / n, cy: sy / n, span: pov ? GAME_ZOOM * 1.1 : 30 };
+    if (pov) {
+      // 3. Their army, else 4. their main base, at the game's zoom.
+      const army = this.armyCenter(pov, loop);
+      if (army) return { ...army, span: GAME_ZOOM * 1.1 };
+      const home = this.homeAt(pov, loop);
+      if (home) return { ...home, span: GAME_ZOOM };
+    }
     // 3. An army, alternating between players.
     const players = this.model.tl.meta?.players ?? [];
     if (players.length) {
@@ -84,6 +108,24 @@ export class Director {
     // 4. The whole map.
     const b = this.bounds;
     return { cx: (b.left + b.right) / 2, cy: (b.bottom + b.top) / 2, span: b.top - b.bottom };
+  }
+
+  /**
+   * A player's main base at loop: their oldest town hall still standing (the
+   * one they started with, until it falls), else the first they ever had.
+   */
+  private homeAt(player: number, loop: number): { cx: number; cy: number } | undefined {
+    let first, alive;
+    for (const u of this.model.units) {
+      if (u.owner !== player || !TOWNHALLS.has(this.model.types[u.type]?.name ?? "")) continue;
+      if (!first || u.bornLoop < first.bornLoop) first = u;
+      if (isAlive(u, loop) && (!alive || u.bornLoop < alive.bornLoop)) alive = u;
+    }
+    const hall = alive ?? first;
+    if (!hall) return undefined;
+    const p = { x: 0, y: 0, facing: 0 };
+    positionAt(this.model.tracks[hall.id], 0, Math.max(loop, hall.bornLoop), p);
+    return { cx: p.x, cy: p.y };
   }
 
   /** The center of a player's densest group of army units, if it has six. */

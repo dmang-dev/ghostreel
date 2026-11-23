@@ -139,6 +139,7 @@ function show(summary: api.Summary, model: Model, map: api.MapData | null, minim
     (e) => console.warn("analysis:", e),
   );
   buildFogOptions(model);
+  buildCameraOptions(model);
   scene.fit(playable.Left, playable.Bottom, playable.Right, playable.Top);
   selected = undefined;
   loop = 0;
@@ -1154,7 +1155,10 @@ async function loadDoodads(): Promise<void> {
     const group = new THREE.Group();
     scene.setDoodads(group);
     if (cliffs?.pieces.length) scene.setCliffCells(cliffs.pieces.map((p) => [(p.x - 1) / 2, (p.y - 1) / 2] as const));
-    await Promise.all([buildDoodads(group, list, unitModels), cliffs && buildCliffs(group, cliffs, unitModels)]);
+    // The replay's unit models load with them, so an export never films a
+    // stand-in box while a type's model is still on its way.
+    const types = cur.model.types.map((t) => t.name).filter(Boolean);
+    await Promise.all([buildDoodads(group, list, unitModels), cliffs && buildCliffs(group, cliffs, unitModels), unitModels.preload(types)]);
   } catch (e) {
     console.warn("doodads:", e);
   }
@@ -1167,6 +1171,15 @@ function buildFogOptions(model: Model): void {
   for (const p of model.tl.meta?.players ?? []) sel.append(new Option(`Fog: ${p.name}'s view`, String(p.id)));
   sel.value = "0";
   scene.setFogPlayer(0);
+}
+
+/** The export's director cameras: the overview, or a player's view (their base, their fights, the game's zoom). */
+function buildCameraOptions(model: Model): void {
+  const sel = $<HTMLSelectElement>("export-pov");
+  const keep = sel.value;
+  sel.replaceChildren(new Option("Overview", "0"));
+  for (const p of model.tl.meta?.players ?? []) sel.append(new Option(`${p.name}'s view`, String(p.id)));
+  sel.value = [...sel.options].some((o) => o.value === keep) ? keep : "0";
 }
 
 function setFog(p: number): void {
@@ -1236,9 +1249,9 @@ function setHotspots(list: Marker[]): void {
   director = cur ? newDirector() : undefined;
 }
 
-function newDirector(): Director {
+function newDirector(pov = 0): Director {
   const p = cur!.playable;
-  return new Director(cur!.model, hotspots, { left: p.Left, bottom: p.Bottom, right: p.Right, top: p.Top });
+  return new Director(cur!.model, hotspots, { left: p.Left, bottom: p.Bottom, right: p.Right, top: p.Top }, { pov });
 }
 
 function setDirector(on: boolean): void {
@@ -1284,6 +1297,7 @@ function exportOptions(): ExportOptions {
     height: h,
     fps: 30,
     director: $<HTMLInputElement>("export-director").checked,
+    pov: Number($<HTMLSelectElement>("export-pov").value) || 0,
   };
 }
 
@@ -1329,7 +1343,7 @@ $("export-start").onclick = async () => {
   try {
     const blob = await exportVideo(
       {
-        scene, model: cur.model, director: opts.director ? newDirector() : undefined, hotspots, playerColor,
+        scene, model: cur.model, director: opts.director ? newDirector(opts.pov) : undefined, hotspots, playerColor,
         minimap: () => {
           minimapAt = 0;
           drawMinimap();

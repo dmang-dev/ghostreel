@@ -30,6 +30,13 @@ import (
 //   - Upgrades: the same messages, sent once the owner has an upgrade, and
 //     ModelSwap, which replaces the model (Zerglings with Metabolic Boost
 //     grow wings).
+//   - Construction: the model the actor creates when the unit starts being
+//     built (UnitConstruction.<unit>.Start, Create <unit>Build), drawn with
+//     the building until it's done. A Terran building's own model rises out
+//     of the ground through its Build stages while this scaffolding
+//     (TerranBuild, scaled to the building) stands over it; a Zerg
+//     building grows inside its cocoon (ZergBuild); a Protoss one inside
+//     its warp-in matrix (ProtossBuild).
 //
 // Only what holds for a unit type on its own counts: messages on
 // ActorCreation or on UnitBirth of that type, and on an upgrade's arrival,
@@ -65,6 +72,7 @@ type look struct {
 	Idle     *idle    // nil: Stand
 	Model    string   // a CModel that replaces the unit's own; "" keeps it
 	Upgrades []string // upgrades that change the look, as the game data spells them
+	Build    string   // the CModel drawn with it while under construction; "" for none
 }
 
 // idle is the animation a unit plays when it isn't doing anything else.
@@ -100,6 +108,9 @@ func (lk look) extras() map[string]any {
 	}
 	if len(lk.Upgrades) > 0 {
 		out["upgrades"] = lk.Upgrades
+	}
+	if lk.Build != "" {
+		out["build"] = lk.Build
 	}
 	return out
 }
@@ -137,6 +148,9 @@ func (l *Library) unitLook(unit string, death bool, have []string) look {
 			return reflect.DeepEqual(with.drawn(), base.drawn())
 		})
 	}
+	if hasActor && !death {
+		lk.Build = l.constructionModel(unit, actor)
+	}
 	if lk.Model != "" {
 		id = lk.Model
 	}
@@ -150,6 +164,30 @@ func (l *Library) unitLook(unit string, death bool, have []string) look {
 		}
 	}
 	return lk
+}
+
+// constructionModel is the CModel the unit's actor creates when the unit
+// starts being built (see "Construction" above), or "" when there's none.
+// The created actor is a CActorModel whose model is its Model field, or the
+// CModel of its own name (BarracksBuild).
+func (l *Library) constructionModel(unit, actor string) string {
+	for _, ev := range l.actorEvents(actor) {
+		if ev.target != "" || !strings.EqualFold(ev.terms, "UnitConstruction."+unit+".Start") {
+			continue
+		}
+		f := strings.Fields(ev.send)
+		if len(f) != 2 || f[0] != "Create" || !safeName.MatchString(f[1]) || !l.actors.has("CActorModel", f[1]) {
+			continue
+		}
+		id := f[1]
+		if m, ok := l.actors.field("CActorModel", f[1], "Model"); ok && safeName.MatchString(m) {
+			id = m
+		}
+		if l.models.has("CModel", id) {
+			return id
+		}
+	}
+	return ""
 }
 
 // actorMessages applies to lk the messages a unit's actor sends itself when

@@ -109,6 +109,24 @@ export class UnitModels {
   }
 
   /**
+   * Loads the models of the given unit types ahead of time, with their death
+   * models and the models drawn beside them (attachments, construction), so
+   * a unit appearing for the first time doesn't show as a box while its
+   * model loads. Resolves when all have loaded or failed.
+   */
+  async preload(types: string[]): Promise<void> {
+    if (!this.available) return;
+    const companions = (t: Template | null) =>
+      t ? [...t.look.attach.map((a) => a.model), ...(t.look.build ? [t.look.build] : [])].map((id) => this.template(`model/${id}`)) : [];
+    await Promise.all(
+      [...new Set(types)].flatMap((type) => [
+        this.template(`unit/${type}`).then((t) => Promise.all(companions(t))),
+        this.template(`death/${type}`),
+      ]),
+    );
+  }
+
+  /**
    * Loads a template by API path under /api/assets ("unit/Marine",
    * "model/Rock?v=2"), once; null when the server has none.
    */
@@ -218,13 +236,23 @@ export class UnitInstance {
    * animations can't bind to their bones.
    */
   private readonly attached: { inst: UnitInstance; bone: THREE.Object3D; local: THREE.Matrix4 }[] = [];
+  /**
+   * The model drawn with a building while it's built (look.build): Terran
+   * scaffolding, a Zerg cocoon, a Protoss warp-in matrix. Loaded the first
+   * time the unit is posed under construction; null while it loads or when
+   * there's none.
+   */
+  private construction?: UnitInstance | null;
   private disposed = false;
 
   /**
    * load fetches an attached model's template by CModel id; loaded is
    * called when one is added, so the view can redraw.
    */
-  constructor(private readonly tpl: Template, team: THREE.Color, load?: (model: string) => Promise<Template | null>, loaded?: () => void) {
+  constructor(
+    private readonly tpl: Template, team: THREE.Color,
+    private readonly load?: (model: string) => Promise<Template | null>, private readonly loaded?: () => void,
+  ) {
     this.model = SkeletonUtils.clone(tpl.root);
     this.root.add(this.model);
     this.mixer = new THREE.AnimationMixer(this.model);
@@ -268,6 +296,7 @@ export class UnitInstance {
 
   setTeam(c: THREE.Color): void {
     for (const a of this.attached) a.inst.setTeam(c);
+    this.construction?.setTeam(c);
     if (this.team.equals(c)) return;
     this.team.copy(c);
     this.teamUniform.value.copy(c);
@@ -291,16 +320,19 @@ export class UnitInstance {
     }
     if (!this.warped) {
       this.warped = [];
-      this.root.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (!m.isMesh) return;
-        for (const mat of materialsOf(m) as THREE.MeshStandardMaterial[]) {
-          this.warped!.push({ mat, transparent: mat.transparent, opacity: mat.opacity, emissive: mat.emissive?.clone() ?? new THREE.Color(), depthWrite: mat.depthWrite });
-          mat.transparent = true;
-          mat.depthWrite = false;
-          mat.needsUpdate = true;
-        }
-      });
+      // The model and its attachments; the warp-in matrix around it shows as it is.
+      for (const r of [this.model, ...this.attached.map((a) => a.inst.root)]) {
+        r.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          for (const mat of materialsOf(m) as THREE.MeshStandardMaterial[]) {
+            this.warped!.push({ mat, transparent: mat.transparent, opacity: mat.opacity, emissive: mat.emissive?.clone() ?? new THREE.Color(), depthWrite: mat.depthWrite });
+            mat.transparent = true;
+            mat.depthWrite = false;
+            mat.needsUpdate = true;
+          }
+        });
+      }
     }
     for (const s of this.warped) {
       s.mat.opacity = s.opacity * (0.25 + 0.75 * w);
@@ -311,6 +343,7 @@ export class UnitInstance {
   /** Poses the model and its attachments for this frame. */
   pose(p: Pose): void {
     this.poseModel(p);
+    this.poseConstruction(p);
     for (const a of this.attached) {
       a.inst.pose({ action: "stand", time: p.time, speed: 0 });
       // The bone's transform within the model, as posed just now.
@@ -346,6 +379,21 @@ export class UnitInstance {
     const hold = p.action === "stand" && idle?.hold === true && !!info && idle.anim.every((w) => info!.words.includes(w));
     this.setWarp(warp);
     if (!info) {
+      this.play(undefined, 0);
+      return;
+    }
+    const dur = info.clip.duration;
+    if (p.action === "walk" && info.moveSpeed > 0 && p.speed > 0) {
+      t *= THREE.MathUtils.clamp(p.speed / info.moveSpeed, 0.5, 2);
+    }
+    if (hold) t = dur;
+    if (dur > 0) t = info.looping && p.action !== "death" && !hold ? t % dur : Math.min(t, dur - 1e-3);
+    this.play(info, t);
+  }
+
+  /** Shows a clip at a time (already wrapped or clamped to the clip); undefined: the bind pose. */
+  private play(info: ClipInfo | undefined, t: number): void {
+    if (!info) {
       if (this.current) {
         this.current.action.stop();
         this.current = undefined;
@@ -358,19 +406,38 @@ export class UnitInstance {
       action.play();
       this.current = { info, action };
     }
-    const dur = info.clip.duration;
-    if (p.action === "walk" && info.moveSpeed > 0 && p.speed > 0) {
-      t *= THREE.MathUtils.clamp(p.speed / info.moveSpeed, 0.5, 2);
-    }
-    if (hold) t = dur;
-    if (dur > 0) t = info.looping && p.action !== "death" && !hold ? t % dur : Math.min(t, dur - 1e-3);
     this.current.action.time = t;
     this.mixer.update(0);
+  }
+
+  /** Shows the construction model while the unit is being built, and hides it after. */
+  private poseConstruction(p: Pose): void {
+    const building = p.action === "build" && p.progress !== undefined && p.progress < 1;
+    const id = this.tpl.look.build;
+    if (building && id && this.construction === undefined && this.load) {
+      this.construction = null;
+      void this.load(id).then((t) => {
+        if (!t || this.disposed) return;
+        // Its template root carries the same turn as the unit's, so it
+        // stands at the unit's origin facing the same way.
+        const inst = new UnitInstance(t, this.team);
+        this.root.add(inst.root);
+        this.construction = inst;
+        this.loaded?.();
+      });
+    }
+    const c = this.construction;
+    if (!c) return;
+    c.root.visible = building;
+    if (!building) return;
+    const at = constructionPose(c.tpl.clips, p.progress!, p.buildTime ?? 45);
+    c.play(at?.info, at?.time ?? 0);
   }
 
   dispose(): void {
     this.disposed = true;
     for (const a of this.attached) a.inst.dispose();
+    this.construction?.dispose();
     this.mixer.stopAllAction();
     this.model.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -405,6 +472,45 @@ export function buildPose(clips: ClipInfo[], progress: number, seconds: number):
     return { info: st.start, time: Math.min(elapsed, st.start.clip.duration - 1e-3) };
   }
   return { info: st.stand!, time: elapsed - (st.start?.clip.duration ?? 0) };
+}
+
+/**
+ * The clip and time for a construction model (see UnitInstance.construction)
+ * at a point in the build, wrapped or clamped to the clip. Terran
+ * scaffolding ("Birth A Start", "Birth A Stand", ... C) and the Zerg cocoon
+ * ("Build A Start" ... C) go through their stages in equal shares of the
+ * build time; stage D, which has no stand clip, plays when the building is
+ * done, and by then the model is gone. The Protoss matrix plays "Stand
+ * Build Start", loops "Stand Build" and ends on "Stand Build End" as the
+ * build finishes. undefined when the model has none of these.
+ */
+export function constructionPose(clips: ClipInfo[], progress: number, seconds: number): { info: ClipInfo; time: number } | undefined {
+  const find = (w: string[]) => clips.find((c) => c.words.length === w.length && w.every((x, i) => c.words[i] === x));
+  const p = Math.min(Math.max(progress, 0), 1);
+  const elapsed = p * seconds;
+  const fit = (info: ClipInfo, t: number) => {
+    const dur = info.clip.duration;
+    return { info, time: dur <= 0 ? 0 : info.looping ? ((t % dur) + dur) % dur : Math.min(Math.max(t, 0), dur - 1e-3) };
+  };
+  for (const word of ["birth", "build"]) {
+    const stages = ["a", "b", "c", "d"]
+      .map((s) => ({ start: find([word, s, "start"]), stand: find([word, s, "stand"]) }))
+      .filter((s): s is { start: ClipInfo | undefined; stand: ClipInfo } => !!s.stand);
+    if (!stages.length) continue;
+    const k = Math.min(stages.length - 1, Math.floor(p * stages.length));
+    const st = stages[k];
+    const into = ((p * stages.length - k) * seconds) / stages.length;
+    if (st.start && into < st.start.clip.duration) return fit(st.start, into);
+    return fit(st.stand, into - (st.start?.clip.duration ?? 0));
+  }
+  const start = find(["stand", "build", "start"]);
+  const loop = find(["stand", "build"]);
+  const end = find(["stand", "build", "end"]);
+  if (!start && !loop && !end) return undefined;
+  const left = seconds - elapsed;
+  if (end && (left < end.clip.duration || !loop)) return fit(end, end.clip.duration - left);
+  if (start && (elapsed < start.clip.duration || !loop)) return fit(start, elapsed);
+  return fit(loop!, elapsed - (start?.clip.duration ?? 0));
 }
 
 const SKIP = new Set(["start", "end", "cover", "flail", "unload", "spell", "morph"]);

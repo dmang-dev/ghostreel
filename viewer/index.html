@@ -81,6 +81,9 @@
             <option value="1280x720" selected>720p</option><option value="1920x1080">1080p</option>
           </select></label>
           <label><input type="checkbox" id="export-director" checked /> Director camera</label>
+          <label title="Overview: the whole map when nothing is happening. A player's view: opens on their main base at the game's zoom and stays close, like their own camera.">Camera <select id="export-pov">
+            <option value="0">Overview</option>
+          </select></label>
           <p id="export-note" class="note"></p>
           <progress id="export-progress" max="1" value="0" hidden></progress>
           <div class="row">

@@ -129,6 +129,7 @@ In the browser, none of that is possible: browsers can't read your Battle.net ca
 - **Highlight reel:** the top 5, 8 or 12 hotspots that don't overlap, each with a title card and a few seconds before and after.
 - **Whole game:** start to finish.
 - **Options:** speed 1×–8× (1× is real time), 720p or 1080p, and the director's camera or the current view.
+- **Camera:** the director's **Overview** shows the whole map while nothing is happening and frames big fights wide. A **player's view** watches like that player's own camera in the game: it opens on their main base at the game's zoom, keeps fights framed close, and between them goes to their army, or back to their main base.
 
 The video is made in the app, frame by frame, as fast as your computer can draw it, and then saved as a download. A graphics card helps; on a machine without one it managed about 11 frames a second, roughly a third of real time at 30 fps. It needs WebCodecs, which Chrome, Edge, the Windows app and (recent) macOS have. The Linux app's WebKitGTK doesn't, so on Linux use `ghostreel serve` with Chrome or the browser build.
 

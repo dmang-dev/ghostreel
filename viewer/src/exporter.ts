@@ -23,6 +23,8 @@ export interface ExportOptions {
   fps: number;
   /** Let the director move the camera; otherwise the current view stays. */
   director: boolean;
+  /** The director's point of view: a player id (their own camera, roughly), or 0 for the overview. */
+  pov: number;
 }
 
 export interface ExportContext {

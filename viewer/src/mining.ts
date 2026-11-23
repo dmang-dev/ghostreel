@@ -15,7 +15,7 @@
 
 import { Source, type Keyframe, type Unit, type UnitType } from "./gen/timeline/v1/timeline_pb";
 
-const TOWNHALLS = new Set(["CommandCenter", "OrbitalCommand", "PlanetaryFortress", "Nexus", "Hatchery", "Lair", "Hive"]);
+export const TOWNHALLS = new Set(["CommandCenter", "OrbitalCommand", "PlanetaryFortress", "Nexus", "Hatchery", "Lair", "Hive"]);
 const REFINERY = /^(Assimilator|Refinery|Extractor)(Rich)?$/;
 const CYCLE = 112; // loops per gather round trip (the command tier's, measured on 4.10)
 const BASE_R = 2.75; // a town hall's radius, where workers drop off

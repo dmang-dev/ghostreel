@@ -2,7 +2,7 @@
 
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { buildPose, pickClip, type ClipInfo } from "./models";
+import { buildPose, constructionPose, pickClip, type ClipInfo } from "./models";
 
 const clips = (...names: string[]) =>
   names.map((name) => ({
@@ -90,5 +90,48 @@ describe("buildPose", () => {
     const birth = [clip("Birth", 4, false), clip("Stand", 1, true)].map((c) => ({ ...c, words: [c.clip.name.toLowerCase()] }));
     expect(buildPose(birth, 0.5, 40)).toMatchObject({ info: { clip: { name: "Birth" } }, time: 2 });
     expect(buildPose([clip("Stand", 1, true)], 0.5, 40)).toBeUndefined();
+  });
+});
+
+describe("constructionPose", () => {
+  const clip = (name: string, duration: number, looping: boolean) =>
+    ({ clip: { name, duration } as THREE.AnimationClip, words: name.toLowerCase().split(/\s+/), looping, moveSpeed: 0 }) as ClipInfo;
+  // TerranBuild's clips, as the converter names them.
+  const scaffold = [
+    clip("Birth A Start", 2, false), clip("Birth A Stand", 3, true),
+    clip("Birth B Start", 2, false), clip("Birth B Stand", 3, true),
+    clip("Birth C Start", 2, false), clip("Birth C Stand", 3, true),
+    clip("Birth D Start", 2, false),
+  ];
+
+  it("steps scaffolding through stages A to C, leaving D for the finish", () => {
+    // 60 s build: 20 s per stage.
+    expect(constructionPose(scaffold, 0.01, 60)).toMatchObject({ info: { clip: { name: "Birth A Start" } }, time: 0.6 });
+    const a = constructionPose(scaffold, 0.2, 60)!; // 12 s in: 10 s into A's stand, which loops every 3 s
+    expect(a.info.clip.name).toBe("Birth A Stand");
+    expect(a.time).toBeCloseTo(1, 5);
+    expect(constructionPose(scaffold, 0.34, 60)?.info.clip.name).toBe("Birth B Start");
+    expect(constructionPose(scaffold, 0.99, 60)?.info.clip.name).toBe("Birth C Stand");
+  });
+
+  it("does the same for a cocoon's Build stages", () => {
+    const cocoon = [clip("Build A Start", 1, false), clip("Build A Stand", 1, true), clip("Build B Stand", 1, true), clip("Build D Start", 1, false), clip("GLstand", 1, true)];
+    expect(constructionPose(cocoon, 0.1, 40)?.info.clip.name).toBe("Build A Stand");
+    expect(constructionPose(cocoon, 0.9, 40)?.info.clip.name).toBe("Build B Stand");
+  });
+
+  it("starts, loops and ends a warp-in matrix", () => {
+    const matrix = [clip("Stand Build Start", 2, false), clip("Stand Build", 4, true), clip("Stand Build End", 3, false), clip("GLstand", 1, true)];
+    expect(constructionPose(matrix, 0.02, 50)).toMatchObject({ info: { clip: { name: "Stand Build Start" } }, time: 1 });
+    const mid = constructionPose(matrix, 0.5, 50)!; // 25 s: 23 s into the loop
+    expect(mid.info.clip.name).toBe("Stand Build");
+    expect(mid.time).toBeCloseTo(3, 5);
+    const end = constructionPose(matrix, 0.98, 50)!; // 1 s left: 2 s into the 3 s end
+    expect(end.info.clip.name).toBe("Stand Build End");
+    expect(end.time).toBeCloseTo(2, 5);
+  });
+
+  it("gives up on a model with none of these", () => {
+    expect(constructionPose([clip("Stand", 1, true)], 0.5, 40)).toBeUndefined();
   });
 });

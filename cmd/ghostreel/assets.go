@@ -16,8 +16,9 @@ import (
 	"github.com/dmang-dev/ghostreel/internal/gamedata"
 )
 
-// cmdAssets converts unit models from the local game data into the cache the
-// viewer reads (the server also converts on demand; this warms the cache and
+// cmdAssets converts unit models from the local game data, with the models
+// drawn beside them (attachments, construction), into the cache the viewer
+// reads (the server also converts on demand; this warms the cache and
 // reports what is missing).
 func cmdAssets(args []string) error {
 	fs := flag.NewFlagSet("assets", flag.ExitOnError)
@@ -57,6 +58,14 @@ func cmdAssets(args []string) error {
 			continue
 		}
 		ok++
+		// What the viewer loads with it: its death model (many units have
+		// none), attachments, construction models.
+		_, _ = l.UnitGLB(t, true)
+		for _, id := range l.CompanionModels(t) {
+			if _, err := l.ModelGLB(id, 0); err != nil && !errors.Is(err, casc.ErrNotLocal) {
+				fmt.Printf("  %-26s %s: %v\n", t, id, err)
+			}
+		}
 		if *out != "" {
 			if err := os.MkdirAll(*out, 0o755); err != nil {
 				return err

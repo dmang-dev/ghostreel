@@ -28,7 +28,7 @@ import (
 )
 
 // Version is part of the cache path; bump it when the conversion changes.
-const Version = "a4"
+const Version = "a5"
 
 // mods are the dependencies of a ladder map, lowest priority first.
 var mods = []string{"core", "liberty", "libertymulti", "swarm", "swarmmulti", "void", "voidmulti"}
@@ -249,6 +249,22 @@ func (l *Library) ModelGLB(id string, variation int) ([]byte, error) {
 		extras := look{Scale: l.modelScale(id)}.extras()
 		return source{name: name, anims: l.models.list("CModel", id, "RequiredAnims"), extras: extras}, err
 	})
+}
+
+// CompanionModels lists the CModel ids the viewer loads beside a unit
+// type's own model (ModelGLB): its attachments and its construction model.
+func (l *Library) CompanionModels(unit string) []string {
+	lk := l.unitLook(unit, false, nil)
+	var out []string
+	for _, a := range lk.Attach {
+		if !slices.Contains(out, a.Model) {
+			out = append(out, a.Model)
+		}
+	}
+	if lk.Build != "" && !slices.Contains(out, lk.Build) {
+		out = append(out, lk.Build)
+	}
+	return out
 }
 
 // UnitGLB returns a unit type's model (or its death model) as binary glTF,
